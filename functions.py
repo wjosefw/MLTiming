@@ -2,6 +2,7 @@
 import numpy as np
 from numba import njit
 import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter1d
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -72,6 +73,7 @@ def normalize_by_max(array_pulsos):
 #----------------------------------------------------------------------------------------------
 
 def simpsons_rule_array(y, h):
+    """"Calculate integral using Simpsons' rule"""
     array = np.zeros(y.shape[0])
     n = y.shape[1]
 
@@ -157,15 +159,137 @@ def weights_definition(NM, Npoints):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30):
+def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = True):
     corrected_signal = np.zeros_like(vector)
     for i in range(vector.shape[0]):
       inverted_signal = np.roll(-vector[i,:],shift)
       inverted_signal[0:shift] = 0.
       fraction_signal = fraction*vector[i,:]
       corrected_signal[i,:] = inverted_signal + fraction_signal
-      plt.plot(corrected_signal[i,:])
+      if plot:
+        plt.plot(corrected_signal[i,:])
     return corrected_signal
 
 
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
 
+def pulso(t,t0, tau_rise = 15, tau_drop = 150, NOISE = True):
+  y = (1 - np.exp(-(t-t0)/tau_rise))*np.exp(-(t-t0)/tau_drop) 
+  y[y<0.] = 0.
+  if NOISE:
+    noise = np.random.normal(scale = 0.01, size = len(t)-t0)
+    smoothed_noise = gaussian_filter1d(noise, sigma = 10)
+    noise2 = np.random.normal(scale = 1e-4, size = t0)
+    y[t0:] = y[t0:] + smoothed_noise
+    y[:t0] = y[:t0] + noise2
+  y = y / np.max(y)
+  return y
+
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def delay_pulse_pair(pulse_set, time_step, delay_steps = 32, NOISE = True):
+  """"Function to delay a pair of two pulses a number of time points."""
+  
+  INPUT = np.zeros_like(pulse_set)
+  REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
+
+  NRD0 = np.random.randint(delay_steps, size = pulse_set.shape[0])
+  NRD1 = np.random.randint(delay_steps, size = pulse_set.shape[0])
+
+  for i in range(pulse_set.shape[0]):
+    N0 = NRD0[i]
+    INPUT[i,:,0] = np.roll(pulse_set[i,:,0],N0)
+
+    N1 = NRD1[i]
+    INPUT[i,:,1] = np.roll(pulse_set[i,:,1],N1)
+    REF[i] = time_step*(N0-N1) 
+  
+    if NOISE:
+      noise0 = np.random.normal(scale = 1e-3, size = N0)
+      noise1 = np.random.normal(scale = 1e-3, size = N1)
+      INPUT[i,0:N0,0] = noise0
+      INPUT[i,0:N1,1] = noise1
+    else:
+      INPUT[i,0:N0,0] = pulse_set[i,:,0]
+      INPUT[i,0:N1,1] = pulse_set[i,:,1]
+  
+  return INPUT, REF
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def delay_pulse_4_channels(pulse_set, time_step, delay_steps = 20, NOISE = True):
+  """"Function to delay a pair of two pulses a number of time points.
+   First I delay the two pulses the same amount on channel zero and two.
+    And then a different amount between each other in channel one and three. 
+    That way I can have two reference time differences. The time
+    differences betweem channel zero-one and two-three."""
+
+  INPUT = np.zeros((pulse_set.shape[0],pulse_set.shape[1], 4))
+  REF_pulse1_delayed = np.zeros((pulse_set.shape[0],),dtype = np.float32)
+  REF_pulse2_delayed = np.zeros((pulse_set.shape[0],),dtype = np.float32)
+
+
+  NRD0 = np.random.randint(delay_steps, size = pulse_set.shape[0])
+  NRD1 = np.random.randint(delay_steps, size = pulse_set.shape[0])
+  NRD2 = np.random.randint(delay_steps, size = pulse_set.shape[0])
+
+  for i in range(pulse_set.shape[0]):
+    N0 = NRD0[i]
+    INPUT[i,:,0] = np.roll(pulse_set[i,:,0],N0)
+    INPUT[i,:,2] = np.roll(pulse_set[i,:,1],N0)
+
+    N1 = NRD1[i]
+    INPUT[i,:,1] = np.roll(pulse_set[i,:,0],N1)
+
+    N2 = NRD2[i]
+    INPUT[i,:,3] = np.roll(pulse_set[i,:,1],N2)
+
+
+    REF_pulse1_delayed[i] = time_step*(N0-N1) 
+    REF_pulse2_delayed[i] = time_step*(N0-N2)  
+
+    if NOISE:
+      noise00 = np.random.normal(scale = 0.01, size = pulse_set.shape[1])
+      noise11 = np.random.normal(scale = 0.01, size = pulse_set.shape[1])
+      noise22 = np.random.normal(scale = 0.01, size = pulse_set.shape[1])
+      smoothed_noise_00 = gaussian_filter1d(noise00, sigma = 10)
+      smoothed_noise_11 = gaussian_filter1d(noise11, sigma = 10)
+      smoothed_noise_22 = gaussian_filter1d(noise22, sigma = 10)
+      INPUT[i,0:N0,0] = smoothed_noise_00[0:N0]
+      INPUT[i,0:N0,2] = smoothed_noise_00[0:N0]
+      INPUT[i,0:N1,1] = smoothed_noise_11[0:N1]
+      INPUT[i,0:N2,3] = smoothed_noise_22[0:N2]
+    else:
+      INPUT[i,0:N0,0] = pulse_set[i,0:N0,0]
+      INPUT[i,0:N0,2] = pulse_set[i,0:N0,1]
+      INPUT[i,0:N1,1] = pulse_set[i,0:N1,0]
+      INPUT[i,0:N2,3] = pulse_set[i,0:N2,1]
+
+  return INPUT, REF_pulse1_delayed, REF_pulse2_delayed    
+
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+
+def get_mean_pulse_from_set(pulse_set, channel = 0):
+    transforms = []
+    
+    for i in range(pulse_set.shape[0]):
+        fourier_transform = np.fft.fft(pulse_set[i,:,channel])
+        transforms.append(fourier_transform)
+    
+    transforms = np.array(transforms, dtype='object')
+    sum_of_transf = np.sum(transforms, axis = 0) #sum all fourier transforms
+    reconstructed_signal = np.fft.ifft(sum_of_transf) #inverse fourier transf.
+    normalized_reconstructed_signal = reconstructed_signal/np.max(reconstructed_signal)
+    mean_pulse = np.real(normalized_reconstructed_signal)
+    
+    return mean_pulse
+
+    
+   
