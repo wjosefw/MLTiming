@@ -190,8 +190,10 @@ def pulso(t,t0, tau_rise = 15, tau_drop = 150, NOISE = True):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def delay_pulse_pair(pulse_set, time_step, delay_steps = 32, NOISE = True):
-  """"Function to delay a pair of two pulses a number of time points."""
+def delay_pulse_pair(pulse_set, time_step, t_shift = 0, delay_steps = 32, NOISE = True):
+  """"Function to delay a pair of two pulses a number of time points.
+  t_shift is defined positive if channel one is delayed with respect 
+  to channel zero and negative the other way around."""
   
   INPUT = np.zeros_like(pulse_set)
   REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
@@ -205,7 +207,7 @@ def delay_pulse_pair(pulse_set, time_step, delay_steps = 32, NOISE = True):
 
     N1 = NRD1[i]
     INPUT[i,:,1] = np.roll(pulse_set[i,:,1],N1)
-    REF[i] = time_step*(N0-N1) 
+    REF[i] = time_step*(N0-N1-t_shift) 
   
     if NOISE:
       noise0 = np.random.normal(scale = 1e-3, size = N0)
@@ -222,11 +224,20 @@ def delay_pulse_pair(pulse_set, time_step, delay_steps = 32, NOISE = True):
 #----------------------------------------------------------------------------------------------
 
 def delay_pulse_4_channels(pulse_set, time_step, delay_steps = 20, NOISE = True):
-  """"Function to delay a pair of two pulses a number of time points.
-   First I delay the two pulses the same amount on channel zero and two.
-    And then a different amount between each other in channel one and three. 
-    That way I can have two reference time differences. The time
-    differences betweem channel zero-one and two-three."""
+  """
+    Delays pulses and optionally adds noise to create reference time differences between channels.
+    
+    Parameters:
+        pulse_set (np.array): Array of pulse signals.
+        time_step (float): Time step value for calculating reference time differences.
+        delay_steps (int): Maximum delay steps for rolling the pulses.
+        NOISE (bool): Flag to add Gaussian noise to the signals.
+    
+    Returns:
+        np.array: Modified pulse signals with delays and optional noise.
+        np.array: Time differences between channel 0 and 1.
+        np.array: Time differences between channel 2 and 3.
+  """
 
   INPUT = np.zeros((pulse_set.shape[0],pulse_set.shape[1], 4))
   REF_pulse1_delayed = np.zeros((pulse_set.shape[0],),dtype = np.float32)
@@ -286,10 +297,63 @@ def get_mean_pulse_from_set(pulse_set, channel = 0):
     transforms = np.array(transforms, dtype='object')
     sum_of_transf = np.sum(transforms, axis = 0) #sum all fourier transforms
     reconstructed_signal = np.fft.ifft(sum_of_transf) #inverse fourier transf.
-    normalized_reconstructed_signal = reconstructed_signal/np.max(reconstructed_signal)
-    mean_pulse = np.real(normalized_reconstructed_signal)
+    normalized_recontructed_signal = reconstructed_signal / np.max(reconstructed_signal)
+    mean_pulse = np.real(normalized_recontructed_signal)
     
     return mean_pulse
 
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+
+def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, channel=0):
+    """
+    Aligns each pulse in a set with a reference pulse by shifting it to minimize MSE.
+    
+    Parameters:
+        reference (np.array): The reference pulse.
+        pulse_set (np.array): The set of pulses to align.
+        start (int): Start index for slicing the pulses.
+        stop (int): Stop index for slicing the pulses.
+        max_delay (int): Maximum delay allowed for shifting.
+        channel (int): Channel index to use from pulse_set.
+    
+    Returns:
+        np.array: Array of delay steps for each pulse to achieve minimum MSE.
+        np.array: Array of moved pulses corresponding to the minimal MSE alignment.
+    """
+
+    if int(stop-start) <= max_delay:
+       print('Window (stop-start) cannot be smaller than max_delay')
+
+    y1 = reference[start:stop]
+    delays = []
+    moved_pulses = []
+    for i in range(pulse_set.shape[0]):
+        mse = []
+        y2_list = []
+        y2 = pulse_set[i, start:stop, channel]
+        for j in range(-max_delay, max_delay + 1):  # j goes from -max_delay to max_delay
+            y2_rolled = np.roll(y2, j)
+            # Correct edges based on shift direction
+            if j < 0:
+                y2_rolled[j:] = pulse_set[i, stop:stop + abs(j), channel]
+            if j >= 0:
+                y2_rolled[:j] = pulse_set[i, :j, channel]
+            mse.append(np.mean((y1 - y2_rolled)**2))
+            y2_list.append(y2_rolled)
+        
+        mse = np.array(mse)
+        min_mse_index = np.argmin(mse)
+        delay_steps = min_mse_index - max_delay  # adjust index to reflect actual shift
+        delays.append(delay_steps)
+        
+        y2_array = np.array(y2_list)
+        moved_pulses.append(y2_array[min_mse_index])  # Reuse min_mse_index to avoid recomputation
+
+    return np.array(delays), np.array(moved_pulses)
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
     
    
