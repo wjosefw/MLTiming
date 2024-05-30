@@ -7,17 +7,29 @@ from scipy.ndimage import gaussian_filter1d
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def fix_imbalances(vector, value=0, window = 0.4):
-    """ Function to remove random elements
-    of an array centered around a specific
-    value """
+def fix_imbalances(vector, value = 0, window = 0.4):
+    """
+    Remove random elements of an array centered around a specific value.
+
+    Parameters:
+    vector (array-like): The input data array.
+    value (float, optional): The central value around which to remove elements. Default is 0.
+    window (float, optional): The range around the central value within which elements are considered for removal. Default is 0.4.
+
+    Returns:
+    array-like: Indices of the elements to be deleted.
+    """
+    # Calculate the upper and lower thresholds around the specified value
     top_threshold = value + window
     lower_threshold = value - window    
+    # Find the indices of elements within the specified range
     index = np.where((vector > lower_threshold) & (vector < top_threshold))[0]
+    # Randomly shuffle the indices
     np.random.shuffle(index)
-    index_to_delete = index[:int(0.5*index.shape[0])]
+    # Select half of the indices for deletion
+    index_to_delete = index[:int(0.5 * index.shape[0])]
+    # Return the indices to be deleted
     return index_to_delete
-
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -36,8 +48,21 @@ def gauss_fit(x, y):
 #----------------------------------------------------------------------------------------------
 
 def momentos(vector):
+  """
+    Calculate the moments of a vector using different weight functions.
+
+    Parameters:
+    vector (array-like): The input data array with shape (Nev, Nt, Nc),
+                         where Nev is the number of events, Nt is the number of time points,
+                         and Nc is the number of channels.
+
+    Returns:
+    array-like: An array of moments calculated using different weight functions. The shape of the 
+                returned array is (Nev, number_of_moments, Nc).
+  """
+
   Nev,Nt,Nc = np.shape(vector)    #Nev: Núm eventos, Nt: Núm puntos temporales, Nc: Número canales
-  t = np.reshape(np.linspace(0,Nt, Nt)/float(Nt),(1,-1,1))#Normalized array of time
+  t = np.reshape(np.linspace(0,Nt, Nt)/float(Nt),(1,-1,1)) #Normalized array of time
   MOMENT = np.zeros((Nev,0,Nc))
 
   for i in range(4): #Number of moments used
@@ -96,45 +121,123 @@ def simpsons_rule_array(y, h):
 
 from scipy import signal
 
-def get_correlation(ref_pulse, pulse_set, channel = 0):
-  """Function to calculate the correlation of a
-  reference pulse to every pulse in a set"""
-  y1 = ref_pulse
-  n = len(y1)
-  correlation = []
-  for i in range(pulse_set.shape[0]):
-    y2 = pulse_set[i,:,channel]
-    corr = signal.correlate(y2, y1, mode = 'same')
-    correlation.append(corr[n//2]) #Correlation at delay zero
-  correlation = np.array(correlation)
-  return correlation
+def get_correlation(ref_pulse, pulse_set, channel=0):
+    """
+    Calculate the correlation of a reference pulse with every pulse in a set.
+
+    Parameters:
+    ref_pulse (array-like): The reference pulse to compare against.
+    pulse_set (array-like): A set of pulses to search through. Expected shape is (num_pulses, pulse_length, num_channels).
+    channel (int, optional): The channel of the pulses to use for comparison. Default is 0.
+
+    Returns:
+    array-like: An array of correlation values between the reference pulse and each pulse in the set.
+    """
+
+    y1 = ref_pulse
+    n = len(y1)
+    correlation = []
+
+    for i in range(pulse_set.shape[0]):
+        
+        y2 = pulse_set[i, :, channel]
+        corr = signal.correlate(y2, y1, mode = 'same')
+        correlation.append(corr[n // 2])  # Append the correlation at delay zero to the list
+    correlation = np.array(correlation)
+    return correlation
+
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
 def get_closest(ref_pulse, pulse_set, channel = 0):
-  """Function to calculate the most similar
-  pulse in a set to a reference one"""
+  """
+    Calculate the index of the pulse in a set that is most similar to a reference pulse.
+
+    Parameters:
+    ref_pulse (array-like): The reference pulse to compare against.
+    pulse_set (array-like): A set of pulses to search through. Expected shape is (num_pulses, pulse_length, num_channels).
+    channel (int, optional): The channel of the pulses to use for comparison. Default is 0.
+
+    Returns:
+    int: The index of the pulse in pulse_set that is most similar to ref_pulse.
+    """
+  
   y1 = ref_pulse
   mse = []
+
   for i in range(pulse_set.shape[0]):
     y2 = pulse_set[i,:,channel]
     mse.append(np.mean((y1-y2)**2))
+  
   mse = np.array(mse)
   sorted_indices = np.argsort(mse)
-  index_of_closest = sorted_indices[1]
+  index_of_closest = sorted_indices[1]  # Get the index of the closest pulse, excluding the first one (which is the reference pulse itself)
+
   return index_of_closest
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
 def create_set(og_set, channel = 0):
-  new_set = np.zeros_like(og_set)
-  for i in range(og_set.shape[0]):
-    closest = get_closest(og_set[i,:,channel], og_set, channel = channel)
-    new_set[i,:,0] = og_set[i,:,channel]
-    new_set[i,:,1] = og_set[closest,:,channel]
-  return new_set
+    """
+    Create a new set of pulses where each pulse is paired with its closest match from the original set.
+
+    Parameters:
+    og_set (array-like): The original set of pulses. Expected shape is (num_pulses, pulse_length, num_channels).
+    channel (int, optional): The channel of the pulses to use for finding the closest match. Default is 0.
+
+    Returns:
+    array-like: A new set of pulses where each pulse in the original set is paired with its closest match.
+                The returned set has shape (num_pulses, pulse_length, 2), where the first channel is the original pulse
+                and the second channel is the closest matching pulse.
+    """
+    
+    new_set = np.zeros_like(og_set)
+  
+    for i in range(og_set.shape[0]):
+        
+        closest = get_closest(og_set[i, :, channel], og_set, channel = channel)  # Find the index of the closest pulse to the current pulse
+        new_set[i, :, 0] = og_set[i, :, channel]         # Assign the original pulse to the first channel of the new set
+        new_set[i, :, 1] = og_set[closest, :, channel] # Assign the closest matching pulse to the second channel of the new set
+
+    return new_set
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift = 8, NOISE = True):
+    """
+    Create a new position for the pulse set by shifting one channel and optionally adding noise.
+
+    Parameters:
+    pulse_set (np.ndarray): The input pulse set array of shape (N_pulse_pairs, n_time_points, n_channels).
+    channel_to_move (int): The index of the channel to be shifted. Default is 1.
+    channel_to_fix (int): The index of the channel to remain fixed. Default is 0.
+    t_shift (int): The number of time points to shift the channel. Default is 8.
+    NOISE (bool): Whether to add noise to the shifted channel. Default is True.
+
+    Returns:
+    np.ndarray: The new pulse set array with the specified channel shifted and optionally noise added.
+    """
+
+    New_position = np.zeros_like(pulse_set)
+    
+    for i in range(New_position.shape[0]):
+        
+        New_position[i,:,channel_to_fix] = pulse_set[i,:,channel_to_fix]
+        New_position[i,:,channel_to_move] = np.roll(pulse_set[i,:,channel_to_move], t_shift)
+        
+        if NOISE:
+            noise00 = np.random.normal(scale = 1e-3, size = t_shift)
+            noise0 = np.random.normal(scale = 0.01, size = New_position.shape[1])
+            smoothed_noise = gaussian_filter1d(noise0, sigma = 10)
+            New_position[i,:,channel_to_move] = New_position[i,:,channel_to_move]  + smoothed_noise
+            New_position[i,:t_shift,channel_to_move] = noise00
+        else:
+            New_position[i,:t_shift,channel_to_move] = pulse_set[i,:t_shift,channel_to_move]
+    
+    return New_position
 
 
 #----------------------------------------------------------------------------------------------
@@ -187,41 +290,177 @@ def pulso(t,t0, tau_rise = 15, tau_drop = 150, NOISE = True):
   return y
 
 
+
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def delay_pulse_pair(pulse_set, time_step, t_shift = 0, delay_steps = 32, NOISE = True):
-  """"Function to delay a pair of two pulses a number of time points.
-  t_shift is defined positive if channel one is delayed with respect 
-  to channel zero and negative the other way around."""
+
+def pulso_sigmoid(t,t0, A=100, center_window=0.3, rise_window=0.2, tau_rise = 15, tau_drop = 150, NOISE = True):
+
+  if NOISE:
+    t0 = t0 + np.random.uniform(-center_window, center_window)
+    tau_rise = tau_rise + np.random.uniform(-rise_window, rise_window)
+    noise = np.random.normal(scale = 0.01, size = len(t))
+    smoothed_noise = gaussian_filter1d(noise, sigma = 10)
+    y = A*(1/(1 + np.exp(-(t-t0)/tau_rise)))*np.exp(-(t-t0)/tau_drop) 
+    y = y + smoothed_noise
   
-  INPUT = np.zeros_like(pulse_set)
-  REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
-
-  NRD0 = np.random.randint(delay_steps, size = pulse_set.shape[0])
-  NRD1 = np.random.randint(delay_steps, size = pulse_set.shape[0])
-
-  for i in range(pulse_set.shape[0]):
-    N0 = NRD0[i]
-    INPUT[i,:,0] = np.roll(pulse_set[i,:,0],N0)
-
-    N1 = NRD1[i]
-    INPUT[i,:,1] = np.roll(pulse_set[i,:,1],N1)
-    REF[i] = time_step*(N0-N1-t_shift) 
+  else:
+    y = A*(1/(1 + np.exp(-(t-t0)/tau_rise)))*np.exp(-(t-t0)/tau_drop)  
   
+  y = y / np.max(y)
+  return y
+
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def pulso_poisson(t, t0, A=1000, center_window=0.3, rise_window=0.2, tau_rise=15, tau_drop=150, NOISE=True):
+    """
+    Generate a pulse with optional noise.
+
+    Parameters:
+    t (array-like): The time array.
+    t0 (float): The central time around which the pulse is centered.
+    A (float, optional): The amplitude of the pulse. Default is 1000.
+    center_window (float, optional): The range around t0 to randomly vary the central time. Default is 0.3.
+    rise_window (float, optional): The range to randomly vary the rise time. Default is 0.2.
+    tau_rise (float, optional): The rise time constant. Default is 15.
+    tau_drop (float, optional): The drop time constant. Default is 150.
+    NOISE (bool, optional): Whether to add noise to the pulse. Default is True.
+
+    Returns:
+    array-like: The generated pulse.
+    """
+   
+    centro = t0 + np.random.uniform(-center_window, center_window)
+    tau_rise = tau_rise + np.random.uniform(-rise_window, rise_window)
+    y = A * (1 - np.exp(-(t - centro) / tau_rise)) * np.exp(-(t - centro) / tau_drop)
+    y[y < 0.] = 0.
+    
     if NOISE:
-      noise0 = np.random.normal(scale = 1e-3, size = N0)
-      noise1 = np.random.normal(scale = 1e-3, size = N1)
-      INPUT[i,0:N0,0] = noise0
-      INPUT[i,0:N1,1] = noise1
-    else:
-      INPUT[i,0:N0,0] = pulse_set[i,:,0]
-      INPUT[i,0:N1,1] = pulse_set[i,:,1]
-  
-  return INPUT, REF
+        noise = np.random.normal(scale=0.01, size=len(t))
+        smoothed_noise = gaussian_filter1d(noise, sigma=100)
+        y = y + np.random.poisson(y) + smoothed_noise
+    
+    y = y / np.max(y)
+    return y
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
+
+def pulso_escalon(t,t0, A = 1):
+  y = np.zeros_like(t) 
+  y[:t0] = 0.
+  y[t0:] = A
+  return y
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def delay_pulse_pair(pulse_set, time_step, t_shift = 0, delay_steps=32, NOISE=True):
+    """
+    Function to apply random delays to each pulse in a pair, calculate a reference time difference,
+    and optionally add noise to the delayed pulses.
+
+    Parameters:
+    - pulse_set (array): Array of pulse pairs. Shape is (N, M, 2) where N is number of pulse pairs,
+                         M is number of time points, and '2' indicates two channels.
+    - time_step (float): The time interval between consecutive time points in the data.
+    - t_shift (int, optional): Initial time shift applied between two channels. Positive values indicate
+                               that channel 1 is delayed relative to channel 0, and negative values the opposite.
+    - delay_steps (int, optional): Maximum number of delay steps to apply.
+    - NOISE (bool, optional): If True, random Gaussian noise is added to the beginning of the pulses.
+
+    Returns:
+    - INPUT (array): Array containing the delayed pulses with the same shape as pulse_set.
+    - REF (array): Array of reference time differences adjusted for the initial shift, t_shift.
+
+    """
+    
+    INPUT = np.zeros_like(pulse_set)
+    REF = np.zeros((pulse_set.shape[0],), dtype=np.float32)
+
+    NRD0 = np.random.randint(delay_steps, size=pulse_set.shape[0])
+    NRD1 = np.random.randint(delay_steps, size=pulse_set.shape[0])
+
+    for i in range(pulse_set.shape[0]):
+        N0 = NRD0[i]
+        INPUT[i, :, 0] = np.roll(pulse_set[i, :, 0], N0)
+
+        N1 = NRD1[i]
+        INPUT[i, :, 1] = np.roll(pulse_set[i, :, 1], N1)
+
+        # Calculate the reference time difference taking into account the delays and initial time shift.
+        REF[i] = time_step * (N0 - N1 - t_shift)
+
+        # Add noise to the beginning of the pulses, if enabled.
+        if NOISE:
+            noise0 = np.random.normal(scale=1e-3, size=N0)
+            noise1 = np.random.normal(scale=1e-3, size=N1)
+            INPUT[i, 0:N0, 0] = noise0
+            INPUT[i, 0:N1, 1] = noise1
+        else:
+            # If no noise, retain the original pulses in the delayed sections.
+            INPUT[i, 0:N0, 0] = pulse_set[i,0:N0, 0]
+            INPUT[i, 0:N1, 1] = pulse_set[i,0:N1, 1]
+
+    return INPUT, REF
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def create_and_delay_pulse_pair(pulse_set, time_step, delay_steps = 32, NOISE = True):
+    """
+    Function to create pulses pairs and apply random delays to each other, calculate a reference 
+    time difference, and optionally add noise to the delayed pulses.
+
+    Parameters:
+    - pulse_set (array): Array of pulses. Shape is (N, M) where N is number of pulses,
+                         M is number of time points.
+    - time_step (float): The time interval between consecutive time points in the data.
+    - delay_steps (int, optional): Maximum number of delay steps to apply.
+    - NOISE (bool, optional): If True, random Gaussian noise is added to the beginning of the pulses.
+
+    Returns:
+    - INPUT (array): Array containing the delayed pulses with the same shape as pulse_set.
+    - REF (array): Array of reference time differences adjusted for the initial shift, t_shift.
+
+    """
+    
+    INPUT = np.zeros((pulse_set.shape[0],pulse_set.shape[1],2))
+    REF = np.zeros((pulse_set.shape[0],), dtype=np.float32)
+
+    NRD0 = np.random.randint(delay_steps, size=pulse_set.shape[0])
+    NRD1 = np.random.randint(delay_steps, size=pulse_set.shape[0])
+
+    for i in range(pulse_set.shape[0]):
+        N0 = NRD0[i]
+        INPUT[i, :, 0] = np.roll(pulse_set[i, :], N0)
+
+        N1 = NRD1[i]
+        INPUT[i, :, 1] = np.roll(pulse_set[i, :], N1)
+
+        # Calculate the reference time difference taking into account the delays and initial time shift.
+        REF[i] = time_step * (N0 - N1)
+
+        # Add noise to the beginning of the pulses, if enabled.
+        if NOISE:
+            noise0 = np.random.normal(scale=1e-3, size=N0)
+            noise1 = np.random.normal(scale=1e-3, size=N1)
+            INPUT[i, 0:N0, 0] = noise0
+            INPUT[i, 0:N1, 1] = noise1
+        else:
+            # If no noise, retain the original pulses in the delayed sections.
+            INPUT[i, 0:N0, 0] = pulse_set[i,0:N0]
+            INPUT[i, 0:N1, 1] = pulse_set[i,0:N1]
+
+    return INPUT, REF
+
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
 
 def delay_pulse_4_channels(pulse_set, time_step, delay_steps = 20, NOISE = True):
   """
@@ -286,20 +525,29 @@ def delay_pulse_4_channels(pulse_set, time_step, delay_steps = 20, NOISE = True)
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-
 def get_mean_pulse_from_set(pulse_set, channel = 0):
+    """
+    Calculate the mean pulse from a set of pulses using Fourier transforms.
+
+    Parameters:
+    pulse_set (array-like): The input set of pulses. Expected shape is (num_pulses, pulse_length, num_channels).
+    channel (int, optional): The channel of the pulses to use for calculation. Default is 0.
+
+    Returns:
+    array-like: The mean pulse calculated from the set of pulses.
+    """
     transforms = []
     
     for i in range(pulse_set.shape[0]):
-        fourier_transform = np.fft.fft(pulse_set[i,:,channel])
+        fourier_transform = np.fft.fft(pulse_set[i, :, channel])
         transforms.append(fourier_transform)
     
     transforms = np.array(transforms, dtype='object')
-    sum_of_transf = np.sum(transforms, axis = 0) #sum all fourier transforms
-    reconstructed_signal = np.fft.ifft(sum_of_transf) #inverse fourier transf.
-    normalized_recontructed_signal = reconstructed_signal / np.max(reconstructed_signal)
-    mean_pulse = np.real(normalized_recontructed_signal)
-    
+    sum_of_transf = np.sum(transforms, axis = 0)
+    reconstructed_signal = np.fft.ifft(sum_of_transf)
+    normalized_reconstructed_signal = reconstructed_signal / np.max(reconstructed_signal)
+    mean_pulse = np.real(normalized_reconstructed_signal)
+  
     return mean_pulse
 
 #----------------------------------------------------------------------------------------------
@@ -323,7 +571,7 @@ def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, cha
         np.array: Array of moved pulses corresponding to the minimal MSE alignment.
     """
 
-    if int(stop-start) <= max_delay:
+    if int(stop-start) < max_delay:
        print('Window (stop-start) cannot be smaller than max_delay')
 
     y1 = reference[start:stop]
@@ -356,4 +604,4 @@ def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, cha
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
     
-   
+    
