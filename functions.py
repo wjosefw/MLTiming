@@ -3,6 +3,7 @@ import numpy as np
 from numba import njit
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
+import torch
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -47,7 +48,7 @@ def gauss_fit(x, y):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def momentos(vector):
+def momentos(vector, order = 4):
   """
     Calculate the moments of a vector using different weight functions.
 
@@ -65,34 +66,84 @@ def momentos(vector):
   t = np.reshape(np.linspace(0,Nt, Nt)/float(Nt),(1,-1,1)) #Normalized array of time
   MOMENT = np.zeros((Nev,0,Nc))
 
-  for i in range(4): #Number of moments used
-    W = t**(i+1)
+  for i in range(order): #Number of moments used
+    W = t**(i) 
     W = np.tile(W,(Nev,1,Nc))
     MM = np.sum(vector*W,axis=1,keepdims=True)
     MOMENT = np.append(MOMENT,MM,axis=1)
 
-    W = np.exp(-(i)*t)
-    W = np.tile(W,(Nev,1,Nc))
-    MM = np.sum(vector*W,axis=1,keepdims=True)
-    MOMENT = np.append(MOMENT,MM,axis=1)
+    #W = np.exp(-(i)*t)
+    #W = np.tile(W,(Nev,1,Nc))
+    #MM = np.sum(vector*W,axis=1,keepdims=True)
+    #MOMENT = np.append(MOMENT,MM,axis=1)
 
-    W = np.exp(-(t**i))
-    W = np.tile(W,(Nev,1,Nc))
-    MM = np.sum(vector*W,axis=1,keepdims=True)
-    MOMENT = np.append(MOMENT,MM,axis=1)
+    #W = np.exp(-(t**(i)))
+    #W = np.tile(W,(Nev,1,Nc))
+    #MM = np.sum(vector*W,axis=1,keepdims=True)
+    #MOMENT = np.append(MOMENT,MM,axis=1)
 
   return MOMENT
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-@njit
-def normalize_by_max(array_pulsos):
-  y = np.zeros_like(array_pulsos)
-  for i in range(array_pulsos.shape[0]):
-    y[i,:,0] =  array_pulsos[i,:,0] / np.max(array_pulsos[i,:,0])
-    y[i,:,1] =  array_pulsos[i,:,1] / np.max(array_pulsos[i,:,1])
-  return y
+
+def normalize_by_max(array_pulsos, fit_polynomial=True):
+    """
+    Normalize pulse data by the maximum value, optionally fitting a polynomial 
+    for better normalization.
+
+    Parameters:
+    array_pulsos (numpy.ndarray): 3D array of pulse data with shape (n_pulses, n_samples, n_channels).
+    fit_polynomial (bool): If True, fit a polynomial to a window around the maximum 
+                           value before normalization. Defaults to True.
+
+    Returns:
+    numpy.ndarray: Normalized pulse data with the same shape as input.
+    """
+    # Initialize the output array with zeros, same shape as input
+    y = np.zeros_like(array_pulsos)
+    
+    if fit_polynomial:
+        # Loop over each pulse
+        for i in range(array_pulsos.shape[0]):
+            # Find the index of the maximum value in each channel
+            index_max_channel0 = np.argmax(array_pulsos[i, :, 0])
+            index_max_channel1 = np.argmax(array_pulsos[i, :, 1])
+        
+            # Define the window around the maximum value
+            lower_window_channel0 = max(index_max_channel0 - 30, 0)
+            lower_window_channel1 = max(index_max_channel1 - 30, 0)
+            higher_window_channel0 = min(index_max_channel0 + 30, array_pulsos.shape[1])
+            higher_window_channel1 = min(index_max_channel1 + 30, array_pulsos.shape[1])
+
+            # Extract the values within the window for each channel
+            y_channel0 = array_pulsos[i, lower_window_channel0:higher_window_channel0, 0]
+            y_channel1 = array_pulsos[i, lower_window_channel1:higher_window_channel1, 1]
+        
+            # Create the x values corresponding to the window
+            x_channel0 = np.arange(lower_window_channel0, higher_window_channel0)
+            x_channel1 = np.arange(lower_window_channel1, higher_window_channel1)
+
+            # Fit a 2nd-degree polynomial to the data in the window
+            r_channel0 = np.polyfit(x_channel0, y_channel0, 2)
+            r_channel1 = np.polyfit(x_channel1, y_channel1, 2)
+        
+            # Calculate the polynomial values
+            y_channel0 = r_channel0[0]*x_channel0**2 + r_channel0[1]*x_channel0 + r_channel0[2]
+            y_channel1 = r_channel1[0]*x_channel1**2 + r_channel1[1]*x_channel1 + r_channel1[2]
+        
+            # Normalize the original pulse data by the maximum value of the fitted polynomial
+            y[i, :, 0] = array_pulsos[i, :, 0] / np.max(y_channel0)
+            y[i, :, 1] = array_pulsos[i, :, 1] / np.max(y_channel1)
+    
+    else:
+        # If no polynomial fitting is required, normalize directly by the maximum value in each channel
+        for i in range(array_pulsos.shape[0]):
+            y[i, :, 0] = array_pulsos[i, :, 0] / np.max(array_pulsos[i, :, 0])
+            y[i, :, 1] = array_pulsos[i, :, 1] / np.max(array_pulsos[i, :, 1])
+    
+    return y
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -115,6 +166,51 @@ def simpsons_rule_array(y, h):
       array[i] = integral
 
     return array
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+
+def normalize(data, method='standardization'):
+    """
+    Normalizes the data using the specified method and returns the normalized data along with the parameters.
+    
+    Parameters:
+        data (numpy.ndarray): The data to be normalized (shape: N x M x 2).
+        method (str): The normalization method ('min-max', 'max', 'standardization'). Default is 'standardization'.
+        
+    Returns:
+        tuple: The normalized data, normalization parameters (depends on the method).
+    """
+    if method not in ['min-max', 'max', 'standardization']:
+        raise ValueError("Invalid method. Choose from 'min-max', 'max', 'standardization'.")
+
+    if method == 'min-max':
+        min_vals = np.min(data[:, :, 0], axis=0)
+        max_vals = np.max(data[:, :, 0], axis=0)
+        params = (min_vals, max_vals)
+        normalized_data_dec0 = (data[:, :, 0] - min_vals) / (max_vals - min_vals)
+        normalized_data_dec1 = (data[:, :, 1] - min_vals) / (max_vals - min_vals)
+    
+    elif method == 'max':
+        max_vals = np.max(data[:, :, 0], axis=0)
+        params = max_vals
+        normalized_data_dec0 = data[:, :, 0] / max_vals
+        normalized_data_dec1 = data[:, :, 1] / max_vals
+    
+    elif method == 'standardization':
+        means = np.mean(data[:, :, 0], axis=0)
+        stds = np.std(data[:, :, 0], axis=0)
+        params = (means, stds)
+        normalized_data_dec0 = (data[:, :, 0] - means) / stds
+        normalized_data_dec1 = (data[:, :, 1] - means) / stds
+
+    # Concatenate the normalized channels back together
+    normalized_data = np.stack((normalized_data_dec0, normalized_data_dec1), axis=-1)
+    
+    return normalized_data, params
+
+
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -320,14 +416,14 @@ def pulso_poisson(t, t0, A=1000, center_window=0.3, rise_window=0.2, tau_rise=15
     Generate a pulse with optional noise.
 
     Parameters:
-    t (array-like): The time array.
-    t0 (float): The central time around which the pulse is centered.
-    A (float, optional): The amplitude of the pulse. Default is 1000.
-    center_window (float, optional): The range around t0 to randomly vary the central time. Default is 0.3.
-    rise_window (float, optional): The range to randomly vary the rise time. Default is 0.2.
-    tau_rise (float, optional): The rise time constant. Default is 15.
-    tau_drop (float, optional): The drop time constant. Default is 150.
-    NOISE (bool, optional): Whether to add noise to the pulse. Default is True.
+    - t (array-like): The time array.
+    - t0 (float): The central time around which the pulse is centered.
+    - A (float, optional): The amplitude of the pulse. Default is 1000.
+    - center_window (float, optional): The range around t0 to randomly vary the central time. Default is 0.3.
+    - rise_window (float, optional): The range to randomly vary the rise time. Default is 0.2.
+    - tau_rise (float, optional): The rise time constant. Default is 15.
+    - tau_drop (float, optional): The drop time constant. Default is 150.
+    - NOISE (bool, optional): Whether to add noise to the pulse. Default is True.
 
     Returns:
     array-like: The generated pulse.
@@ -429,10 +525,10 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_steps = 32, NOISE = 
     """
     
     INPUT = np.zeros((pulse_set.shape[0],pulse_set.shape[1],2))
-    REF = np.zeros((pulse_set.shape[0],), dtype=np.float32)
+    REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
 
-    NRD0 = np.random.randint(delay_steps, size=pulse_set.shape[0])
-    NRD1 = np.random.randint(delay_steps, size=pulse_set.shape[0])
+    NRD0 = np.random.randint(delay_steps, size = pulse_set.shape[0])
+    NRD1 = np.random.randint(delay_steps, size = pulse_set.shape[0])
 
     for i in range(pulse_set.shape[0]):
         N0 = NRD0[i]
@@ -604,4 +700,104 @@ def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, cha
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
     
+def cut_pulse_by_fraction(vector, fraction=0.2, window_low=140, window_high=10):
+    """
+    Truncates pulse data in the input vector based on a specified fraction.
+
+    Parameters:
+    vector (ndarray): Input 3D array of shape (n_samples, n_points, n_channels).
+    fraction (float): Fraction threshold to determine the start of the pulse. Default is 0.2.
+    window_low (int): Number of points before the fraction threshold to retain. Default is 140.
+    window_high (int): Number of points after the fraction threshold to retain. Default is 10.
+
+    Returns:
+    ndarray: A new vector with truncated pulse data.
+    """
+    new_vector = np.copy(vector)
     
+    for i in range(vector.shape[0]):
+        # Find indices where the signal in each channel exceeds the fraction threshold
+        indices_channel0 = np.where(vector[i,:, 0] >= fraction)[0]
+        indices_channel1 = np.where(vector[i,:, 1] >= fraction)[0]
+        
+        # Calculate the low and high indices to truncate around the fraction threshold
+        low_index_channel0 = indices_channel0[0] - window_low
+        low_index_channel1 = indices_channel1[0] - window_low
+
+        high_index_channel0 = indices_channel0[0] + window_high
+        high_index_channel1 = indices_channel1[0] + window_high
+        
+        # Set values outside the specified windows to zero for each channel
+        new_vector[i,:low_index_channel0, 0] = 0.0
+        new_vector[i,:low_index_channel1, 1] = 0.0
+        
+        new_vector[i,high_index_channel0:, 0] = 0.0
+        new_vector[i,high_index_channel1:, 1] = 0.0
+    
+    return new_vector    
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def set_seed(seed):
+    import random
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
+    """
+    Calculate the Gaussian fit parameters (centroid and standard deviation) for each row of the input vector.
+
+    Parameters:
+    vector (numpy.ndarray): Input 2D array where each row represents a set of data points.
+    shift (numpy.ndarray): Array of shift values to be subtracted from each row of the input vector.
+    nbins (int, optional): Number of bins to use for the histogram. Default is 51.
+
+    Returns:
+    numpy.ndarray: Array of centroid values for each row of the input vector.
+    numpy.ndarray: Array of standard deviation values for each row of the input vector.
+    """
+    
+    # Initialize lists to store the centroid and standard deviation for each row
+    centroid = []
+    std = []
+    
+    # Loop over each row in the input vector
+    for i in range(vector.shape[0]):
+        # Calculate the histogram of the current row after applying the shift
+        histogN, binsN = np.histogram(vector[i, :] - shift[i], bins=nbins, range=[-0.8, 0.8])
+        
+        # Calculate the center of each bin
+        cbinsN = 0.5 * (binsN[1:] + binsN[:-1])
+        
+        try:
+            # Perform Gaussian fitting
+            HN, AN, x0N, sigmaN = gauss_fit(cbinsN, histogN)
+            
+            # Handle cases where sigmaN is NaN
+            if np.isnan(sigmaN):
+                sigmaN = 10
+                x0N = 10
+        except:
+            # Handle exceptions by setting default values
+            x0N, sigmaN = 10, 10
+        
+        # Append the results to the respective lists
+        centroid.append(x0N)
+        std.append(sigmaN)
+    
+    # Convert lists to numpy arrays
+    centroid = np.array(centroid, dtype='float64')
+    std = np.array(std, dtype='float64')
+    
+    # Return the results
+    return centroid, std
