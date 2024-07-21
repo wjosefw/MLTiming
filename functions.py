@@ -171,7 +171,7 @@ def simpsons_rule_array(y, h):
 #----------------------------------------------------------------------------------------------
 
 
-def normalize(data, method='standardization'):
+def normalize(data, method = 'standardization'):
     """
     Normalizes the data using the specified method and returns the normalized data along with the parameters.
     
