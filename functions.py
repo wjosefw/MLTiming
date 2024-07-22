@@ -188,10 +188,10 @@ def normalize(data, method = 'standardization'):
     if method == 'min-max':
         min_vals = np.min(data[:, :, 0], axis=0)
         max_vals = np.max(data[:, :, 0], axis=0)
-        params = (min_vals, max_vals)
         normalized_data_dec0 = (data[:, :, 0] - min_vals) / (max_vals - min_vals)
         normalized_data_dec1 = (data[:, :, 1] - min_vals) / (max_vals - min_vals)
-    
+        params = (min_vals, max_vals)   
+
     elif method == 'max':
         max_vals = np.max(data[:, :, 0], axis=0)
         params = max_vals
@@ -204,6 +204,7 @@ def normalize(data, method = 'standardization'):
         params = (means, stds)
         normalized_data_dec0 = (data[:, :, 0] - means) / stds
         normalized_data_dec1 = (data[:, :, 1] - means) / stds
+        params = (means, stds)
 
     # Concatenate the normalized channels back together
     normalized_data = np.stack((normalized_data_dec0, normalized_data_dec1), axis=-1)
@@ -211,6 +212,53 @@ def normalize(data, method = 'standardization'):
     return normalized_data, params
 
 
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+
+def normalize_given_params(data, params, channel=0, method='standardization'):
+    """
+    Normalize the given data using the specified method and parameters.
+
+    Parameters:
+    data (array-like): The input data array with shape (N, M, Nc), where N is the number of events,
+                       M is the number of time points, and Nc is the number of channels.
+    params (tuple): A tuple containing the parameters needed for normalization. For 'min-max' method,
+                    it should be (min_values, max_values). For 'standardization' method, it should be 
+                    (mean_values, std_devs). Both min_values and max_values, or mean_values and std_devs should have 
+                    lengths equal to M (second dimension of data).
+    channel (int): The channel to normalize. Defaults to 0.
+    method (str): The normalization method to use. Choose from 'min-max' or 'standardization'. Defaults to 'standardization'.
+
+    Returns:
+    array-like: The normalized data array with the same shape as the input data.
+    
+    Raises:
+    ValueError: If the method is not one of 'min-max' or 'standardization'.
+    ValueError: If params is not a tuple with two elements.
+    ValueError: If the lengths of params[0] and params[1] do not match the second dimension (M) of data.
+    """
+    
+    
+    if method not in ['min-max', 'standardization']:
+        raise ValueError("Invalid method. Choose from 'min-max' or 'standardization'.")
+    
+    # Check if params is a tuple and has two elements
+    if not isinstance(params, tuple) or len(params) != 2:
+        raise ValueError("Params must be a tuple with two elements.")
+    
+    if len(params[0]) != data.shape[1] or len(params[1]) != data.shape[1]:
+        raise ValueError("Length of params[0] and params[1] must match the second dimension (axis = 1) of data.")
+    
+    # Create a copy of the original data to avoid modifying it
+    data_copy = np.copy(data)
+    
+    if method == 'min-max':
+        normalized_data = (data_copy[:, :, channel] - params[0]) / (params[1] - params[0])
+    elif method == 'standardization':
+        normalized_data = (data_copy[:, :, channel] - params[0]) / params[1]
+
+    return normalized_data
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
