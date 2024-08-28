@@ -4,6 +4,8 @@ from numba import njit
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
 import torch
+import random
+from scipy.interpolate import interp1d
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -38,16 +40,71 @@ def fix_imbalances(vector, value = 0, window = 0.4):
 from scipy.optimize import curve_fit
 def gauss(x, H, A, x0, sigma):
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+
 def gauss_fit(x, y):
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
     return popt
 
+def plot_gaussian_and_get_params(array, shift, range = 0.8, nbins = 51, label = ' '):
+    histog, bins, patches = plt.hist(array - shift, bins = nbins, range = [-range, range], alpha = 0.5, label = label)
+    cbins = 0.5 * (bins[1:] + bins[:-1])
+    HN, AN, x0, sigma = gauss_fit(cbins, histog)
+    
+    FWHM = 2.35482*sigma
+    return HN, AN, x0, sigma, FWHM
+
+def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
+    """
+    Calculate the Gaussian fit parameters (centroid and standard deviation) for each row of the input vector.
+
+    Parameters:
+    vector (numpy.ndarray): Input 2D array where each row represents a set of data points.
+    shift (numpy.ndarray): Array of shift values to be subtracted from each row of the input vector.
+    nbins (int, optional): Number of bins to use for the histogram. Default is 51.
+
+    Returns:
+    numpy.ndarray: Array of centroid values for each row of the input vector.
+    numpy.ndarray: Array of standard deviation values for each row of the input vector.
+    """
+    
+    centroid = []
+    std = []
+    
+    # Loop over each row in the input vector
+    for i in range(vector.shape[0]):
+        # Calculate the histogram of the current row after applying the shift
+        histogN, binsN = np.histogram(vector[i, :] - shift[i], bins = nbins)
+        
+        # Calculate the center of each bin
+        cbinsN = 0.5 * (binsN[1:] + binsN[:-1])
+        
+        try:
+            # Perform Gaussian fitting
+            HN, AN, x0N, sigmaN = gauss_fit(cbinsN, histogN)
+            
+            # Handle cases where sigmaN is NaN
+            if np.isnan(sigmaN):
+                sigmaN = 10
+                x0N = 10
+        except:
+            # Handle exceptions by setting default values
+            x0N, sigmaN = 10, 10
+        
+        # Append the results to the respective lists
+        centroid.append(x0N)
+        std.append(sigmaN)
+    
+    centroid = np.array(centroid, dtype='float64')
+    std = np.array(std, dtype='float64')
+    
+    return centroid, std
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
+    
 def momentos(vector, order = 4):
   """
     Calculate the moments of a vector using different weight functions.
@@ -71,16 +128,6 @@ def momentos(vector, order = 4):
     W = np.tile(W,(Nev,1,Nc))
     MM = np.sum(vector*W,axis=1,keepdims=True)
     MOMENT = np.append(MOMENT,MM,axis=1)
-
-    #W = np.exp(-(i)*t)
-    #W = np.tile(W,(Nev,1,Nc))
-    #MM = np.sum(vector*W,axis=1,keepdims=True)
-    #MOMENT = np.append(MOMENT,MM,axis=1)
-
-    #W = np.exp(-(t**(i)))
-    #W = np.tile(W,(Nev,1,Nc))
-    #MM = np.sum(vector*W,axis=1,keepdims=True)
-    #MOMENT = np.append(MOMENT,MM,axis=1)
 
   return MOMENT
 
@@ -421,87 +468,6 @@ def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def pulso(t,t0, tau_rise = 15, tau_drop = 150, NOISE = True):
-  y = (1 - np.exp(-(t-t0)/tau_rise))*np.exp(-(t-t0)/tau_drop) 
-  y[y<0.] = 0.
-  if NOISE:
-    noise = np.random.normal(scale = 0.01, size = len(t)-t0)
-    smoothed_noise = gaussian_filter1d(noise, sigma = 10)
-    noise2 = np.random.normal(scale = 1e-4, size = t0)
-    y[t0:] = y[t0:] + smoothed_noise
-    y[:t0] = y[:t0] + noise2
-  y = y / np.max(y)
-  return y
-
-
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-
-def pulso_sigmoid(t,t0, A=100, center_window=0.3, rise_window=0.2, tau_rise = 15, tau_drop = 150, NOISE = True):
-
-  if NOISE:
-    t0 = t0 + np.random.uniform(-center_window, center_window)
-    tau_rise = tau_rise + np.random.uniform(-rise_window, rise_window)
-    noise = np.random.normal(scale = 0.01, size = len(t))
-    smoothed_noise = gaussian_filter1d(noise, sigma = 10)
-    y = A*(1/(1 + np.exp(-(t-t0)/tau_rise)))*np.exp(-(t-t0)/tau_drop) 
-    y = y + smoothed_noise
-  
-  else:
-    y = A*(1/(1 + np.exp(-(t-t0)/tau_rise)))*np.exp(-(t-t0)/tau_drop)  
-  
-  y = y / np.max(y)
-  return y
-
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def pulso_poisson(t, t0, A=1000, center_window=0.3, rise_window=0.2, tau_rise=15, tau_drop=150, NOISE=True):
-    """
-    Generate a pulse with optional noise.
-
-    Parameters:
-    - t (array-like): The time array.
-    - t0 (float): The central time around which the pulse is centered.
-    - A (float, optional): The amplitude of the pulse. Default is 1000.
-    - center_window (float, optional): The range around t0 to randomly vary the central time. Default is 0.3.
-    - rise_window (float, optional): The range to randomly vary the rise time. Default is 0.2.
-    - tau_rise (float, optional): The rise time constant. Default is 15.
-    - tau_drop (float, optional): The drop time constant. Default is 150.
-    - NOISE (bool, optional): Whether to add noise to the pulse. Default is True.
-
-    Returns:
-    array-like: The generated pulse.
-    """
-   
-    centro = t0 + np.random.uniform(-center_window, center_window)
-    tau_rise = tau_rise + np.random.uniform(-rise_window, rise_window)
-    y = A * (1 - np.exp(-(t - centro) / tau_rise)) * np.exp(-(t - centro) / tau_drop)
-    y[y < 0.] = 0.
-    
-    if NOISE:
-        noise = np.random.normal(scale=0.01, size=len(t))
-        smoothed_noise = gaussian_filter1d(noise, sigma=100)
-        y = y + np.random.poisson(y) + smoothed_noise
-    
-    y = y / np.max(y)
-    return y
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def pulso_escalon(t,t0, A = 1):
-  y = np.zeros_like(t) 
-  y[:t0] = 0.
-  y[t0:] = A
-  return y
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 def delay_pulse_pair(pulse_set, time_step, t_shift = 0, delay_steps=32, NOISE=True):
     """
     Function to apply random delays to each pulse in a pair, calculate a reference time difference,
@@ -801,51 +767,22 @@ def set_seed(seed):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
+def interpolate_pulses(data, EXTRASAMPLING = 8, time_step = 0.2):
     """
-    Calculate the Gaussian fit parameters (centroid and standard deviation) for each row of the input vector.
+    Interpolate real pulses using cubic interpolation.
 
-    Parameters:
-    vector (numpy.ndarray): Input 2D array where each row represents a set of data points.
-    shift (numpy.ndarray): Array of shift values to be subtracted from each row of the input vector.
-    nbins (int, optional): Number of bins to use for the histogram. Default is 51.
-
-    Returns:
-    numpy.ndarray: Array of centroid values for each row of the input vector.
-    numpy.ndarray: Array of standard deviation values for each row of the input vector.
+    - data: numpy array of shape (N, M, 2), where N is the number of pulses,
+      M is the number of time points, and 2 represents the real and imaginary components.    
     """
-    
-    # Initialize lists to store the centroid and standard deviation for each row
-    centroid = []
-    std = []
-    
-    # Loop over each row in the input vector
-    for i in range(vector.shape[0]):
-        # Calculate the histogram of the current row after applying the shift
-        histogN, binsN = np.histogram(vector[i, :] - shift[i], bins=nbins, range=[-0.8, 0.8])
-        
-        # Calculate the center of each bin
-        cbinsN = 0.5 * (binsN[1:] + binsN[:-1])
-        
-        try:
-            # Perform Gaussian fitting
-            HN, AN, x0N, sigmaN = gauss_fit(cbinsN, histogN)
-            
-            # Handle cases where sigmaN is NaN
-            if np.isnan(sigmaN):
-                sigmaN = 10
-                x0N = 10
-        except:
-            # Handle exceptions by setting default values
-            x0N, sigmaN = 10, 10
-        
-        # Append the results to the respective lists
-        centroid.append(x0N)
-        std.append(sigmaN)
-    
-    # Convert lists to numpy arrays
-    centroid = np.array(centroid, dtype='float64')
-    std = np.array(std, dtype='float64')
-    
-    # Return the results
-    return centroid, std
+    Nt = np.shape(data)[1]
+    Nt_new = Nt * EXTRASAMPLING
+    new_time_step = time_step / EXTRASAMPLING
+
+    t = np.linspace(0, Nt, Nt)
+    t_new = np.linspace(0, Nt, Nt_new)
+
+    interp_func_data = interp1d(t, data, kind = 'cubic', axis = 1)
+    new_data = interp_func_data(t_new)
+
+    return new_data, new_time_step
+
