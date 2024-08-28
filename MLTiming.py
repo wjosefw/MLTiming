@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
 from efficient_kan.src.efficient_kan import KAN
 #from faster_kan.fastkan.fastkan import FastKAN
 #from kan import *
@@ -15,6 +14,7 @@ from functions import (momentos, create_and_delay_pulse_pair, create_position,
                        normalize_given_params, plot_gaussian_and_get_params, 
                        interpolate_pulses)
 from functions_KAN import  count_parameters, train_loop_KAN
+from Models import train_loop_MLP, MLP_Torch
 
 
 # Load data 
@@ -34,7 +34,7 @@ delay_steps = 30        # Max number of steps to delay pulses
 moments_order = 6       # Max order of moments used
 set_seed(42)            # Fix seeds
 nbins = 51              # Num bins for all histograms
-create_positions = 0    # Wether to create new_source positions. (0 = YES, 1 = NO)                           
+create_positions = True    # Wether to create new_source positions.                     
 t_shift = 8             # Time steps to move for the new positions
 normalization_method = 'min-max'
 EXTRASAMPLING = 8
@@ -42,6 +42,7 @@ start = 50*EXTRASAMPLING
 stop = 74*EXTRASAMPLING 
 lr = 1e-3
 epochs = 500
+Num_Neurons = 32
 
 # -------------------------------------------------------------------------
 #----------------------- INTERPOLATE PULSES -------------------------------
@@ -53,7 +54,7 @@ new_REALS, new_time_step =  interpolate_pulses(REALS, EXTRASAMPLING = EXTRASAMPL
 # Align the pulses 
 align_steps = 20
 new_data[:,:,1] = np.roll(new_data[:,:,1], align_steps)
-new_data[:,:align_steps,1] = np.random.normal(scale = 1e-3, size = align_steps)
+new_data[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
 
 
 print('New number of time points: %.d' % (new_data.shape[1]))
@@ -81,10 +82,10 @@ train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,start:stop
 val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,start:stop,0], new_time_step, delay_steps = delay_steps, NOISE = False)
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,start:stop,1], new_time_step, delay_steps = delay_steps, NOISE = False)
 
-if create_positions == 1:
+if create_positions == False:
     TEST = test_data[:,start:stop,:]
 
-if create_positions == 0:
+if create_positions == True:
     TEST_00 = test_data[:,start:stop,:] 
     TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift, NOISE = False)
     TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift, NOISE = False)
@@ -110,7 +111,21 @@ M_Val_dec1_channel0 =  normalize_given_params(M_Val_dec1, params_dec1, channel =
 M_Val_dec1_channel1 =  normalize_given_params(M_Val_dec1, params_dec1, channel = 1, method = normalization_method)
 M_Val_dec1 = np.stack((M_Val_dec1_channel0, M_Val_dec1_channel1), axis = -1)
 
+# Create Datasets/Dataloaders
+train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
+train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
 
+val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
+val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
+
+train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
+train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
+
+val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = True)
+val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = True)
+
+
+# Test set
 MOMENTS_TEST = momentos(TEST, order = moments_order)
 MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
 MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
@@ -118,8 +133,8 @@ MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis =
 
 
 # Print information 
-print(M_Train_dec0.shape, "NM dec0 =", M_Train_dec0.shape[1])
-print(M_Train_dec1.shape, "NM dec1 =", M_Train_dec1.shape[1])
+print("NM dec0 =", M_Train_dec0.shape[1])
+print("NM dec1 =", M_Train_dec1.shape[1])
 print("Normalization parameters detector 0:", params_dec0)
 print("Normalization parameters detector 1:", params_dec1)
 
@@ -131,43 +146,31 @@ print("Normalization parameters detector 1:", params_dec1)
 NM = M_Train_dec0.shape[1]
 architecture = [NM, NM*2, NM, 1]   
 
-model_dec0 = KAN(architecture)
-model_dec1 = KAN(architecture)
+#model_dec0 = KAN(architecture)
+#model_dec1 = KAN(architecture)
+model_dec0 = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
+model_dec1 = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
          
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
-
-# Create Dataset
-train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
-train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
-
-val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
-val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
-
-# Create DataLoaders
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
-
-val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = True)
-val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = True)
 
 optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr) 
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr)  
 
 # Execute train loop
-loss_dec0, test_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
-loss_dec1, test_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
+loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
+loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-if create_positions == 1:
+if create_positions == False:
     
     TOFN_V28 = test_dec0[:,:V28.shape[0]] - test_dec1[:,:V28.shape[0]]
     TOFN_V55 = test_dec0[:,V28.shape[0] :V28.shape[0] + V55.shape[0]] - test_dec1[:,V28.shape[0] :V28.shape[0] + V55.shape[0]]
     TOFN_V82 = test_dec0[:,V28.shape[0] + V55.shape[0]:] - test_dec1[:,V28.shape[0] + V55.shape[0]:]
 
-if create_positions == 0:
+if create_positions == True:
     
     TOFN_V02 = test_dec0[:,:TEST_00.shape[0]] - test_dec1[:,:TEST_00.shape[0]]
     TOFN_V00 = test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - test_dec1[:,TEST_00.shape[0] : 2*TEST_00.shape[0]]
@@ -177,7 +180,7 @@ if create_positions == 0:
     
 
 # Calulate Validation error
-if create_positions == 1:
+if create_positions == False:
     
     # Calculate centered position 'centroid'
     centroid_V55, sigmaN_V55 = calculate_gaussian_center_sigma(TOFN_V55, np.zeros((TOFN_V55.shape[0])), nbins = nbins)  
@@ -187,7 +190,7 @@ if create_positions == 1:
     error_V82 = abs((TOFN_V82 - centroid_V55[:, np.newaxis] - 0.2))
     Error = np.concatenate((error_V28, error_V55, error_V82), axis = 1)
 
-if create_positions == 0:
+if create_positions == True:
 
     # Calculate centered position 'centroid'
     centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOFN_V00, np.zeros((TOFN_V00.shape[0])), nbins = nbins) 
@@ -232,21 +235,7 @@ plt.show()
 
   
 # Histogram and gaussian fit 
-if create_positions == 0:
-    HN, AN, x0N_V04, sigmaN_V04, FWHMN_V04 = plot_gaussian_and_get_params(TOFN_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
-    HN, AN, x0N_V28, sigmaN_V28, FWHMN_V28 = plot_gaussian_and_get_params(TOFN_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
-    HN, AN, x0N_V55, sigmaN_V55, FWHMN_V55 = plot_gaussian_and_get_params(TOFN_V00[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
-    HN, AN, x0N_V82, sigmaN_V82, FWHMN_V82 = plot_gaussian_and_get_params(TOFN_V20[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-    HN, AN, x0N_V40, sigmaN_V40, FWHMN_V40 = plot_gaussian_and_get_params(TOFN_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
-
-    print('')
-    print("V40: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V40, FWHMN_V40, sigmaN_V40))
-    print("V82: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V82, FWHMN_V82, sigmaN_V82))
-    print("V55: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V55, FWHMN_V55, sigmaN_V55))
-    print("V28: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V28, FWHMN_V28, sigmaN_V28))
-    print("V04: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V04, FWHMN_V04, sigmaN_V04))
-
-if create_positions == 1:
+if create_positions == False:
     HN, AN, x0N_V28, sigmaN_V28, FWHMN_V28 = plot_gaussian_and_get_params(TOFN_V28[idx_min_MAE,:], centroid_V55[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
     HN, AN, x0N_V55, sigmaN_V55, FWHMN_V55 = plot_gaussian_and_get_params(TOFN_V55[idx_min_MAE,:], centroid_V55[idx_min_MAE], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
     HN, AN, x0N_V82, sigmaN_V82, FWHMN_V82 = plot_gaussian_and_get_params(TOFN_V82[idx_min_MAE,:], centroid_V55[idx_min_MAE], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
@@ -256,6 +245,20 @@ if create_positions == 1:
     print("V82: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V82, FWHMN_V82, sigmaN_V82))
     print("V55: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V55, FWHMN_V55, sigmaN_V55))
     print("V28: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V28, FWHMN_V28, sigmaN_V28))
+
+if create_positions == True:
+    HN, AN, x0N_V04, sigmaN_V04, FWHMN_V04 = plot_gaussian_and_get_params(TOFN_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
+    HN, AN, x0N_V02, sigmaN_V02, FWHMN_V02 = plot_gaussian_and_get_params(TOFN_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
+    HN, AN, x0N_V00, sigmaN_V00, FWHMN_V00 = plot_gaussian_and_get_params(TOFN_V00[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
+    HN, AN, x0N_V20, sigmaN_V20, FWHMN_V20 = plot_gaussian_and_get_params(TOFN_V20[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
+    HN, AN, x0N_V40, sigmaN_V40, FWHMN_V40 = plot_gaussian_and_get_params(TOFN_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
+
+    print('')
+    print("V40: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V40, FWHMN_V40, sigmaN_V40))
+    print("V20: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V20, FWHMN_V20, sigmaN_V20))
+    print("V00: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V00, FWHMN_V00, sigmaN_V00))
+    print("V02: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V02, FWHMN_V02, sigmaN_V02))
+    print("V04: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V04, FWHMN_V04, sigmaN_V04))
 
 plt.legend()
 plt.xlabel('$\Delta t$ (ns)')
