@@ -10,7 +10,10 @@ print(device)
 
 
 # Import functions 
-from functions import momentos, create_and_delay_pulse_pair, create_position, set_seed, calculate_gaussian_center_sigma, normalize, normalize_given_params, plot_gaussian_and_get_params, interpolate_pulses
+from functions import (momentos, create_and_delay_pulse_pair, create_position, 
+                       set_seed, calculate_gaussian_center_sigma, normalize, 
+                       normalize_given_params, plot_gaussian_and_get_params, 
+                       interpolate_pulses)
 from functions_KAN import  count_parameters, train_loop_KAN
 
 
@@ -126,9 +129,7 @@ print("Normalization parameters detector 1:", params_dec1)
 # -------------------------------------------------------------------------
 
 NM = M_Train_dec0.shape[1]
-architecture = [NM, NM*2, 1, 1]   
-grid_size = 5   
-k_order = 3
+architecture = [NM, NM*2, NM, 1]   
 
 model_dec0 = KAN(architecture)
 model_dec1 = KAN(architecture)
@@ -229,14 +230,14 @@ plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
-epoch = idx_min_MAE  
+  
 # Histogram and gaussian fit 
 if create_positions == 0:
-    HN, AN, x0N_V04, sigmaN_V04, FWHMN_V04 = plot_gaussian_and_get_params(TOFN_V04[epoch,:], centroid_V00[epoch], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
-    HN, AN, x0N_V28, sigmaN_V28, FWHMN_V28 = plot_gaussian_and_get_params(TOFN_V02[epoch,:], centroid_V00[epoch], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
-    HN, AN, x0N_V55, sigmaN_V55, FWHMN_V55 = plot_gaussian_and_get_params(TOFN_V00[epoch,:], centroid_V00[epoch], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
-    HN, AN, x0N_V82, sigmaN_V82, FWHMN_V82 = plot_gaussian_and_get_params(TOFN_V20[epoch,:], centroid_V00[epoch], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-    HN, AN, x0N_V40, sigmaN_V40, FWHMN_V40 = plot_gaussian_and_get_params(TOFN_V40[epoch,:], centroid_V00[epoch], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
+    HN, AN, x0N_V04, sigmaN_V04, FWHMN_V04 = plot_gaussian_and_get_params(TOFN_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
+    HN, AN, x0N_V28, sigmaN_V28, FWHMN_V28 = plot_gaussian_and_get_params(TOFN_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
+    HN, AN, x0N_V55, sigmaN_V55, FWHMN_V55 = plot_gaussian_and_get_params(TOFN_V00[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
+    HN, AN, x0N_V82, sigmaN_V82, FWHMN_V82 = plot_gaussian_and_get_params(TOFN_V20[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
+    HN, AN, x0N_V40, sigmaN_V40, FWHMN_V40 = plot_gaussian_and_get_params(TOFN_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
 
     print('')
     print("V40: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V40, FWHMN_V40, sigmaN_V40))
@@ -246,9 +247,9 @@ if create_positions == 0:
     print("V04: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V04, FWHMN_V04, sigmaN_V04))
 
 if create_positions == 1:
-    HN, AN, x0N_V28, sigmaN_V28, FWHMN_V28 = plot_gaussian_and_get_params(TOFN_V28[epoch,:], centroid_V55[epoch], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
-    HN, AN, x0N_V55, sigmaN_V55, FWHMN_V55 = plot_gaussian_and_get_params(TOFN_V55[epoch,:], centroid_V55[epoch], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
-    HN, AN, x0N_V82, sigmaN_V82, FWHMN_V82 = plot_gaussian_and_get_params(TOFN_V82[epoch,:], centroid_V55[epoch], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
+    HN, AN, x0N_V28, sigmaN_V28, FWHMN_V28 = plot_gaussian_and_get_params(TOFN_V28[idx_min_MAE,:], centroid_V55[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
+    HN, AN, x0N_V55, sigmaN_V55, FWHMN_V55 = plot_gaussian_and_get_params(TOFN_V55[idx_min_MAE,:], centroid_V55[idx_min_MAE], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
+    HN, AN, x0N_V82, sigmaN_V82, FWHMN_V82 = plot_gaussian_and_get_params(TOFN_V82[idx_min_MAE,:], centroid_V55[idx_min_MAE], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
    
 
     print('')
