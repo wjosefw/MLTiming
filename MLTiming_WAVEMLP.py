@@ -5,7 +5,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 # Load Data
-#data = np.load('/home/josea/PRUEBA_Co60.npz')['data']
+V55 = np.load('/home/josea/Co60_5cm_5cm.npy')
+V28 = np.load('/home/josea/Co60_2cm_8cm.npy')
+V82 = np.load('/home/josea/Co60_8cm_2cm.npy')
+REALS = np.concatenate((V28, V55, V82), axis = 0)
+
 data = np.load('/home/josea/pulsos_Na22_filt_norm_practica_polyfit.npz')['data']
 
 # Import functions
@@ -20,7 +24,7 @@ from functions_KAN import count_parameters
 
 delay_steps = 30        # Max number of steps to delay pulses
 set_seed(42)            # Fix seeds
-nbins = 51              # Num bins for all histograms
+nbins = 91              # Num bins for all histograms
 create_positions = True    # Wether to create new_source positions.                     
 t_shift = 8             # Time steps to move for the new positions
 EXTRASAMPLING = 8
@@ -28,7 +32,7 @@ start = 50*EXTRASAMPLING
 stop = 74*EXTRASAMPLING 
 lr = 1e-3
 epochs = 500
-Num_Neurons = 32
+Num_Neurons = 64
 
 # -------------------------------------------------------------------------
 #----------------------- INTERPOLATE PULSES -------------------------------
@@ -48,9 +52,9 @@ print('New time step: %.4f' % (new_time_step))
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-train_data = new_data[:3600,start:stop,:]
-validation_data = new_data[3600:3800,start:stop,:]
-test_data = new_data[3800:,start:stop,:]
+train_data = new_data[:18000,start:stop,:]
+validation_data = new_data[18000:18001,start:stop,:]
+test_data = new_data[18000:,start:stop,:]
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -65,18 +69,6 @@ train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], new_
 val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = False)
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], new_time_step, delay_steps = delay_steps, NOISE = False)
 
-# Create Datasets/Dataloaders
-train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
-train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
-
-val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
-val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
-
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
-
-val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = True)
-val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = True)
 
 # Test set
 if create_positions == False:
@@ -89,6 +81,20 @@ if create_positions == True:
     TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift), NOISE = False)
     TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift), NOISE = False)
     TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
+
+
+# Create Datasets/Dataloaders
+train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
+train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
+
+val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
+val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
+
+train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
+train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
+
+val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = True)
+val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = True)
 
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
