@@ -8,11 +8,12 @@ V28= np.load('/home/josea/Co60_2cm_8cm.npy')
 V82= np.load('/home/josea/Co60_8cm_2cm.npy')
 REALS = np.concatenate((V28, V55, V82), axis = 0)
 
-data = np.load('/home/josea/PRUEBA_Co60.npz')['data']
+#data = np.load('/home/josea/PRUEBA_Co60.npz')['data']
+data = np.load('/home/josea/pulsos_Na22_filt_norm_practica_polyfit.npz')['data']
 
 # Import functions
 from functions import (gauss, gauss_fit, create_and_delay_pulse_pair, create_position, calculate_gaussian_center_sigma, 
-                       plot_gaussian_and_get_params, set_seed, interpolate_pulses)
+                       plot_gaussian, get_gaussian_params, set_seed, interpolate_pulses)
 from Models import ConvolutionalModel, train_loop_convolutional
 from functions_KAN import count_parameters
 
@@ -23,14 +24,14 @@ from functions_KAN import count_parameters
 
 
 delay_steps = 30  # Max number of steps to delay pulses
-nbins = 51  # Num bins for all histograms                          
+nbins = 91  # Num bins for all histograms                          
 t_shift = 8  # Time steps to move for the new positions
 create_positions = True
 EXTRASAMPLING = 8
 start = 50*EXTRASAMPLING
 stop = 74*EXTRASAMPLING
 set_seed(42) #Fix seeds
-epochs = 500 
+epochs = 750 
 lr = 1e-4
 
 
@@ -55,8 +56,8 @@ print('New time step: %.4f' % (new_time_step))
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-train_data = new_data[:3800,:,:]
-test_data = new_data[3800:,:,:]
+train_data = new_data[:18000,:,:]
+test_data = new_data[18000:,:,:]
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -124,48 +125,53 @@ loss_dec1, test_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, trai
 # -------------------------------------------------------------------------
 
 if create_positions == False:
-        TOFN_V28 = test_dec0[:,:V28.shape[0]] - test_dec1[:,:V28.shape[0]]
-        TOFN_V55 = test_dec0[:,V28.shape[0] :V28.shape[0] + V55.shape[0]] - test_dec1[:,V28.shape[0] :V28.shape[0] + V55.shape[0]]
-        TOFN_V82 = test_dec0[:,V28.shape[0] + V55.shape[0]:] - test_dec1[:,V28.shape[0] + V55.shape[0]:]
+
+    TOF_V28 = test_dec0[:,:V28.shape[0]] - test_dec1[:,:V28.shape[0]]
+    TOF_V55 = test_dec0[:,V28.shape[0] :V28.shape[0] + V55.shape[0]] - test_dec1[:,V28.shape[0] :V28.shape[0] + V55.shape[0]]
+    TOF_V82 = test_dec0[:,V28.shape[0] + V55.shape[0]:] - test_dec1[:,V28.shape[0] + V55.shape[0]:]
 
 if create_positions == True:
-    TOFN_V02 = test_dec0[:,:TEST_00.shape[0]] - test_dec1[:,:TEST_00.shape[0]]
-    TOFN_V00 = test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - test_dec1[:, TEST_00.shape[0] : 2*TEST_00.shape[0]]
-    TOFN_V20 = test_dec0[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] - test_dec1[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]]
-    TOFN_V04 = test_dec0[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] - test_dec1[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]]
-    TOFN_V40 = test_dec0[:,4*TEST_00.shape[0]:] - test_dec1[:,4*TEST_00.shape[0]:]
+
+    TOF_V02 = test_dec0[:,:TEST_00.shape[0]] - test_dec1[:,:TEST_00.shape[0]]
+    TOF_V00 = test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - test_dec1[:, TEST_00.shape[0] : 2*TEST_00.shape[0]]
+    TOF_V20 = test_dec0[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] - test_dec1[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]]
+    TOF_V04 = test_dec0[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] - test_dec1[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]]
+    TOF_V40 = test_dec0[:,4*TEST_00.shape[0]:] - test_dec1[:,4*TEST_00.shape[0]:]
 
 # Calulate Validation error
 if create_positions == False:
     
     # Calculate centered position 'centroid'
-    centroid_V55, sigmaN_V55 = calculate_gaussian_center_sigma(TOFN_V55, np.zeros((TOFN_V55.shape[0])),  nbins = nbins)  
+    centroid_V55, sigma_V55 = calculate_gaussian_center_sigma(TOF_V55, np.zeros((TOF_V55.shape[0])),  nbins = nbins)  
     
-    error_V28 = abs((TOFN_V28 - centroid_V55[:, np.newaxis] + 0.2))
-    error_V55 = abs((TOFN_V55 - centroid_V55[:, np.newaxis]))
-    error_V82 = abs((TOFN_V82 - centroid_V55[:, np.newaxis] - 0.2))
+    error_V28 = abs((TOF_V28 - centroid_V55[:, np.newaxis] + 0.2))
+    error_V55 = abs((TOF_V55 - centroid_V55[:, np.newaxis]))
+    error_V82 = abs((TOF_V82 - centroid_V55[:, np.newaxis] - 0.2))
     Error = np.concatenate((error_V28, error_V55, error_V82), axis = 1)
 
 if create_positions == True:
-    # Calculate centered position 'centroid'
-    centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOFN_V00, np.zeros((TOFN_V00.shape[0])), nbins = nbins) 
     
-    error_V02 = abs((TOFN_V02 - centroid_V00[:, np.newaxis] + 0.2))
-    error_V00 = abs((TOFN_V00 - centroid_V00[:, np.newaxis]))
-    error_V20 = abs((TOFN_V20 - centroid_V00[:, np.newaxis] - 0.2))
-    error_V04 = abs((TOFN_V04 - centroid_V00[:, np.newaxis] + 0.4))
-    error_V40 = abs((TOFN_V40 - centroid_V00[:, np.newaxis] - 0.4))
+    centroid_V00, sigma_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
+    
+    error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + 0.2))
+    error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
+    error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - 0.2))
+    error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 0.4))
+    error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 0.4))
 
     Error = np.concatenate((error_V02, error_V00, error_V20, error_V04, error_V40), axis = 1)
     
 
-# Print MAE
+# Get MAE
+Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40), axis = 1)   
+Error_No_V00 = np.concatenate((error_V02, error_V20, error_V04, error_V40), axis = 1) 
 MAE = np.mean(Error, axis = 1)
-idx_min_MAE = np.where(MAE == np.min(MAE))[0][0]
-print(idx_min_MAE, np.min(MAE))
+MAE_No_V00 = np.mean(Error_No_V00, axis = 1)
 
+idx_min_MAE = np.where(MAE_No_V00 == np.min(MAE_No_V00))[0][0]
+print(idx_min_MAE, MAE[idx_min_MAE])
 
-# PLot
+# Plot
 plt.figure(figsize = (20,5))
 plt.subplot(131)
 plt.plot(np.log10(MAE.astype('float64')), label = 'MAE')
@@ -192,20 +198,30 @@ plt.show()
 
 
 # Histogram and gaussian fit 
-HN, AN, x0N_V04, sigmaN_V04, FWHMN_V04 = plot_gaussian_and_get_params(TOFN_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
-HN, AN, x0N_V02, sigmaN_V02, FWHMN_V02 = plot_gaussian_and_get_params(TOFN_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
-HN, AN, x0N_V00, sigmaN_V00, FWHMN_V00 = plot_gaussian_and_get_params(TOFN_V00[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
-HN, AN, x0N_V20, sigmaN_V20, FWHMN_V20 = plot_gaussian_and_get_params(TOFN_V20[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-HN, AN, x0N_V40, sigmaN_V40, FWHMN_V40 = plot_gaussian_and_get_params(TOFN_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
+# Histogram and gaussian fit 
+plot_gaussian(TOF_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
+plot_gaussian(TOF_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_V00[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
+plot_gaussian(TOF_V20[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
+
+
+params_V04, errors_V04 = get_gaussian_params(TOF_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
+params_V02, errors_V02 = get_gaussian_params(TOF_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
+params_V00, errors_V00 = get_gaussian_params(TOF_V00[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
+params_V20, errors_V20 = get_gaussian_params(TOF_V20[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
+params_V40, errors_V40 = get_gaussian_params(TOF_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
+
+
+print("V40: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
+print("V20: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
+print("V00: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
+print("V02: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
+print("V04: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
 
 print('')
-print("V40: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V40, FWHMN_V40, sigmaN_V40))
-print("V02: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V02, FWHMN_V02, sigmaN_V02))
-print("V00: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V00, FWHMN_V00, sigmaN_V00))
-print("V20: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V20, FWHMN_V20, sigmaN_V20))
-print("V04: CENTROID(ns) = %.3f  FWHM(ns) = %.3f  std(ns) = %.3f" % (x0N_V04, FWHMN_V04, sigmaN_V04))
-
 plt.legend()
 plt.xlabel('$\Delta t$ (ns)')
 plt.ylabel('Counts')
 plt.show()
+
