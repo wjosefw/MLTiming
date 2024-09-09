@@ -6,7 +6,7 @@ from efficient_kan.src.efficient_kan import KAN
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
-
+import sys
 
 # Import functions 
 from functions import (momentos, create_and_delay_pulse_pair, create_position, 
@@ -18,23 +18,22 @@ from Models import train_loop_MLP, MLP_Torch
 
 
 # Load data 
-rest_data = np.load('/home/josea/pulsos_Na22_filt_norm_practica_polyfit_rest.npz')['data']
-FS_data = np.load('/home/josea/pulsos_Na22_filt_norm_practica_polyfit_FS.npz')['data']
+data = np.load('/home/josea/pulsos_Na22_filt_norm_practica_polyfit.npz')['data']
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
 delay_steps = 30        # Max number of steps to delay pulses
-moments_order = 1       # Max order of moments used
+moments_order = 5       # Max order of moments used
 set_seed(42)            # Fix seeds
-nbins = 71              # Num bins for all histograms                   
+nbins = 91              # Num bins for all histograms                   
 t_shift = 8             # Time steps to move for the new positions
 normalization_method = 'standardization'
 EXTRASAMPLING = 8
 start = 50*EXTRASAMPLING 
 stop = 74*EXTRASAMPLING 
-lr = 1e-3 
+lr = 1e-3
 epochs = 500
 Num_Neurons = 64
 
@@ -42,16 +41,13 @@ Num_Neurons = 64
 #----------------------- INTERPOLATE PULSES -------------------------------
 # -------------------------------------------------------------------------
 
-new_data, new_time_step =  interpolate_pulses(rest_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
-new_FS_data, new_time_step =  interpolate_pulses(FS_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
+new_data, new_time_step =  interpolate_pulses(data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
 
 # Align the pulses 
 align_steps = 20
 new_data[:,:,1] = np.roll(new_data[:,:,1], align_steps)
 new_data[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
 
-new_FS_data[:,:,1] = np.roll(new_FS_data[:,:,1], align_steps)
-new_FS_data[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
 
 print('New number of time points: %.d' % (new_data.shape[1]))
 print('New time step: %.4f' % (new_time_step))
@@ -61,9 +57,9 @@ print('New time step: %.4f' % (new_time_step))
 # -------------------------------------------------------------------------
 
 
-train_data = new_data[:,start:stop,:] 
+train_data = new_data[:18000,start:stop,:] 
 validation_data = new_data[18000:18001,start:stop,:] 
-test_data = new_FS_data[:,start:stop,:]
+test_data = new_data[18000:,start:stop,:]
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -137,10 +133,10 @@ print("Normalization parameters detector 1:", params_dec1)
 NM = M_Train_dec0.shape[1]
 architecture = [NM, 5, 1, 1]    
 
-model_dec0 = KAN(architecture)
-model_dec1 = KAN(architecture)
-#model_dec0 = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
-#model_dec1 = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
+#model_dec0 = KAN(architecture)
+#model_dec1 = KAN(architecture)
+model_dec0 = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
+model_dec1 = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
          
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
@@ -148,8 +144,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr)  
 
 # Execute train loop
-loss_dec0, test_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
-loss_dec1, test_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
+loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
+loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -181,6 +177,7 @@ MAE_No_V00 = np.mean(Error_No_V00, axis = 1)
 idx_min_MAE = np.where(MAE_No_V00 == np.min(MAE_No_V00))[0][0]
 print(idx_min_MAE, MAE[idx_min_MAE])
 
+
 # Plot
 plt.figure(figsize = (20,5))
 plt.subplot(131)
@@ -199,14 +196,15 @@ plt.ylabel('Counts')
 plt.legend()
 
 plt.subplot(133)
-plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Detector 0')
-plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Detector 1')
+plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Train loss Detector 0')
+plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Train loss Detector 1')
 plt.title('Training loss')
 plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
-  
+
+
 # Histogram and gaussian fit 
 plot_gaussian(TOF_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
 plot_gaussian(TOF_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
@@ -222,14 +220,17 @@ params_V20, errors_V20 = get_gaussian_params(TOF_V20[idx_min_MAE,:], centroid_V0
 params_V40, errors_V40 = get_gaussian_params(TOF_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
 
 
-print("V40: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
-print("V20: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
-print("V00: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
-print("V02: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-print("V04: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
+print("V40: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
+print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
+print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
+print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
+print("V04: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
 
 print('')
 plt.legend()
 plt.xlabel('$\Delta t$ (ns)')
 plt.ylabel('Counts')
 plt.show()
+
+
+
