@@ -13,18 +13,18 @@ class ConvolutionalModel(nn.Module):
     def __init__(self, N_points):
         super(ConvolutionalModel, self).__init__()
         
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=(2, 2), padding='same')
-        self.bn1 = nn.BatchNorm2d(16)
-        self.pool1 = nn.MaxPool2d((1, 2)) # Output: (batch_size, 16, 1, N_points // 2)
+        self.conv1 = nn.Conv2d(in_channels = 1, out_channels = 8, kernel_size = 3, padding = 1, stride = 1)
+        self.bn1 = nn.BatchNorm2d(8)
+        self.pool1 = nn.MaxPool2d((1, 2)) # Output: (batch_size, 8, 1, N_points // 2)
         
-        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(2, 2), padding='same')
-        #self.pool2 = nn.MaxPool2d((1, 2))  # Output: (batch_size, 32, 1, N_points // 4)
+        self.conv2 = nn.Conv2d(in_channels = 8, out_channels = 16, kernel_size = 3, padding = 1, stride = 1)
+        self.bn2 = nn.BatchNorm2d(16)
+        self.pool2 = nn.MaxPool2d((1, 2))  # Output: (batch_size, 8, 1, N_points // 4)
         
         # Calculate the flattened size after the convolutions and pooling
-        self.flatten_size = 32 * (N_points // 2)  # Adjust according to pooling layers
+        self.flatten_size = 16 * (N_points // 4)  # Adjust according to pooling layers
         
-        self.fc1 = nn.Linear(self.flatten_size, 4)
-        self.fc2 = nn.Linear(4, 1)
+        self.fc1 = nn.Linear(self.flatten_size, 1)
     
     def forward(self, x):
         x = self.conv1(x)
@@ -33,17 +33,17 @@ class ConvolutionalModel(nn.Module):
         x = self.pool1(x)
         
         x = self.conv2(x)
-        #x = self.pool2(x)
+        x = self.bn2(x)
+        x = self.pool2(x)
         
         x = x.view(x.size(0), -1)  # Flatten
         
         x = self.fc1(x)
-        x = self.fc2(x)
-        
+     
         return x
+    
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 class MLP_Torch(nn.Module):
     def __init__(self, NM = 12, NN = 128, STD_INIT = 0.5):
@@ -70,7 +70,6 @@ class MLP_Torch(nn.Module):
         out = forward_single(input)
         return out
     
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -106,6 +105,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
     
     
     loss_list = []
+    val_loss_list = []
     test = []
 
     # Cosine Annealing Scheduler
@@ -155,10 +155,13 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
 
             val_loss = 0
             for val_data, val_labels in val_loader:
+                val_data, val_labels = val_data.to(device), val_labels.to(device)
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
                 val_loss += custom_loss(val_0, val_1, val_labels)
+            val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
+
 
         # Save the model at the specified checkpoint frequency if 'save' is True
         if save:
@@ -166,12 +169,9 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
                 model_name = name + '_' + str(epoch)
                 torch.save(model.state_dict(), model_name)
 
-    # Convert lists to numpy arrays
-    loss_array = np.array(loss_list, dtype='object')
-    test = np.array(test, dtype='object')
+    
 
-    return loss_array, test
-
+    return np.array(loss_list, dtype = 'object'), np.array(val_loss_list, dtype = 'object'), np.array(test, dtype = 'object')
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
