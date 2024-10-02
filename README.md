@@ -26,7 +26,11 @@ For inquiries, contact: [javellan@ucm.es](mailto:javellan@ucm.es)
 
 ### Step 2: Create Virtual Coincidences
 - **Delay Pairs**: Use the `create_and_delay_pulse_pair` function, which requires the size of the time step and the maximum number of delay steps. This function creates pairs of pulses with known time delays for model training.
-
+### Step 3: Define Model
+- **Select Inputs**: We provide a range of functions and models that utilize waveforms as data inputs or compute features to optimize input size. For feature extraction, please use the `momentos` function, which requires the virtual coincidence array and the desired number of features to calculate.
+- **Choose a Model**: For initial testing, three distinct network architectures are available: a Multi-Layer Perceptron (MLP), a Convolutional Neural Network (CNN), and a KAN model. You can find these architectures in the `models.py` file.
+### Step 4: Train Models
+- **Execute Training Loop**: Leverage the predefined training loops to train the networks. This process will yield results for both the validation and testing sets at each epoch, allowing you to monitor the model's performance over time.
 ---
 
 ## **Key Features**
@@ -52,4 +56,6 @@ With **MLTiming**, researchers and practitioners can efficiently calibrate gamma
 1. Clone this repository:
    ```bash
    git clone https://github.com/wjosefw/Signal-processing-with-Neural-networks.git
-
+2. After activating the virtual environment, you can install specific package requirements as follows: 
+    ```bash
+    pip install -r requirements.txt
