@@ -1,10 +1,9 @@
-
+import torch
+import random
 import numpy as np
 from numba import njit
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
-import torch
-import random
 from scipy.interpolate import interp1d
 
 #----------------------------------------------------------------------------------------------
@@ -47,13 +46,6 @@ def gauss_fit(x, y):
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
     return popt
 
-def plot_gaussian_and_get_params(array, shift, range = 0.8, nbins = 51, label = ' '):
-    histog, bins, patches = plt.hist(array - shift, bins = nbins, range = [-range, range], alpha = 0.5, label = label)
-    cbins = 0.5 * (bins[1:] + bins[:-1])
-    HN, AN, x0, sigma = gauss_fit(cbins, histog)
-    
-    FWHM = 2.35482*sigma
-    return HN, AN, x0, sigma, FWHM
 
 def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
     """
@@ -101,39 +93,167 @@ def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
     
     return centroid, std
 
+
+def plot_gaussian(array, shift, range = 0.8, nbins = 51, label = ' '):
+    """Plot histogram as points and overlay the Gaussian fit."""
+    # Calculate the histogram data
+    histog, bins, patches = plt.hist(array - shift, bins = nbins, range = [-range, range], alpha = 0.5, label = label)
+    cbins = 0.5 * (bins[1:] + bins[:-1])
+    
+    # Fit the Gaussian to the histogram data
+    popt = gauss_fit(cbins, histog)
+    hist_color = patches[0].get_facecolor()
+    x_fit = np.linspace(-range, range, 500)
+    y_fit = gauss(x_fit, *popt)
+    plt.plot(x_fit, y_fit, color=hist_color)
+
+def get_gaussian_params(array, shift, range=0.8, nbins=51):
+    histog, bins = np.histogram(array - shift, bins = nbins, range = [-range, range])
+    cbins = 0.5 * (bins[1:] + bins[:-1])  # Calculate bin centers
+    
+    # Fit the Gaussian to the histogram data
+    x = cbins
+    y = histog
+    mean = sum(x * y) / sum(y)
+    sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
+    popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
+    
+    if pcov is None:
+        print("Gaussian fitting failed or parameter errors could not be estimated.")
+        return None
+    
+    HN, AN, x0, sigma = popt
+    
+    FWHM = 2.35482 * sigma
+    perr = np.sqrt(np.diag(pcov))
+    
+    return (HN, AN, x0, FWHM), perr
+
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
     
-def momentos(vector, order = 4):
-  """
-    Calculate the moments of a vector using different weight functions.
+#def momentos(vector, order = 4):
+#  """
+#    Calculate the moments of a vector using different weight functions.
+#
+#    Parameters:
+#    vector (array-like): The input data array with shape (Nev, Nt, Nc),
+#                         where Nev is the number of events, Nt is the number of time points,
+#                         and Nc is the number of channels.
+#
+#    Returns:
+#    array-like: An array of moments calculated using different weight functions. The shape of the 
+#                returned array is (Nev, number_of_moments, Nc).
+#  """
+#
+#  Nev, Nt, Nc = np.shape(vector)    #Nev: Núm eventos, Nt: Núm puntos temporales, Nc: Número canales
+#  t = np.reshape(np.linspace(0, Nt, Nt)/float(Nt),(1, -1, 1)) #Normalized array of time
+#  MOMENT = np.zeros((Nev,0,Nc))
+#
+#  for i in range(order): # Number of moments used
+#    W = t**(i) 
+#    W = np.tile(W,(Nev, 1, Nc))
+#    MM = np.sum(vector*W, axis = 1, keepdims = True)
+#    MOMENT = np.append(MOMENT, MM, axis = 1)
+#
+#  return MOMENT
+
+
+#from numba import jit
+#
+#@jit
+#def momentos(vector, order=4):
+#    """
+#    Calculate the moments of a vector using different weight functions.
+#
+#    Parameters:
+#    vector (array-like): The input data array with shape (Nev, Nt, Nc),
+#                         where Nev is the number of events, Nt is the number of time points,
+#                         and Nc is the number of channels.
+#
+#    Returns:
+#    array-like: An array of moments calculated using different weight functions.
+#                The shape of the returned array is (Nev, order, Nc).
+#    """
+#    Nev, Nt, Nc = np.shape(vector)  # Nev: Number of events, Nt: Number of time points, Nc: Number of channels
+#    t = np.linspace(0, 1, Nt) # Normalized time array
+#
+#    # Pre-allocate MOMENT array (Nev, order, Nc)
+#    MOMENT = np.zeros((Nev, order, Nc))
+#
+#    for i in range(order):  # Number of moments used
+#        W = t ** i  # Calculate time weight for the current moment        
+#        # Instead of np.sum, use explicit summation to make Numba-compatible
+#        for event in range(Nev):
+#            MM0 = 0.0
+#            MM1 = 0.0
+#            for time in range(Nt):    
+#                #for channel in range(Nc):
+#                MM0 += vector[event, time, 0] * W[time]
+#                MM1 += vector[event, time, 1] * W[time]
+#            MOMENT[event, i, 0] = MM0
+#            MOMENT[event, i, 1] = MM1
+#
+#    return MOMENT
+
+import numpy as np
+from numba import cuda
+
+@cuda.jit
+def calculate_moments_gpu(vector, t, MOMENT, order):
+    Nev, Nt, Nc = vector.shape[:3]  # Get dimensions
+    
+    # Thread indices in the CUDA grid
+    event_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+    order_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
+    
+    if event_idx < Nev and order_idx < order:
+        for channel in range(Nc):
+            moment = 0.0
+            for time_idx in range(Nt):
+                moment += vector[event_idx, time_idx, channel] * (t[time_idx] ** order_idx)
+            MOMENT[event_idx, order_idx, channel] = moment
+
+def momentos(vector, order=4):
+    """
+    Calculate the moments of a vector using CUDA with Numba for GPU acceleration.
 
     Parameters:
-    vector (array-like): The input data array with shape (Nev, Nt, Nc),
+    vector (array-like): The input data array with shape (Nev, Nt, Nc).
                          where Nev is the number of events, Nt is the number of time points,
                          and Nc is the number of channels.
 
     Returns:
-    array-like: An array of moments calculated using different weight functions. The shape of the 
-                returned array is (Nev, number_of_moments, Nc).
-  """
+    array-like: An array of moments calculated using different weight functions.
+                The shape of the returned array is (Nev, order, Nc).
+    """
+    # Ensure the array is contiguous
+    vector = np.ascontiguousarray(vector)
 
-  Nev,Nt,Nc = np.shape(vector)    #Nev: Núm eventos, Nt: Núm puntos temporales, Nc: Número canales
-  t = np.reshape(np.linspace(0,Nt, Nt)/float(Nt),(1,-1,1)) #Normalized array of time
-  MOMENT = np.zeros((Nev,0,Nc))
+    Nev, Nt, Nc = vector.shape
+    t = np.linspace(0, 1, Nt)  # Normalized time array
 
-  for i in range(order): #Number of moments used
-    W = t**(i) 
-    W = np.tile(W,(Nev,1,Nc))
-    MM = np.sum(vector*W,axis=1,keepdims=True)
-    MOMENT = np.append(MOMENT,MM,axis=1)
+    # Allocate memory on the GPU
+    vector_gpu = cuda.to_device(vector)
+    t_gpu = cuda.to_device(t)
+    MOMENT_gpu = cuda.device_array((Nev, order, Nc))  # Create an empty array on the GPU to store results
 
-  return MOMENT
+    # Define the CUDA grid and block size
+    threads_per_block = (16, 16)  # Number of threads per block (adjust as needed)
+    blocks_per_grid = ((Nev + threads_per_block[0] - 1) // threads_per_block[0],
+                       (order + threads_per_block[1] - 1) // threads_per_block[1])
+
+    # Launch the kernel to calculate moments on the GPU
+    calculate_moments_gpu[blocks_per_grid, threads_per_block](vector_gpu, t_gpu, MOMENT_gpu, order)
+
+    # Copy the result back to the CPU
+    MOMENT = MOMENT_gpu.copy_to_host()
+
+    return MOMENT
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 def normalize_by_max(array_pulsos, fit_polynomial=True):
     """
@@ -217,7 +337,6 @@ def simpsons_rule_array(y, h):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-
 def normalize(data, method = 'standardization'):
     """
     Normalizes the data using the specified method and returns the normalized data along with the parameters.
@@ -258,10 +377,8 @@ def normalize(data, method = 'standardization'):
     
     return normalized_data, params
 
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 def normalize_given_params(data, params, channel=0, method='standardization'):
     """
@@ -336,7 +453,6 @@ def get_correlation(ref_pulse, pulse_set, channel=0):
         correlation.append(corr[n // 2])  # Append the correlation at delay zero to the list
     correlation = np.array(correlation)
     return correlation
-
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -430,7 +546,6 @@ def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift 
     
     return New_position
 
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -463,7 +578,6 @@ def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = 
       if plot:
         plt.plot(corrected_signal[i,:])
     return corrected_signal
-
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -567,10 +681,8 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_steps = 32, NOISE = 
 
     return INPUT, REF
 
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 def delay_pulse_4_channels(pulse_set, time_step, delay_steps = 20, NOISE = True):
   """
@@ -631,7 +743,6 @@ def delay_pulse_4_channels(pulse_set, time_step, delay_steps = 20, NOISE = True)
 
   return INPUT, REF_pulse1_delayed, REF_pulse2_delayed    
 
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -662,7 +773,6 @@ def get_mean_pulse_from_set(pulse_set, channel = 0):
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, channel=0):
     """
@@ -714,7 +824,7 @@ def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, cha
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
     
-def cut_pulse_by_fraction(vector, fraction=0.2, window_low=140, window_high=10):
+def cut_pulse_by_fraction(vector, fraction = 0.2, window_low = 140, window_high = 10):
     """
     Truncates pulse data in the input vector based on a specified fraction.
 
@@ -728,7 +838,7 @@ def cut_pulse_by_fraction(vector, fraction=0.2, window_low=140, window_high=10):
     ndarray: A new vector with truncated pulse data.
     """
     new_vector = np.copy(vector)
-    
+        
     for i in range(vector.shape[0]):
         # Find indices where the signal in each channel exceeds the fraction threshold
         indices_channel0 = np.where(vector[i,:, 0] >= fraction)[0]
@@ -752,9 +862,26 @@ def cut_pulse_by_fraction(vector, fraction=0.2, window_low=140, window_high=10):
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
+    
+def get_points_after_threshold(vector, time_step = 0.2, fraction = 0.2, num_points = 10):
+
+    new_vector = np.zeros((vector.shape[0], int(num_points), 2))
+    time = calculate_slope_y_intercept(vector, time_step, threshold = fraction)
+
+    for i in range(vector.shape[0]):
+        # Find indices where the signal in each channel exceeds the fraction threshold
+        idx_channel0 = np.where(vector[i,:, 0] >= fraction)[0][0]
+        idx_channel1 = np.where(vector[i,:, 1] >= fraction)[0][0]
+        
+        new_vector[i,:, 0] = vector[i,idx_channel0:idx_channel0 + num_points,0]
+        new_vector[i,:, 1] = vector[i,idx_channel1:idx_channel1 + num_points,1]
+
+    return new_vector    
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
 
 def set_seed(seed):
-    import random
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -786,3 +913,15 @@ def interpolate_pulses(data, EXTRASAMPLING = 8, time_step = 0.2):
 
     return new_data, new_time_step
 
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def calculate_slope_y_intercept(vector, time_step, threshold = 0.1):
+  t = np.arange(vector.shape[0]) * time_step
+  index = np.where(vector > threshold)[0][0]
+  t1 = t[index]
+  t0 = t[index - 1]
+  m = (vector[index] - vector[index - 1]) / (t1 - t0)
+  b = vector[index-1] - m*t0
+  time = (threshold - b) / m
+  return time

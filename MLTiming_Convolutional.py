@@ -27,19 +27,17 @@ test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 delay_steps = 30  # Max number of steps to delay pulses
 nbins = 91  # Num bins for all histograms                          
 t_shift = 8  # Time steps to move for the new positions
-create_positions = True
 EXTRASAMPLING = 8
 start = 50*EXTRASAMPLING
 stop = 74*EXTRASAMPLING
 set_seed(42) #Fix seeds
-epochs = 500
-lr = 1e-3
+epochs = 750
+lr = 1e-4
 
 
 # -------------------------------------------------------------------------
 #----------------------- INTERPOLATE PULSES -------------------------------
 # -------------------------------------------------------------------------
-
 
 new_train, new_time_step =  interpolate_pulses(train_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
 new_val, new_time_step =  interpolate_pulses(val_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
@@ -75,42 +73,31 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-
-#---------------------------------------------- Move to reference pulse --------------------------------
-#mean_pulse_dec0 = get_mean_pulse_from_set(train_data, channel = 0)
-#mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
-
-#delays_train_dec0 , moved_pulses_dec0 = move_to_reference(mean_pulse_dec0, train_data, start = start, stop = stop, max_delay = int(stop-start), channel = 0)
-#delays_train_dec1 , moved_pulses_dec1 = move_to_reference(mean_pulse_dec1, train_data, start = start, stop = stop, max_delay = int(stop-start), channel = 1)
-
-#train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(moved_pulses_dec0, new_time_step, delay_steps = delay_steps , NOISE = True)
-#train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(moved_pulses_dec1, new_time_step, delay_steps = delay_steps , NOISE = True)
-
-
-#---------------------------------------------- Delay real pulses --------------------------------
 train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = True)
 train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], new_time_step, delay_steps = delay_steps, NOISE = True)
 
-# Create Dataset
-train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
-train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
+val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = False)
+val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], new_time_step, delay_steps = delay_steps, NOISE = False)
 
-# Create DataLoaders
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
-
-#--------------------------------------- Move pulses to a reference one -------------------------------------------------
-#delays_test_dec0, moved_pulses_test_dec0 = move_to_reference(mean_pulse_dec0, validation_data, start = start, stop = stop, max_delay = int(stop-start), channel = 0)
-#delays_test_dec1, moved_pulses_test_dec1 = move_to_reference(mean_pulse_dec1, validation_data, start = start, stop = stop, max_delay = int(stop-start), channel = 1)
-
-
-#TEST_00 = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 TEST_00 = test_data
 TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift, NOISE = True)
 TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift, NOISE = True)  
 TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift), NOISE = False)
 TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift), NOISE = False)
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
+
+# Create Dataset / DataLoaders
+train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
+train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
+
+val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
+val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
+
+train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
+train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
+
+val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = False)
+val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = False)
 
 
 # -------------------------------------------------------------------------
@@ -126,50 +113,27 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr) 
 
 #Execute train loop
-loss_dec0, test_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
-loss_dec1, test_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
+loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
+loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-if create_positions == False:
-
-    TOF_V28 = test_dec0[:,:V28.shape[0]] - test_dec1[:,:V28.shape[0]]
-    TOF_V55 = test_dec0[:,V28.shape[0] :V28.shape[0] + V55.shape[0]] - test_dec1[:,V28.shape[0] :V28.shape[0] + V55.shape[0]]
-    TOF_V82 = test_dec0[:,V28.shape[0] + V55.shape[0]:] - test_dec1[:,V28.shape[0] + V55.shape[0]:]
-
-if create_positions == True:
-
-    TOF_V02 = test_dec0[:,:TEST_00.shape[0]] - test_dec1[:,:TEST_00.shape[0]]
-    TOF_V00 = test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - test_dec1[:, TEST_00.shape[0] : 2*TEST_00.shape[0]]
-    TOF_V20 = test_dec0[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] - test_dec1[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]]
-    TOF_V04 = test_dec0[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] - test_dec1[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]]
-    TOF_V40 = test_dec0[:,4*TEST_00.shape[0]:] - test_dec1[:,4*TEST_00.shape[0]:]
+TOF_V02 = test_dec0[:,:TEST_00.shape[0]] - test_dec1[:,:TEST_00.shape[0]]
+TOF_V00 = test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - test_dec1[:, TEST_00.shape[0] : 2*TEST_00.shape[0]]
+TOF_V20 = test_dec0[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] - test_dec1[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]]
+TOF_V04 = test_dec0[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] - test_dec1[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]]
+TOF_V40 = test_dec0[:,4*TEST_00.shape[0]:] - test_dec1[:,4*TEST_00.shape[0]:]
 
 # Calulate Validation error
-if create_positions == False:
+centroid_V00, sigma_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
     
-    # Calculate centered position 'centroid'
-    centroid_V55, sigma_V55 = calculate_gaussian_center_sigma(TOF_V55, np.zeros((TOF_V55.shape[0])),  nbins = nbins)  
-    
-    error_V28 = abs((TOF_V28 - centroid_V55[:, np.newaxis] + 0.2))
-    error_V55 = abs((TOF_V55 - centroid_V55[:, np.newaxis]))
-    error_V82 = abs((TOF_V82 - centroid_V55[:, np.newaxis] - 0.2))
-    Error = np.concatenate((error_V28, error_V55, error_V82), axis = 1)
-
-if create_positions == True:
-    
-    centroid_V00, sigma_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
-    
-    error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + 0.2))
-    error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
-    error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - 0.2))
-    error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 0.4))
-    error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 0.4))
-
-    Error = np.concatenate((error_V02, error_V00, error_V20, error_V04, error_V40), axis = 1)
-    
+error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + 0.2))
+error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
+error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - 0.2))
+error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 0.4))
+error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 0.4))
 
 # Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40), axis = 1)   
@@ -229,20 +193,3 @@ plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
-import time
-
-time_test = np.tile(train_dec0[0,:,:], (1000000, 1,1))
-
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-# Start timer inference
-start_time_inference = time.time()
-with torch.no_grad():
-    assert not torch.is_grad_enabled()
-    output_time_test = model_dec0(torch.tensor(time_test[:,None, None, :,0]).float().to(device))
-end_time_inference = time.time()
-
-# Calculate the elapsed times
-elapsed_time_inference = end_time_inference - start_time_inference
-print(f"Elapsed time inference: {elapsed_time_inference} seconds")

@@ -5,7 +5,8 @@ import torch
 from efficient_kan.src.efficient_kan import KAN
 
 from functions import (interpolate_pulses, create_position, momentos, normalize_given_params, 
-                       calculate_gaussian_center_sigma, plot_gaussian, get_gaussian_params)
+                       calculate_gaussian_center_sigma, plot_gaussian, get_gaussian_params,
+                       constant_fraction_discrimination, calculate_slope_y_intercept)
 
 
 #Load data
@@ -76,7 +77,7 @@ MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis =
 #--------------------------- LOAD MODELS ----------------------------------
 # -------------------------------------------------------------------------
 
-dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/'
+dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
 model_dec0_dir = os.path.join(dir, 'model_dec0_300')
 model_dec1_dir = os.path.join(dir, 'model_dec1_300')
 
@@ -121,8 +122,8 @@ print('MAE: ', MAE)
 
 
 # Plot
-plt.hist(test_dec0, bins = nbins, range = [-1+start_idx*0.2, 1+stop_idx*0.2], alpha = 0.5, label = 'Detector 0');
-plt.hist(test_dec1, bins = nbins, range = [-1+start_idx*0.2, 1+stop_idx*0.2], alpha = 0.5, label = 'Detector 1');
+plt.hist(test_dec0, bins = nbins, range = [-1, 3], alpha = 0.5, label = 'Detector 0');
+plt.hist(test_dec1, bins = nbins, range = [-1, 3], alpha = 0.5, label = 'Detector 1');
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')
@@ -133,7 +134,7 @@ plt.show()
 # Histogram and gaussian fit 
 plot_gaussian(TOF_V04, centroid_V00, range = 0.8, label = '-0.4 ns offset', nbins = nbins)
 plot_gaussian(TOF_V02, centroid_V00, range = 0.8, label = '-0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_V00, centroid_V00, range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
+plot_gaussian(TOF_V00, centroid_V00, range = 0.8, label = ' 0.0 ns offset', nbins = 51)
 plot_gaussian(TOF_V20, centroid_V00, range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
 plot_gaussian(TOF_V40, centroid_V00, range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
 

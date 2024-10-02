@@ -176,12 +176,13 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def train_loop_convolutional(model, optimizer, train_loader, test_tensor, EPOCHS = 75, checkpoint = 15, name = 'model', save = False):
+def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, checkpoint = 15, name = 'model', save = False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     test_tensor = test_tensor.to(device)
     
     loss_list = []
+    val_loss_list = []
     test = []
 
     # Cosine Annealing Scheduler
@@ -226,6 +227,16 @@ def train_loop_convolutional(model, optimizer, train_loader, test_tensor, EPOCHS
             test_epoch = model(test_tensor[:,None, None, :])
             test.append(np.squeeze(test_epoch.cpu().numpy()))
 
+            val_loss = 0
+            for val_data, val_labels in val_loader:
+                val_data, val_labels = val_data.to(device), val_labels.to(device)
+                val_0 = model(val_data[:, None, None, :, 0])
+                val_1 = model(val_data[:, None, None, :, 1])
+                val_loss += custom_loss(val_0, val_1, val_labels)
+        val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
+        print(f'LOSS val {val_loss / len(val_loader)}')
+
+
         if save and (epoch + 1) % checkpoint == 0:
             model_name = f'{name}_{epoch + 1}.pth'
             torch.save(model.state_dict(), model_name)
@@ -233,5 +244,6 @@ def train_loop_convolutional(model, optimizer, train_loader, test_tensor, EPOCHS
     # Convert lists to numpy arrays
     loss_array = np.array(loss_list, dtype = 'object')
     test = np.array(test, dtype = 'object')
-
-    return loss_array, test
+    val = np.array(val_loss_list, dtype = 'object')
+    
+    return loss_array, test, val
