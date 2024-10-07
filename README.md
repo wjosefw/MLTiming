@@ -59,3 +59,10 @@ With **MLTiming**, researchers and practitioners can efficiently calibrate gamma
 2. After activating the virtual environment, you can install specific package requirements as follows: 
     ```bash
     pip install -r requirements.txt
+
+
+---
+
+## **Quickstart Guide**
+
+For a quick start, use the `Quickstart_MLTiming.ipynb` notebook provided in this repository. This notebook walks you through the steps of using **MLTiming**, including data preparation, model definition, and training.
