@@ -1,0 +1,26 @@
+# Ignore Python virtual environment
+venv/
+DT_venv/
+
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore environment variables
+.env
+
+# Ignore logs
+*.log
+
+# Ignore temporary editor files
+*.swp
+*.swo
+
+# Ignore build directories
+build/
+dist/
+
+# Ignore macOS system files
+.DS_Store
+
