@@ -1,6 +1,6 @@
 # **MLTiming: A Machine-Learning Framework for Radiation Time Pick-Up**
 
-![Example Image](https://github.com/wjosefw/Signal-processing-with-Neural-networks/blob/main/scheme_2%20(1).png)
+![Example Image](https://github.com/wjosefw/MLTiming/blob/main/scheme_2%20(1).png)
 
 **MLTiming** is a user-friendly machine-learning tool designed to train individual gamma radiation detectors for precise time-stamping of incoming radiation signals. This innovative framework eliminates the need for auxiliary or reference detectors during the training process, simplifying calibration.
 
