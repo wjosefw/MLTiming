@@ -568,20 +568,6 @@ def weights_definition(NM, Npoints):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = True):
-    corrected_signal = np.zeros_like(vector)
-    for i in range(vector.shape[0]):
-      inverted_signal = np.roll(-vector[i,:],shift)
-      inverted_signal[0:shift] = 0.
-      fraction_signal = fraction*vector[i,:]
-      corrected_signal[i,:] = inverted_signal + fraction_signal
-      if plot:
-        plt.plot(corrected_signal[i,:])
-    return corrected_signal
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 def delay_pulse_pair(pulse_set, time_step, t_shift = 0, delay_steps=32, NOISE=True):
     """
     Function to apply random delays to each pulse in a pair, calculate a reference time difference,
@@ -916,7 +902,19 @@ def interpolate_pulses(data, EXTRASAMPLING = 8, time_step = 0.2):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
+def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = True):
+    corrected_signal = np.zeros_like(vector)
+    for i in range(vector.shape[0]):
+      inverted_signal = np.roll(-vector[i,:],shift)
+      inverted_signal[0:shift] = 0.
+      fraction_signal = fraction*vector[i,:]
+      corrected_signal[i,:] = inverted_signal + fraction_signal
+      if plot:
+        plt.plot(corrected_signal[i,:])
+    return corrected_signal
+
 def calculate_slope_y_intercept(vector, time_step, threshold = 0.1):
+  
   t = np.arange(vector.shape[0]) * time_step
   index = np.where(vector > threshold)[0][0]
   t1 = t[index]
@@ -925,3 +923,32 @@ def calculate_slope_y_intercept(vector, time_step, threshold = 0.1):
   b = vector[index-1] - m*t0
   time = (threshold - b) / m
   return time
+
+def Calculate_CFD(array, fraction = 0.7, shift = 80, threshold = 0.1, time_step = 0.025):
+    """
+    Calculate the timestamps of signals using Constant Fraction Discrimination (CFD) method.
+    
+    Parameters:
+    ----------
+    - Array : A 2D array representing the input signals where each row corresponds to a separate signal.
+    
+    - Fraction (float): The fraction of the maximum signal amplitude used for discrimination.
+    
+    - Shift (int): The amount to shift the CFD signal for discrimination.
+    
+    - Threshold(float): The threshold for determining significant slopes in the CFD signal.
+    
+    - Time_step (float): The time step used for calculating timestamps from the CFD signal.
+    
+    Returns:
+    -------
+    A 2D array where each row contains the calculated timestamps for the corresponding input signal.
+    """
+    cfd_signal = constant_fraction_discrimination(array, fraction=fraction, shift=shift, plot=False)
+    
+    timestamps_list = []
+    for i in range(cfd_signal.shape[0]):
+        timestamps = calculate_slope_y_intercept(cfd_signal[i,:], time_step, threshold=threshold)
+        timestamps_list.append(timestamps)
+    
+    return np.array(timestamps_list)

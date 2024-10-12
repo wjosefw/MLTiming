@@ -31,7 +31,7 @@ faster_kan/
 Deprecated_notebooks/
 Co60_filtered_data_gate1/
 KAN_models/
-Spectograms/
+#Spectograms/
 #Pycaret_cosas/
 pykan/
 predictions/

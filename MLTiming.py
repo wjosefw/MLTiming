@@ -165,22 +165,28 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optim
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-# Calculate TOF
-TOF_V02 = test_dec0[:,:TEST_00.shape[0]] - test_dec1[:,:TEST_00.shape[0]]
-TOF_V00 = test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - test_dec1[:,TEST_00.shape[0] : 2*TEST_00.shape[0]]
-TOF_V20 = test_dec0[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] - test_dec1[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]]
-TOF_V04 = test_dec0[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] - test_dec1[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]]
-TOF_V40 = test_dec0[:,4*TEST_00.shape[0]:] - test_dec1[:,4*TEST_00.shape[0]:]
-    
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec0_Na22.npz', data = test_dec0)
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec1_Na22.npz', data = test_dec1)
+
+
+# Calculate TOF and extract the different positions
+TOF = test_dec0 - test_dec1
+
+TOF_V02 = TOF[:,:TEST_00.shape[0]] 
+TOF_V00 = TOF[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] 
+TOF_V20 = TOF[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
+TOF_V04 = TOF[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
+TOF_V40 = TOF[:,4*TEST_00.shape[0]:] 
+
 
 # Calulate Test error
 centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
 
-error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + 0.2))
+error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + new_time_step*t_shift))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
-error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - 0.2))
-error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 0.4))
-error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 0.4))
+error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - new_time_step*t_shift))
+error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 2*new_time_step*t_shift))
+error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 2*new_time_step*t_shift))
 
 #Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40), axis = 1)   
