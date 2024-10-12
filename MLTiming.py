@@ -3,8 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from efficient_kan.src.efficient_kan import KAN
-#from faster_kan.fastkan.fastkan import FastKAN
-#from kan import *
+
 from functions import (momentos, create_and_delay_pulse_pair, create_position, 
                        set_seed, calculate_gaussian_center_sigma, normalize, 
                        normalize_given_params, interpolate_pulses, plot_gaussian, 
