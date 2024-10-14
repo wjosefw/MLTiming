@@ -29,7 +29,7 @@ test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 delay_steps = 30        # Max number of steps to delay pulses
 moments_order = 5       # Max order of moments used
 set_seed(42)            # Fix seeds
-nbins = 91              # Num bins for all histograms                   
+nbins = 51              # Num bins for all histograms                   
 t_shift = 8             # Time steps to move for the new positions
 normalization_method = 'standardization'
 EXTRASAMPLING = 8
@@ -39,7 +39,8 @@ start = start_idx*EXTRASAMPLING
 stop = stop_idx*EXTRASAMPLING 
 lr = 1e-3
 epochs = 500
-Num_Neurons = 64
+Num_Neurons = 128
+
 
 # -------------------------------------------------------------------------
 #----------------------- INTERPOLATE PULSES -------------------------------
@@ -140,8 +141,7 @@ print("Normalization parameters detector 1:", params_dec1)
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-NM = M_Train_dec0.shape[1]
-architecture = [NM, 5, 1, 1]    
+architecture = [moments_order, 5, 1, 1]    
 
 model_dec0 = KAN(architecture)
 model_dec1 = KAN(architecture)
@@ -164,8 +164,8 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optim
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec0_Na22.npz', data = test_dec0)
-np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec1_Na22.npz', data = test_dec1)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec0_Na22.npz', data = test_dec0)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec1_Na22.npz', data = test_dec1)
 
 
 # Calculate TOF and extract the different positions
