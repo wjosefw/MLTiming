@@ -64,13 +64,10 @@ def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
     centroid = []
     std = []
     
-    # Loop over each row in the input vector
     for i in range(vector.shape[0]):
-        # Calculate the histogram of the current row after applying the shift
+
         histogN, binsN = np.histogram(vector[i, :] - shift[i], bins = nbins)
-        
-        # Calculate the center of each bin
-        cbinsN = 0.5 * (binsN[1:] + binsN[:-1])
+        cbinsN = 0.5 * (binsN[1:] + binsN[:-1]) 
         
         try:
             # Perform Gaussian fitting
@@ -88,11 +85,10 @@ def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
         centroid.append(x0N)
         std.append(sigmaN)
     
-    centroid = np.array(centroid, dtype='float64')
-    std = np.array(std, dtype='float64')
+    centroid = np.array(centroid, dtype = 'float64')
+    std = np.array(std, dtype = 'float64')
     
     return centroid, std
-
 
 def plot_gaussian(array, shift, range = 0.8, nbins = 51, label = ' '):
     """Plot histogram as points and overlay the Gaussian fit."""
@@ -107,10 +103,10 @@ def plot_gaussian(array, shift, range = 0.8, nbins = 51, label = ' '):
     y_fit = gauss(x_fit, *popt)
     plt.plot(x_fit, y_fit, color=hist_color)
 
-def get_gaussian_params(array, shift, range=0.8, nbins=51):
+def get_gaussian_params(array, shift, range = 0.8, nbins = 51):
     histog, bins = np.histogram(array - shift, bins = nbins, range = [-range, range])
     cbins = 0.5 * (bins[1:] + bins[:-1])  # Calculate bin centers
-    
+
     # Fit the Gaussian to the histogram data
     x = cbins
     y = histog
@@ -568,20 +564,6 @@ def weights_definition(NM, Npoints):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = True):
-    corrected_signal = np.zeros_like(vector)
-    for i in range(vector.shape[0]):
-      inverted_signal = np.roll(-vector[i,:],shift)
-      inverted_signal[0:shift] = 0.
-      fraction_signal = fraction*vector[i,:]
-      corrected_signal[i,:] = inverted_signal + fraction_signal
-      if plot:
-        plt.plot(corrected_signal[i,:])
-    return corrected_signal
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 def delay_pulse_pair(pulse_set, time_step, t_shift = 0, delay_steps=32, NOISE=True):
     """
     Function to apply random delays to each pulse in a pair, calculate a reference time difference,
@@ -916,12 +898,75 @@ def interpolate_pulses(data, EXTRASAMPLING = 8, time_step = 0.2):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
+def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = True):
+    corrected_signal = np.zeros_like(vector)
+    for i in range(vector.shape[0]):
+      inverted_signal = np.roll(vector[i,:], shift)
+      inverted_signal[:shift] = 0
+      fraction_signal = fraction*(-vector[i,:])
+      corrected_signal[i,:] = inverted_signal + fraction_signal
+      if plot:
+          plt.plot(corrected_signal[i, :])
+    return corrected_signal
+
+
+def find_first_zero_crossing_after_minimum(vector, time_step):
+
+    # Create time array
+    t = np.arange(vector.shape[0]) * time_step 
+    
+    # Find index of array min
+    min_index = np.argmin(vector)
+    
+    # Look for the first zero-crossing after the minimum
+    for i in range(min_index, len(vector) -  1):
+        if vector[i] < 0 and vector[i + 1] > 0:
+            m = (vector[i + 1] - vector[i]) / (t[i + 1] - t[i])
+            b = vector[i] - m*t[i]
+            crossing_time = -b / m
+            break  # Break the loop after finding the crossing point
+    
+    return crossing_time      
+             
+
+def Calculate_CFD(array, fraction = 0.7, shift = 80, time_step = 0.025):
+    """
+    Calculate the timestamps of signals using Constant Fraction Discrimination (CFD) method.
+    
+    Parameters:
+    ----------
+    - Array : A 2D array representing the input signals where each row corresponds to a separate signal.
+    
+    - Fraction (float): The fraction of the maximum signal amplitude used for discrimination.
+    
+    - Shift (int): The amount to shift the CFD signal for discrimination.
+        
+    - Time_step (float): The time step used for calculating timestamps from the CFD signal.
+    
+    Returns:
+    -------
+    A 2D array where each row contains the calculated timestamps for the corresponding input signal.
+    """
+    cfd_signal = constant_fraction_discrimination(array, fraction = fraction, shift = shift, plot = False)
+    
+    timestamps_list = []
+    for i in range(cfd_signal.shape[0]):
+        timestamps = find_first_zero_crossing_after_minimum(cfd_signal[i,:], time_step)
+        timestamps_list.append(timestamps)
+    
+    return np.array(timestamps_list)
+
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
 def calculate_slope_y_intercept(vector, time_step, threshold = 0.1):
+  
   t = np.arange(vector.shape[0]) * time_step
   index = np.where(vector > threshold)[0][0]
   t1 = t[index]
   t0 = t[index - 1]
   m = (vector[index] - vector[index - 1]) / (t1 - t0)
-  b = vector[index-1] - m*t0
+  b = vector[index - 1] - m*t0
   time = (threshold - b) / m
   return time

@@ -1,14 +1,13 @@
 import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from efficient_kan.src.efficient_kan import KAN
-#from faster_kan.fastkan.fastkan import FastKAN
-#from kan import *
+
 from functions import (momentos, create_and_delay_pulse_pair, create_position, 
                        set_seed, calculate_gaussian_center_sigma, normalize, 
-                       normalize_given_params, interpolate_pulses, plot_gaussian, 
-                       get_gaussian_params)
+                       normalize_given_params, plot_gaussian, get_gaussian_params)
 from functions_KAN import  count_parameters, train_loop_KAN
 from Models import train_loop_MLP, MLP_Torch
 
@@ -23,50 +22,77 @@ train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
 val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 
+
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_steps = 30        # Max number of steps to delay pulses
-moments_order = 5       # Max order of moments used
-set_seed(42)            # Fix seeds
-nbins = 91              # Num bins for all histograms                   
-t_shift = 8             # Time steps to move for the new positions
+delay_time = 1                        # In ns
+time_step = 0.2                       # In ns
+moments_order = int(sys.argv[1])      # Max order of moments used
+set_seed(42)                          # Fix seeds
+nbins = 71                            # Num bins for all histograms                   
+t_shift = 1                           # Time steps to move for the new positions
 normalization_method = 'standardization'
-EXTRASAMPLING = 8
-start_idx = 50
-stop_idx = 74
-start = start_idx*EXTRASAMPLING 
-stop = stop_idx*EXTRASAMPLING 
+start = 50
+stop = 74
 lr = 1e-3
 epochs = 500
 Num_Neurons = 64
+
 
 # -------------------------------------------------------------------------
 #----------------------- INTERPOLATE PULSES -------------------------------
 # -------------------------------------------------------------------------
 
-new_train, new_time_step =  interpolate_pulses(train_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
-new_val, new_time_step =  interpolate_pulses(val_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
-new_test, new_time_step =  interpolate_pulses(test_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
+align_time = 0.6    # In ns
+res = align_time % time_step  # Fractional part of the delay
+idel = int(align_time / time_step) 
 
-# Align the pulses 
-align_steps = 20
+new_train = np.zeros_like(train_data)
+new_val = np.zeros_like(val_data)
+new_test = np.zeros_like(test_data)
 
-new_train[:,:,1] = np.roll(new_train[:,:,1], align_steps)
-new_val[:,:,1] = np.roll(new_val[:,:,1], align_steps)
-new_test[:,:,1] = np.roll(new_test[:,:,1], align_steps)
 
-new_train[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
-new_val[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
-new_test[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
+for i in range(train_data.shape[0]):
+    for j in range(train_data.shape[1] - 1, 0, -1):
+            slope = (train_data[i, j, 1] - train_data[i, j - 1, 1]) / time_step
+            new_train[i, j, 1] =  train_data[i, j, 1] - slope * res 
+    new_train[i,0, 1] = train_data[i,0,1 ]
+    new_train[i,:,1] = np.roll(new_train[i,:,1], idel)
+    new_train[i,:idel,1] = 0
 
-print('New number of time points: %.d' % (new_train.shape[1]))
-print('New time step: %.4f' % (new_time_step))
+
+for i in range(val_data.shape[0]):
+    for j in range(val_data.shape[1] - 1, 0, -1):
+            slope = (val_data[i, j, 1] - val_data[i, j - 1, 1]) / time_step
+            new_val[i, j, 1] =  val_data[i, j, 1] - slope * res 
+    new_val[i,0, 1] = val_data[i,0,1 ]
+    new_val[i,:,1] = np.roll(new_val[i,:,1], idel)
+    new_val[i,:idel,1] = 0
+
+
+
+for i in range(test_data.shape[0]):
+    for j in range(test_data.shape[1] - 1, 0, -1):
+            slope = (test_data[i, j, 1] - test_data[i, j - 1, 1]) / time_step
+            new_test[i, j, 1] =  test_data[i, j, 1] - slope * res 
+    new_test[i,0, 1] = test_data[i,0,1 ]
+    new_test[i,:,1] = np.roll(new_test[i,:,1], idel)
+    new_test[i,:idel,1] = 0
+
+new_train[:,:,0] = train_data[:,:,0]
+new_val[:,:,0] = val_data[:,:,0]
+new_test[:,:,0] = test_data[:,:,0]
+
 
 # -------------------------------------------------------------------------
 #----------------------- CROP WAVEFORM ------------------------------------
 # -------------------------------------------------------------------------
+
+#train_data = np.stack((train_data[:,start_idx:stop_idx,0], train_data[:,start_idx-3:stop_idx-3,1]), axis = -1)
+#validation_data = np.stack((val_data[:,start_idx:stop_idx,0], val_data[:,start_idx-3:stop_idx-3,1]), axis = -1)
+#test_data = np.stack((test_data[:,start_idx:stop_idx,0], test_data[:,start_idx-3:stop_idx-3,1]), axis = -1)
 
 train_data = new_train[:,start:stop,:] 
 validation_data = new_val[:,start:stop,:] 
@@ -79,11 +105,11 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = False)
-train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], new_time_step, delay_steps = delay_steps, NOISE = False)
+train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_time = delay_time)
+train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time_step, delay_time = delay_time)
 
-val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = False)
-val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], new_time_step, delay_steps = delay_steps, NOISE = False)
+val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
+val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
 TEST_00 = test_data 
 TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift, NOISE = False)
@@ -92,8 +118,7 @@ TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_sh
 TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift), NOISE = False)
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
-
-# Calculate moments 
+ # Calculate moments 
 M_Train_dec0 = momentos(train_dec0, order = moments_order) 
 M_Train_dec1 = momentos(train_dec1, order = moments_order) 
 
@@ -141,13 +166,12 @@ print("Normalization parameters detector 1:", params_dec1)
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-NM = M_Train_dec0.shape[1]
-architecture = [NM, 5, 1, 1]    
+architecture = [moments_order, int(sys.argv[2]), 1, 1]    
 
 model_dec0 = KAN(architecture)
 model_dec1 = KAN(architecture)
-#model_dec0 = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
-#model_dec1 = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
+#model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+#model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
          
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
@@ -165,36 +189,32 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optim
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec0_Na22.npz', data = test_dec0)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec1_Na22.npz', data = test_dec1)
+
 # Calculate TOF
-TOF_V02 = test_dec0[:,:TEST_00.shape[0]] - test_dec1[:,:TEST_00.shape[0]]
-TOF_V00 = test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - test_dec1[:,TEST_00.shape[0] : 2*TEST_00.shape[0]]
-TOF_V20 = test_dec0[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] - test_dec1[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]]
-TOF_V04 = test_dec0[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] - test_dec1[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]]
-TOF_V40 = test_dec0[:,4*TEST_00.shape[0]:] - test_dec1[:,4*TEST_00.shape[0]:]
+TOF = test_dec0 - test_dec1
+
+TOF_V02 = TOF[:,:TEST_00.shape[0]] 
+TOF_V00 = TOF[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] 
+TOF_V20 = TOF[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
+TOF_V04 = TOF[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
+TOF_V40 = TOF[:,4*TEST_00.shape[0]:] 
     
 
 # Calulate Test error
 centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
 
-error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + 0.2))
+error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + time_step*t_shift))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
-error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - 0.2))
-error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 0.4))
-error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 0.4))
+error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - time_step*t_shift))
+error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 2*time_step*t_shift))
+error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 2*time_step*t_shift))
 
 #Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40), axis = 1)   
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
-
-
-# Plot MAE_singles vs MAE_coincidences
-#err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
-#err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
-#mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
-#mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
-#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec0_Na22.npz', data = mean_err_val_dec0)
-#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec1_Na22.npz', data = mean_err_val_dec1)
 
 # Plot
 plt.figure(figsize = (20,5))
@@ -250,4 +270,27 @@ plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
-
+## Combine the two numbers
+#num = f"{sys.argv[1]}{sys.argv[2]}"
+#
+## Your existing variables
+#FWHM = np.array([params_V04[3], params_V02[3], params_V00[3], params_V20[3], params_V40[3]])  # ps
+#FWHM_err = np.array([errors_V04[3],  errors_V02[3],  errors_V00[3],  errors_V20[3],  errors_V40[3]])        # ps
+#centroid = np.array([params_V04[2], params_V02[2], params_V00[2], params_V20[2], params_V40[2]])  # ps
+#centroid_err = np.array([errors_V04[2],  errors_V02[2],  errors_V00[2],  errors_V20[2],  errors_V40[2]])        # ps
+#
+## Multiply by 1000
+#FWHM = FWHM * 1000
+#FWHM_err = FWHM_err * 1000
+#centroid = centroid * 1000
+#centroid_err = centroid_err * 1000
+#
+#
+## Open the file in append mode
+#with open('results_FS.txt', 'a') as file:
+#    file.write(f"FWHM_{num} = np.array([{', '.join(f'{v:.1f}' for v in FWHM)}])  # ps\n")
+#    file.write(f"FWHM_err_{num} = np.array([{', '.join(f'{v:.1f}' for v in FWHM_err)}])  # ps\n")
+#    file.write(f"centroid_{num} = np.array([{', '.join(f'{v:.1f}' for v in centroid)}])  # ps\n")
+#    file.write(f"centroid_err_{num} = np.array([{', '.join(f'{v:.1f}' for v in centroid_err)}])  # ps\n")
+#    file.write(f"MAE_{num} = {MAE[-1]:.7f}  # ps\n")  # Write MAE with one decima
+#    file.write("\n")  # Add a new line for better separation
