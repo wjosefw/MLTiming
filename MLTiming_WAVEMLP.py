@@ -6,8 +6,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 # Import functions
-from functions import (create_and_delay_pulse_pair, set_seed, interpolate_pulses, plot_gaussian, 
-                       get_gaussian_params, create_position, calculate_gaussian_center_sigma)
+from functions import (create_and_delay_pulse_pair, set_seed, plot_gaussian, 
+                       get_gaussian_params, create_position, calculate_gaussian_center_sigma,
+                       continuous_delay)
 from Models import MLP_Torch, train_loop_MLP
 from functions_KAN import count_parameters
 
@@ -19,43 +20,30 @@ val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 
 
-
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_steps = 30        # Max number of steps to delay pulses
-set_seed(42)            # Fix seeds
-nbins = 91              # Num bins for all histograms
-t_shift = 8             # Time steps to move for the new positions
-EXTRASAMPLING = 8
-start = 50*EXTRASAMPLING 
-stop = 74*EXTRASAMPLING 
+delay_time = 1    # Max delay to training pulses in ns
+time_step = 0.2   # Signal time step in ns
+nbins = 71        # Num bins for all histograms                          
+t_shift = 1       # Time steps to move for the new positions
+start = 50
+stop = 74
+set_seed(42)      # Fix seeds
 lr = 1e-3
-epochs = 500
+epochs = 200
 Num_Neurons = 64
 
 # -------------------------------------------------------------------------
-#----------------------- INTERPOLATE PULSES -------------------------------
+#----------------------- ALIGN PULSES -------------------------------
 # -------------------------------------------------------------------------
 
-new_train, new_time_step =  interpolate_pulses(train_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
-new_val, new_time_step =  interpolate_pulses(val_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
-new_test, new_time_step =  interpolate_pulses(test_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
+align_time = 0.6
+new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 
-# Align the pulses 
-align_steps = 20
-
-new_train[:,:,1] = np.roll(new_train[:,:,1], align_steps)
-new_val[:,:,1] = np.roll(new_val[:,:,1], align_steps)
-new_test[:,:,1] = np.roll(new_test[:,:,1], align_steps)
-
-new_train[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
-new_val[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
-new_test[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
-
-print('New number of time points: %.d' % (new_train.shape[1]))
-print('New time step: %.4f' % (new_time_step))
 
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
@@ -72,11 +60,11 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------------------------------------------------------------
 
 
-train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = False)
-train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], new_time_step, delay_steps = delay_steps, NOISE = False)
+train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_time = delay_time)
+train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time_step, delay_time = delay_time)
 
-val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = False)
-val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], new_time_step, delay_steps = delay_steps, NOISE = False)
+val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
+val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
 
 # Test set
@@ -122,22 +110,25 @@ loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1,
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
+# Calculate TOF
+TOF = test_dec0 - test_dec1
 
-TOF_V02 = test_dec0[:,:TEST_00.shape[0]] - test_dec1[:,:TEST_00.shape[0]]
-TOF_V00 = test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - test_dec1[:,TEST_00.shape[0] : 2*TEST_00.shape[0]]
-TOF_V20 = test_dec0[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] - test_dec1[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]]
-TOF_V04 = test_dec0[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] - test_dec1[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]]
-TOF_V40 = test_dec0[:,4*TEST_00.shape[0]:] - test_dec1[:,4*TEST_00.shape[0]:]
+TOF_V02 = TOF[:,:TEST_00.shape[0]] 
+TOF_V00 = TOF[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] 
+TOF_V20 = TOF[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
+TOF_V04 = TOF[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
+TOF_V40 = TOF[:,4*TEST_00.shape[0]:] 
     
 
-# Calculate centered position 'centroid'
-centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
-
-error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + 0.2))
+# Calulate Validation error
+centroid_V00, sigma_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
+    
+error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + t_shift*time_step))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
-error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - 0.2))
-error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 0.4))
-error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 0.4))
+error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - t_shift*time_step))
+error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 2*t_shift*time_step))
+error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 2*t_shift*time_step))
+
 
 #Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40), axis = 1)   
