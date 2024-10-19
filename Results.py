@@ -8,13 +8,13 @@ import matplotlib.pyplot as plt
 positions = np.array([-400, -200, 0, 200, 400])
 
 # KAN
-FWHM_KAN = np.array([223.7, 225.1, 223.4, 223.9, 222.6]) #ps
-err_FWHM_KAN = np.array([1.3, 1.4, 1.1, 1.2, 1.3])
-centroid_KAN = np.array([-399.8, -199.8 , -0.0, 199.5 , 399.5]) #ps
-err_centroid_KAN = np.array([1.2, 1.1, 1.1, 1.3, 1.2])
+FWHM_KAN = np.array([222.1, 220.8, 219.8, 221.4, 221.6]) #ps
+err_FWHM_KAN = np.array([1.5, 1.1, 1.2, 1.3, 1.4])
+centroid_KAN = np.array([-401.0, -200.8 , -0.0, 199.8 , 399.9]) #ps
+err_centroid_KAN = np.array([1.4, 1.0, 1.1, 1.2, 1.3])
 parameter_count =  310
-MAE = 0.07974 #ns
-Commit = 'September 22, 2024 at 5:21 PM'
+MAE = 0.07834 #ns
+Commit = 'October 17, 2024 at 4:46 PM'
 
 
 # MLP
