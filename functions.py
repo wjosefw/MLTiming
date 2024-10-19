@@ -9,36 +9,10 @@ from scipy.interpolate import interp1d
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def fix_imbalances(vector, value = 0, window = 0.4):
-    """
-    Remove random elements of an array centered around a specific value.
-
-    Parameters:
-    vector (array-like): The input data array.
-    value (float, optional): The central value around which to remove elements. Default is 0.
-    window (float, optional): The range around the central value within which elements are considered for removal. Default is 0.4.
-
-    Returns:
-    array-like: Indices of the elements to be deleted.
-    """
-    # Calculate the upper and lower thresholds around the specified value
-    top_threshold = value + window
-    lower_threshold = value - window    
-    # Find the indices of elements within the specified range
-    index = np.where((vector > lower_threshold) & (vector < top_threshold))[0]
-    # Randomly shuffle the indices
-    np.random.shuffle(index)
-    # Select half of the indices for deletion
-    index_to_delete = index[:int(0.5 * index.shape[0])]
-    # Return the indices to be deleted
-    return index_to_delete
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 from scipy.optimize import curve_fit
 def gauss(x, H, A, x0, sigma):
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+
 
 def gauss_fit(x, y):
     mean = sum(x * y) / sum(y)
@@ -87,7 +61,6 @@ def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
     
     centroid = np.array(centroid, dtype = 'float64')
     std = np.array(std, dtype = 'float64')
-    
     return centroid, std
 
 def plot_gaussian(array, shift, range = 0.8, nbins = 51, label = ' '):
@@ -101,7 +74,7 @@ def plot_gaussian(array, shift, range = 0.8, nbins = 51, label = ' '):
     hist_color = patches[0].get_facecolor()
     x_fit = np.linspace(-range, range, 500)
     y_fit = gauss(x_fit, *popt)
-    plt.plot(x_fit, y_fit, color=hist_color)
+    plt.plot(x_fit, y_fit, color = hist_color)
 
 def get_gaussian_params(array, shift, range = 0.8, nbins = 51):
     histog, bins = np.histogram(array - shift, bins = nbins, range = [-range, range])
@@ -112,7 +85,7 @@ def get_gaussian_params(array, shift, range = 0.8, nbins = 51):
     y = histog
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
-    popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
+    popt, pcov = curve_fit(gauss, x, y, p0 = [min(y), max(y), mean, sigma])
     
     if pcov is None:
         print("Gaussian fitting failed or parameter errors could not be estimated.")
@@ -128,72 +101,6 @@ def get_gaussian_params(array, shift, range = 0.8, nbins = 51):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-    
-#def momentos(vector, order = 4):
-#  """
-#    Calculate the moments of a vector using different weight functions.
-#
-#    Parameters:
-#    vector (array-like): The input data array with shape (Nev, Nt, Nc),
-#                         where Nev is the number of events, Nt is the number of time points,
-#                         and Nc is the number of channels.
-#
-#    Returns:
-#    array-like: An array of moments calculated using different weight functions. The shape of the 
-#                returned array is (Nev, number_of_moments, Nc).
-#  """
-#
-#  Nev, Nt, Nc = np.shape(vector)    #Nev: Núm eventos, Nt: Núm puntos temporales, Nc: Número canales
-#  t = np.reshape(np.linspace(0, Nt, Nt)/float(Nt),(1, -1, 1)) #Normalized array of time
-#  MOMENT = np.zeros((Nev,0,Nc))
-#
-#  for i in range(order): # Number of moments used
-#    W = t**(i) 
-#    W = np.tile(W,(Nev, 1, Nc))
-#    MM = np.sum(vector*W, axis = 1, keepdims = True)
-#    MOMENT = np.append(MOMENT, MM, axis = 1)
-#
-#  return MOMENT
-
-
-#from numba import jit
-#
-#@jit
-#def momentos(vector, order=4):
-#    """
-#    Calculate the moments of a vector using different weight functions.
-#
-#    Parameters:
-#    vector (array-like): The input data array with shape (Nev, Nt, Nc),
-#                         where Nev is the number of events, Nt is the number of time points,
-#                         and Nc is the number of channels.
-#
-#    Returns:
-#    array-like: An array of moments calculated using different weight functions.
-#                The shape of the returned array is (Nev, order, Nc).
-#    """
-#    Nev, Nt, Nc = np.shape(vector)  # Nev: Number of events, Nt: Number of time points, Nc: Number of channels
-#    t = np.linspace(0, 1, Nt) # Normalized time array
-#
-#    # Pre-allocate MOMENT array (Nev, order, Nc)
-#    MOMENT = np.zeros((Nev, order, Nc))
-#
-#    for i in range(order):  # Number of moments used
-#        W = t ** i  # Calculate time weight for the current moment        
-#        # Instead of np.sum, use explicit summation to make Numba-compatible
-#        for event in range(Nev):
-#            MM0 = 0.0
-#            MM1 = 0.0
-#            for time in range(Nt):    
-#                #for channel in range(Nc):
-#                MM0 += vector[event, time, 0] * W[time]
-#                MM1 += vector[event, time, 1] * W[time]
-#            MOMENT[event, i, 0] = MM0
-#            MOMENT[event, i, 1] = MM1
-#
-#    return MOMENT
-
-import numpy as np
 from numba import cuda
 
 @cuda.jit
@@ -211,7 +118,7 @@ def calculate_moments_gpu(vector, t, MOMENT, order):
                 moment += vector[event_idx, time_idx, channel] * (t[time_idx] ** order_idx)
             MOMENT[event_idx, order_idx, channel] = moment
 
-def momentos(vector, order=4):
+def momentos(vector, order = 4):
     """
     Calculate the moments of a vector using CUDA with Numba for GPU acceleration.
 
@@ -545,185 +452,113 @@ def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def weights_definition(NM, Npoints):
-  t = np.linspace(0,Npoints, Npoints)/float(Npoints) #Normalized array of time
-  Weights = np.zeros((Npoints,NM))
-  NMW = int(NM/3) #Number of Moments per weight
-
-  for i in range(NMW):
-    Weights[:,i] = t**(i+1)
-
-  for i in range(NMW):
-    Weights[:,i + NMW] = np.exp(-t**(i))
-
-  for i in range(NMW):
-    Weights[:,i + 2*(NMW)] = np.exp(-(i)*t)
-
-  return Weights
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def delay_pulse_pair(pulse_set, time_step, t_shift = 0, delay_steps=32, NOISE=True):
-    """
-    Function to apply random delays to each pulse in a pair, calculate a reference time difference,
-    and optionally add noise to the delayed pulses.
-
-    Parameters:
-    - pulse_set (array): Array of pulse pairs. Shape is (N, M, 2) where N is number of pulse pairs,
-                         M is number of time points, and '2' indicates two channels.
-    - time_step (float): The time interval between consecutive time points in the data.
-    - t_shift (int, optional): Initial time shift applied between two channels. Positive values indicate
-                               that channel 1 is delayed relative to channel 0, and negative values the opposite.
-    - delay_steps (int, optional): Maximum number of delay steps to apply.
-    - NOISE (bool, optional): If True, random Gaussian noise is added to the beginning of the pulses.
-
-    Returns:
-    - INPUT (array): Array containing the delayed pulses with the same shape as pulse_set.
-    - REF (array): Array of reference time differences adjusted for the initial shift, t_shift.
-
-    """
+def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop = 74, delay_time = 1):
     
-    INPUT = np.zeros_like(pulse_set)
-    REF = np.zeros((pulse_set.shape[0],), dtype=np.float32)
 
-    NRD0 = np.random.randint(delay_steps, size=pulse_set.shape[0])
-    NRD1 = np.random.randint(delay_steps, size=pulse_set.shape[0])
-
-    for i in range(pulse_set.shape[0]):
-        N0 = NRD0[i]
-        INPUT[i, :, 0] = np.roll(pulse_set[i, :, 0], N0)
-
-        N1 = NRD1[i]
-        INPUT[i, :, 1] = np.roll(pulse_set[i, :, 1], N1)
-
-        # Calculate the reference time difference taking into account the delays and initial time shift.
-        REF[i] = time_step * (N0 - N1 - t_shift)
-
-        # Add noise to the beginning of the pulses, if enabled.
-        if NOISE:
-            noise0 = np.random.normal(scale=1e-3, size=N0)
-            noise1 = np.random.normal(scale=1e-3, size=N1)
-            INPUT[i, 0:N0, 0] = noise0
-            INPUT[i, 0:N1, 1] = noise1
-        else:
-            # If no noise, retain the original pulses in the delayed sections.
-            INPUT[i, 0:N0, 0] = pulse_set[i,0:N0, 0]
-            INPUT[i, 0:N1, 1] = pulse_set[i,0:N1, 1]
-
-    return INPUT, REF
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def create_and_delay_pulse_pair(pulse_set, time_step, delay_steps = 32, NOISE = True):
-    """
-    Function to create pulses pairs and apply random delays to each other, calculate a reference 
-    time difference, and optionally add noise to the delayed pulses.
-
-    Parameters:
-    - pulse_set (array): Array of pulses. Shape is (N, M) where N is number of pulses,
-                         M is number of time points.
-    - time_step (float): The time interval between consecutive time points in the data.
-    - delay_steps (int, optional): Maximum number of delay steps to apply.
-    - NOISE (bool, optional): If True, random Gaussian noise is added to the beginning of the pulses.
-
-    Returns:
-    - INPUT (array): Array containing the delayed pulses with the same shape as pulse_set.
-    - REF (array): Array of reference time differences adjusted for the initial shift, t_shift.
-
-    """
-    
-    INPUT = np.zeros((pulse_set.shape[0],pulse_set.shape[1],2))
+    INPUT = np.zeros((pulse_set.shape[0], int(stop-start), 2))
+    INPUT_2 = np.zeros((pulse_set.shape[0], int(stop-start), 2))
     REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
 
-    NRD0 = np.random.randint(delay_steps, size = pulse_set.shape[0])
-    NRD1 = np.random.randint(delay_steps, size = pulse_set.shape[0])
-
+    NRD0 = np.random.uniform(low = -0.1, high = delay_time, size = pulse_set.shape[0])
+    NRD1 = np.random.uniform(low = -0.1, high = delay_time, size = pulse_set.shape[0])
+    
     for i in range(pulse_set.shape[0]):
-        N0 = NRD0[i]
-        INPUT[i, :, 0] = np.roll(pulse_set[i, :], N0)
+        
+        if NRD0[i] >= 0:
+            res_0 = NRD0[i] % time_step  # Fractional part of the delay
+            for j in range(int(stop-start) - 1, 0, -1):
+                slope = (pulse_set[i, start + j] - pulse_set[i, start + j - 1]) / time_step
+                INPUT[i, j, 0] = pulse_set[i, start + j] - slope * res_0 
+            INPUT[i, 0, 0] = pulse_set[i, start] 
 
-        N1 = NRD1[i]
-        INPUT[i, :, 1] = np.roll(pulse_set[i, :], N1)
+            idel_0 = int( NRD0[i] / time_step) 
+            INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
+            INPUT_2[i,:idel_0,0] = INPUT[i,:idel_0,0]
+        
+        if NRD0[i] < 0:
+            res_0 = NRD0[i] % time_step  # Fractional part of the delay
+            for j in range(int(stop-start) - 1):
+                slope = (pulse_set[i, start + j + 1] - pulse_set[i, start + j]) / time_step
+                INPUT[i, j, 0] = pulse_set[i, start + j] + slope * res_0 
+            INPUT[i, -1, 0] = pulse_set[i, stop] 
 
-        # Calculate the reference time difference taking into account the delays and initial time shift.
-        REF[i] = time_step * (N0 - N1)
+            idel_0 = int(NRD0[i] / time_step) 
+            if idel_0 <= -1:
+                INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
+                INPUT_2[i,idel_0:,0] = pulse_set[i, stop + 1:stop + abs(idel_0) + 1]
+            else:
+                INPUT_2[i,:,0] = INPUT[i,:,0]
 
-        # Add noise to the beginning of the pulses, if enabled.
-        if NOISE:
-            noise0 = np.random.normal(scale=1e-3, size=N0)
-            noise1 = np.random.normal(scale=1e-3, size=N1)
-            INPUT[i, 0:N0, 0] = noise0
-            INPUT[i, 0:N1, 1] = noise1
-        else:
-            # If no noise, retain the original pulses in the delayed sections.
-            INPUT[i, 0:N0, 0] = pulse_set[i,0:N0]
-            INPUT[i, 0:N1, 1] = pulse_set[i,0:N1]
+        if NRD1[i] >= 0:
+            res_1 = NRD1[i] % time_step  #
+            for j in range(int(stop-start) - 1, 0, -1):
+                slope = (pulse_set[i, start + j] - pulse_set[i, start + j - 1]) / time_step
+                INPUT[i, j, 1] = pulse_set[i, start + j] - slope * res_1 
+            INPUT[i, 0, 1] = pulse_set[i, start] 
 
-    return INPUT, REF
+            idel_1 = int( NRD1[i] / time_step) 
+            INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
+            INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
+        
+        if NRD1[i] < 0:
+           res_1 = NRD1[i] % time_step  # Fractional part of the delay
+           for j in range(int(stop-start) - 1):
+               slope = (pulse_set[i, start + j + 1] - pulse_set[i, start + j]) / time_step
+               INPUT[i, j, 1] = pulse_set[i, start + j] + slope * res_1 
+           INPUT[i, -1, 1] = pulse_set[i, stop] 
+           
+           idel_1 = int(NRD1[i] / time_step) 
+           if idel_1 != 0:
+            INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
+            INPUT_2[i,idel_1:,1] = pulse_set[i, stop + 1:stop + abs(idel_1) + 1]
+           else:
+            INPUT_2[i,:,1] = INPUT[i,:,1]
+        
+        REF[i] = NRD0[i] - NRD1[i]
+
+    return INPUT_2, REF
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def delay_pulse_4_channels(pulse_set, time_step, delay_steps = 20, NOISE = True):
-  """
-    Delays pulses and optionally adds noise to create reference time differences between channels.
+
+def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
     
-    Parameters:
-        pulse_set (np.array): Array of pulse signals.
-        time_step (float): Time step value for calculating reference time differences.
-        delay_steps (int): Maximum delay steps for rolling the pulses.
-        NOISE (bool): Flag to add Gaussian noise to the signals.
+
+    INPUT = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
+    INPUT_2 = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
+    REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
+
+    NRD0 = np.random.uniform(low = 0, high = delay_time, size = pulse_set.shape[0])
+    NRD1 = np.random.uniform(low = 0, high = delay_time, size = pulse_set.shape[0])
     
-    Returns:
-        np.array: Modified pulse signals with delays and optional noise.
-        np.array: Time differences between channel 0 and 1.
-        np.array: Time differences between channel 2 and 3.
-  """
+    for i in range(pulse_set.shape[0]):
+        
+        res_0 = NRD0[i] % time_step  # Fractional part of the delay
+        for j in range(pulse_set.shape[1] - 1, 0, -1):
+            slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
+            INPUT[i, j, 0] = pulse_set[i, j] - slope * res_0 
+        INPUT[i, 0, 0] = pulse_set[i, 0] 
 
-  INPUT = np.zeros((pulse_set.shape[0],pulse_set.shape[1], 4))
-  REF_pulse1_delayed = np.zeros((pulse_set.shape[0],),dtype = np.float32)
-  REF_pulse2_delayed = np.zeros((pulse_set.shape[0],),dtype = np.float32)
-
-
-  NRD0 = np.random.randint(delay_steps, size = pulse_set.shape[0])
-  NRD1 = np.random.randint(delay_steps, size = pulse_set.shape[0])
-  NRD2 = np.random.randint(delay_steps, size = pulse_set.shape[0])
-
-  for i in range(pulse_set.shape[0]):
-    N0 = NRD0[i]
-    INPUT[i,:,0] = np.roll(pulse_set[i,:,0],N0)
-    INPUT[i,:,2] = np.roll(pulse_set[i,:,1],N0)
-
-    N1 = NRD1[i]
-    INPUT[i,:,1] = np.roll(pulse_set[i,:,0],N1)
-
-    N2 = NRD2[i]
-    INPUT[i,:,3] = np.roll(pulse_set[i,:,1],N2)
+        idel_0 = int( NRD0[i] / time_step) 
+        INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
+        INPUT_2[i,:idel_0,0] = INPUT[i,:idel_0,0]
 
 
-    REF_pulse1_delayed[i] = time_step*(N0-N1) 
-    REF_pulse2_delayed[i] = time_step*(N0-N2)  
+        res_1 = NRD1[i] % time_step  #
+        for j in range(pulse_set.shape[1] - 1, 0, -1):
+            slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
+            INPUT[i, j, 1] = pulse_set[i, j] - slope * res_1 
+        INPUT[i, 0, 1] = pulse_set[i, 1] 
 
-    if NOISE:
-      noise00 = np.random.normal(scale = 0.01, size = pulse_set.shape[1])
-      noise11 = np.random.normal(scale = 0.01, size = pulse_set.shape[1])
-      noise22 = np.random.normal(scale = 0.01, size = pulse_set.shape[1])
-      smoothed_noise_00 = gaussian_filter1d(noise00, sigma = 10)
-      smoothed_noise_11 = gaussian_filter1d(noise11, sigma = 10)
-      smoothed_noise_22 = gaussian_filter1d(noise22, sigma = 10)
-      INPUT[i,0:N0,0] = smoothed_noise_00[0:N0]
-      INPUT[i,0:N0,2] = smoothed_noise_00[0:N0]
-      INPUT[i,0:N1,1] = smoothed_noise_11[0:N1]
-      INPUT[i,0:N2,3] = smoothed_noise_22[0:N2]
-    else:
-      INPUT[i,0:N0,0] = pulse_set[i,0:N0,0]
-      INPUT[i,0:N0,2] = pulse_set[i,0:N0,1]
-      INPUT[i,0:N1,1] = pulse_set[i,0:N1,0]
-      INPUT[i,0:N2,3] = pulse_set[i,0:N2,1]
+        idel_1 = int( NRD1[i] / time_step) 
+        INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
+        INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
+        
+        
+        REF[i] = NRD0[i] - NRD1[i]
 
-  return INPUT, REF_pulse1_delayed, REF_pulse2_delayed    
+    return INPUT_2, REF
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -756,7 +591,7 @@ def get_mean_pulse_from_set(pulse_set, channel = 0):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, channel=0):
+def move_to_reference(reference, pulse_set, start = 50, stop = 80, max_delay = 10, channel = 0):
     """
     Aligns each pulse in a set with a reference pulse by shifting it to minimize MSE.
     
@@ -845,11 +680,10 @@ def cut_pulse_by_fraction(vector, fraction = 0.2, window_low = 140, window_high 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
     
-def get_points_after_threshold(vector, time_step = 0.2, fraction = 0.2, num_points = 10):
+def get_points_after_threshold(vector, fraction = 0.2, num_points = 10):
 
     new_vector = np.zeros((vector.shape[0], int(num_points), 2))
-    time = calculate_slope_y_intercept(vector, time_step, threshold = fraction)
-
+    
     for i in range(vector.shape[0]):
         # Find indices where the signal in each channel exceeds the fraction threshold
         idx_channel0 = np.where(vector[i,:, 0] >= fraction)[0][0]
@@ -901,10 +735,10 @@ def interpolate_pulses(data, EXTRASAMPLING = 8, time_step = 0.2):
 def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = True):
     corrected_signal = np.zeros_like(vector)
     for i in range(vector.shape[0]):
-      inverted_signal = np.roll(vector[i,:], shift)
-      inverted_signal[:shift] = 0
+      delayed_signal = np.roll(vector[i,:], shift)
+      delayed_signal[:shift] = 0
       fraction_signal = fraction*(-vector[i,:])
-      corrected_signal[i,:] = inverted_signal + fraction_signal
+      corrected_signal[i,:] = delayed_signal + fraction_signal
       if plot:
           plt.plot(corrected_signal[i, :])
     return corrected_signal
@@ -925,7 +759,6 @@ def find_first_zero_crossing_after_minimum(vector, time_step):
             b = vector[i] - m*t[i]
             crossing_time = -b / m
             break  # Break the loop after finding the crossing point
-    
     return crossing_time      
              
 
@@ -936,11 +769,8 @@ def Calculate_CFD(array, fraction = 0.7, shift = 80, time_step = 0.025):
     Parameters:
     ----------
     - Array : A 2D array representing the input signals where each row corresponds to a separate signal.
-    
     - Fraction (float): The fraction of the maximum signal amplitude used for discrimination.
-    
-    - Shift (int): The amount to shift the CFD signal for discrimination.
-        
+    - Shift (int): The amount to shift the CFD signal for discrimination.     
     - Time_step (float): The time step used for calculating timestamps from the CFD signal.
     
     Returns:
@@ -960,13 +790,47 @@ def Calculate_CFD(array, fraction = 0.7, shift = 80, time_step = 0.025):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def calculate_slope_y_intercept(vector, time_step, threshold = 0.1):
-  
-  t = np.arange(vector.shape[0]) * time_step
-  index = np.where(vector > threshold)[0][0]
-  t1 = t[index]
-  t0 = t[index - 1]
-  m = (vector[index] - vector[index - 1]) / (t1 - t0)
-  b = vector[index - 1] - m*t0
-  time = (threshold - b) / m
-  return time
+
+def calculate_slope_y_intercept(vector, time_step, threshold=0.1):
+    """
+    Calculate the time at which a vector exceeds a given threshold by linear interpolation.
+
+    Parameters:
+    ----------
+    - Vector (numpy.ndarray): A 1D array representing the signal or data to analyze.
+    - Time_step (float): The time interval between consecutive samples in the vector.  
+    - Threshold (float): The threshold value to identify the crossing point.
+
+    Returns:
+    -------
+    time (float): The estimated time at which the signal first exceeds the threshold value. 
+    """
+    
+    t = np.arange(vector.shape[0]) * time_step
+    index = np.where(vector > threshold)[0][0]
+    t1 = t[index]
+    t0 = t[index - 1]
+    m = (vector[index] - vector[index - 1]) / (t1 - t0)
+    b = vector[index - 1] - m*t0
+    time = (threshold - b) / m
+    return time
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def continuous_delay(vector, time_step = 0.2, delay_time = 1, channel_to_fix = 0, channel_to_move = 0):
+    
+    res = delay_time % time_step  # Fractional part of the delay
+    idel = int(delay_time / time_step) 
+
+    new_vector = np.zeros_like(vector)
+    for i in range(vector.shape[0]):
+        for j in range(vector.shape[1] - 1, 0, -1):
+                slope = (vector[i, j, channel_to_move] - vector[i, j - 1, channel_to_move]) / time_step
+                new_vector[i, j, channel_to_move] =  vector[i, j, channel_to_move] - slope * res 
+        new_vector[i,0, channel_to_move] = vector[i,0, channel_to_move]
+        new_vector[i,:,channel_to_move] = np.roll(new_vector[i,:,channel_to_move], idel)
+        new_vector[i,:idel,channel_to_move] = 0
+    new_vector[:,:,channel_to_fix] = vector[:,:,channel_to_fix]
+
+    return new_vector
