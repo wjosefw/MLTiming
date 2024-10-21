@@ -109,7 +109,6 @@ error_V40 = abs((TOF_V40 - centroid_V00 - 2*time_step*t_shift))
 
 #Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40))   
-print(error_V00.shape)
 MAE = np.mean(Error)
 print('MAE: ', MAE)
 
@@ -177,6 +176,7 @@ plt.show()
 # -------------------------------------------------------------------------
 #--------------------------- BOOTSTRAPING ---------------------------------
 # -------------------------------------------------------------------------
+
 resolution_list = []
 for i in range(6):
     a = np.random.choice(np.arange(0, test_data.shape[0]), size = 500, replace = False)
