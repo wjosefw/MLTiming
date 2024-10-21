@@ -4,7 +4,7 @@
 for j in {3..9..2}; do
     clear  
     echo "Running with outer loop parameter: $i"
-    for i in {1..8}; do
+    for i in {1..9}; do
         echo "  Running with inner loop parameter: $j"
         
         # Call the Python script with parameters i and j

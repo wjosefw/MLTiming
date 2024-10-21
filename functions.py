@@ -416,7 +416,7 @@ def create_set(og_set, channel = 0):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift = 8, NOISE = True):
+def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift = 8):
     """
     Create a new position for the pulse set by shifting one channel and optionally adding noise.
 
@@ -425,7 +425,6 @@ def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift 
     channel_to_move (int): The index of the channel to be shifted. Default is 1.
     channel_to_fix (int): The index of the channel to remain fixed. Default is 0.
     t_shift (int): The number of time points to shift the channel. Default is 8.
-    NOISE (bool): Whether to add noise to the shifted channel. Default is True.
 
     Returns:
     np.ndarray: The new pulse set array with the specified channel shifted and optionally noise added.
@@ -437,15 +436,7 @@ def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift 
         
         New_position[i,:,channel_to_fix] = pulse_set[i,:,channel_to_fix]
         New_position[i,:,channel_to_move] = np.roll(pulse_set[i,:,channel_to_move], t_shift)
-        
-        if NOISE:
-            noise00 = np.random.normal(scale = 1e-3, size = t_shift)
-            noise0 = np.random.normal(scale = 0.01, size = New_position.shape[1])
-            smoothed_noise = gaussian_filter1d(noise0, sigma = 10)
-            New_position[i,:,channel_to_move] = New_position[i,:,channel_to_move]  + smoothed_noise
-            New_position[i,:t_shift,channel_to_move] = noise00
-        else:
-            New_position[i,:t_shift,channel_to_move] = pulse_set[i,:t_shift,channel_to_move]
+        New_position[i,:t_shift,channel_to_move] = pulse_set[i,:t_shift,channel_to_move]
     
     return New_position
 
@@ -490,7 +481,7 @@ def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop =
                 INPUT_2[i,:,0] = INPUT[i,:,0]
 
         if NRD1[i] >= 0:
-            res_1 = NRD1[i] % time_step  #
+            res_1 = NRD1[i] % time_step  
             for j in range(int(stop-start) - 1, 0, -1):
                 slope = (pulse_set[i, start + j] - pulse_set[i, start + j - 1]) / time_step
                 INPUT[i, j, 1] = pulse_set[i, start + j] - slope * res_1 
@@ -517,6 +508,52 @@ def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop =
         REF[i] = NRD0[i] - NRD1[i]
 
     return INPUT_2, REF
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+
+def create_delays_uniform(pulse_set, time_step, start = 50, stop = 74, delay_time = 1):
+    
+
+    INPUT = np.zeros((pulse_set.shape[0], int(stop-start), 2))
+    INPUT_2 = np.zeros((pulse_set.shape[0], int(stop-start), 2))
+    REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
+
+    NRD = np.random.uniform(low = -0.1, high = delay_time, size = pulse_set.shape[0])
+    
+    for i in range(pulse_set.shape[0]):
+        
+        if NRD[i] >= 0:
+            res_1 = NRD[i] % time_step  
+            for j in range(int(stop-start) - 1, 0, -1):
+                slope = (pulse_set[i, start + j] - pulse_set[i, start + j - 1]) / time_step
+                INPUT[i, j, 1] = pulse_set[i, start + j] - slope * res_1 
+            INPUT[i, 0, 1] = pulse_set[i, start] 
+
+            idel_1 = int(NRD[i] / time_step) 
+            INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
+            INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
+        
+        if NRD[i] < 0:
+           res_1 = NRD[i] % time_step  # Fractional part of the delay
+           for j in range(int(stop-start) - 1):
+               slope = (pulse_set[i, start + j + 1] - pulse_set[i, start + j]) / time_step
+               INPUT[i, j, 1] = pulse_set[i, start + j] + slope * res_1 
+           INPUT[i, -1, 1] = pulse_set[i, stop] 
+           
+           idel_1 = int(NRD[i] / time_step) 
+           if idel_1 != 0:
+            INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
+            INPUT_2[i,idel_1:,1] = pulse_set[i, stop + 1:stop + abs(idel_1) + 1]
+           else:
+            INPUT_2[i,:,1] = INPUT[i,:,1]
+        
+        INPUT_2[i,:,0] = pulse_set[i,start:stop]
+        REF[i] =  - NRD[i]
+
+    return INPUT_2, REF
+
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------

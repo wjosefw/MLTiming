@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
+from Losses import custom_loss_MAE
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -73,11 +74,6 @@ class MLP_Torch(nn.Module):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def custom_loss(outputs_0, outputs_1, labels):
-    loss = (torch.mean(abs(outputs_0 - outputs_1 - labels)) +
-            torch.sum(torch.relu(-outputs_0)) +
-            torch.sum(torch.relu(-outputs_1)))
-    return loss
 
 def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPOCHS = 75, checkpoint = 15, name = 'model', save = False):
     """
@@ -128,7 +124,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
             outputs_1 = model(inputs[:, :, 1])
 
             # Compute the loss and its gradients
-            loss = custom_loss(outputs_0, outputs_1, labels)
+            loss = custom_loss_MAE(outputs_0, outputs_1, labels)
             loss.backward()
 
             # Adjust learning weights
@@ -158,7 +154,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += custom_loss(val_0, val_1, val_labels)
+                val_loss += custom_loss_MAE(val_0, val_1, val_labels)
             val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
 
@@ -203,7 +199,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
             outputs_1 = model(inputs[:, None, None, :, 1])
 
             # Compute the loss and its gradients
-            loss = custom_loss(outputs_0, outputs_1, labels)
+            loss = custom_loss_MAE(outputs_0, outputs_1, labels)
             loss.backward()
 
             # Adjust learning weights
@@ -232,7 +228,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
                 val_0 = model(val_data[:, None, None, :, 0])
                 val_1 = model(val_data[:, None, None, :, 1])
-                val_loss += custom_loss(val_0, val_1, val_labels)
+                val_loss += custom_loss_MAE(val_0, val_1, val_labels)
         val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
         print(f'LOSS val {val_loss / len(val_loader)}')
 

@@ -3,10 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from efficient_kan.src.efficient_kan import KAN
-#from faster_kan.fastkan.fastkan import FastKAN
-#from kan import *
+
+
 from functions import (momentos, create_and_delay_pulse_pair, set_seed, 
-                       normalize, normalize_given_params, interpolate_pulses, 
+                       normalize, normalize_given_params, continuous_delay, 
                        plot_gaussian, get_gaussian_params)
 from functions_KAN import  count_parameters, train_loop_KAN
 from Models import train_loop_MLP, MLP_Torch
@@ -25,39 +25,26 @@ val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_steps = 30        # Max number of steps to delay pulses
+delay_time = 1          # Max delay to training pulses in ns
+time_step = 0.2         # Signal time step in ns
 moments_order = 5       # Max order of moments used
 set_seed(42)            # Fix seeds
 nbins = 91              # Num bins for all histograms                   
 normalization_method = 'standardization'
-EXTRASAMPLING = 8
-start_idx = 50
-stop_idx = 74
-start = start_idx*EXTRASAMPLING 
-stop = stop_idx*EXTRASAMPLING 
+start = 50
+stop = 74
 architecture = [moments_order, 5, 1, 1]  # KAN architecture
 lr = 1e-3
 epochs = 50
 Num_Neurons = 64
 
 # -------------------------------------------------------------------------
-#----------------------- INTERPOLATE PULSES -------------------------------
+#----------------------- ALIGN PULSES -------------------------------------
 # -------------------------------------------------------------------------
 
-new_train, new_time_step =  interpolate_pulses(train_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
-new_val, new_time_step =  interpolate_pulses(val_data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
-
-# Align the pulses 
-align_steps = 20
-
-new_train[:,:,1] = np.roll(new_train[:,:,1], align_steps)
-new_val[:,:,1] = np.roll(new_val[:,:,1], align_steps)
-
-new_train[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
-new_val[:,:align_steps,1] = np.random.normal(scale = 1e-6, size = align_steps)
-
-print('New number of time points: %.d' % (new_train.shape[1]))
-print('New time step: %.4f' % (new_time_step))
+align_time = 0.6
+new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 
 # -------------------------------------------------------------------------
 #----------------------- CROP WAVEFORM ------------------------------------
@@ -73,8 +60,8 @@ print('Número de casos de validacion: ', validation_data.shape[0])
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-train, REF_train = create_and_delay_pulse_pair(train_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = False)
-val, REF_val = create_and_delay_pulse_pair(validation_data[:,:,0], new_time_step, delay_steps = delay_steps, NOISE = False)
+train, REF_train = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_steps = delay_time)
+val, REF_val = create_and_delay_pulse_pair(validation_data[:,:,0],time_step, delay_steps = delay_time)
 
 # Calculate moments 
 M_Train = momentos(train, order = moments_order) 
@@ -131,6 +118,7 @@ print('MAE validation: ', np.mean(abs(err_val)))
 plot_gaussian(err_val, 0.0, range = 0.05, label = 'Validation errors', nbins = nbins)
 params, errors = get_gaussian_params(err_val, 0.0, range = 0.05, nbins = nbins)
 print("CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params[2], errors[2], params[3], errors[3]))
+
 plt.legend()
 plt.xlabel('$\epsilon$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)

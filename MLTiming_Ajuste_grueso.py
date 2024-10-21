@@ -1,9 +1,9 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from efficient_kan.src.efficient_kan import KAN
-#from faster_kan.fastkan.fastkan import FastKAN
-#from kan import *
 import torch
+from efficient_kan.src.efficient_kan import KAN
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
@@ -13,57 +13,52 @@ from functions import (get_mean_pulse_from_set, momentos, move_to_reference,
                        create_and_delay_pulse_pair, create_position, set_seed, 
                        calculate_gaussian_center_sigma, normalize, 
                        normalize_given_params, plot_gaussian, get_gaussian_params, 
-                       interpolate_pulses)
+                       continuous_delay)
 from functions_KAN import count_parameters, train_loop_KAN
 
 
 # Load data 
-data = np.load('/home/josea/pulsos_Na22_filt_norm_practica_polyfit.npz')['data']
+dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
 
+train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
+val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
+test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_steps = 30         # Max number of steps to delay pulses
+delay_time = 1           # Max delay to training pulses in ns
+time_step = 0.2          # Signal time step in ns
 moments_order = 5        # Max order of moments used
 set_seed(42)             # Fix seeds
-nbins = 91               # Num bins for all histograms
-t_shift = 8              # Time steps to move for the new positions
+nbins = 71               # Num bins for all histograms
+t_shift = 1              # Time steps to move for the new positions
 normalization_method = 'min-max'
-EXTRASAMPLING = 8
-start = 50*EXTRASAMPLING 
-stop = 74*EXTRASAMPLING 
-lr = 3e-3
+start = 50
+stop = 74
+lr = 1e-4
 epochs = 500
 
 # -------------------------------------------------------------------------
-#------------------------- INTERPOLATION ----------------------------------
+#----------------------- ALIGN PULSES -------------------------------------
 # -------------------------------------------------------------------------
 
-new_data, new_time_step =  interpolate_pulses(data, EXTRASAMPLING = EXTRASAMPLING, time_step = 0.2)
-
-# Align the pulses 
-align_steps = 20
-new_data[:,:,1] = np.roll(new_data[:,:,1], align_steps)
-new_data[:,:align_steps,1] = np.random.normal(scale = 1e-3, size = align_steps)
-
-
-print('New number of time points: %.d' % (new_data.shape[1]))
-print('New time step: %.4f' % (new_time_step))
+align_time = 0.6
+new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 
 
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-
-train_data = new_data[:18000,:,:]
-validation_data = new_data[18000:18001,:,:]
-test_data = new_data[18000:,:,:]
+train_data = new_train[:,start:stop,:] 
+validation_data = new_val[:,start:stop,:] 
+test_data = new_test[:,start:stop,:]
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
-
 
 # -------------------------------------------------------------------------
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
@@ -72,23 +67,21 @@ print('Número de casos de test: ', test_data.shape[0])
 mean_pulse_dec0 = get_mean_pulse_from_set(train_data, channel = 0)
 mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
 
-# Train/Validation set
+# Train/Validation/Test set
 delays_dec0, moved_pulses_dec0 = move_to_reference(mean_pulse_dec0, train_data, start = start, stop = stop, max_delay = int(stop-start), channel = 0)
 delays_dec1, moved_pulses_dec1 = move_to_reference(mean_pulse_dec1, train_data, start = start, stop = stop, max_delay = int(stop-start), channel = 1)
-
-train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(moved_pulses_dec0, new_time_step, delay_steps = delay_steps, NOISE = False)
-train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(moved_pulses_dec1, new_time_step, delay_steps = delay_steps, NOISE = False)
 
 delays_val_dec0, moved_pulses_val_dec0 = move_to_reference(mean_pulse_dec0, validation_data, start = start, stop = stop, max_delay = int(stop-start), channel = 0)
 delays_val_dec1, moved_pulses_val_dec1 = move_to_reference(mean_pulse_dec1, validation_data, start = start, stop = stop, max_delay = int(stop-start), channel = 1)
 
-val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(moved_pulses_val_dec0, new_time_step, delay_steps = delay_steps, NOISE = False)
-val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(moved_pulses_val_dec1, new_time_step, delay_steps = delay_steps, NOISE = False)
-
-# Test set
 delays_test_dec0, moved_pulses_test_dec0 = move_to_reference(mean_pulse_dec0, test_data, start = start, stop = stop, max_delay = int(stop-start), channel = 0)
 delays_test_dec1, moved_pulses_test_dec1 = move_to_reference(mean_pulse_dec1, test_data, start = start, stop = stop, max_delay = int(stop-start), channel = 1)
 
+train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(moved_pulses_dec0, time_step, delay_time = delay_time)
+train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(moved_pulses_dec1, time_step, delay_time = delay_time)
+
+val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(moved_pulses_val_dec0, time_step, delay_time = delay_time)
+val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(moved_pulses_val_dec1, time_step, delay_time = delay_time)
 
 TEST_00 = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift, NOISE = False)
@@ -96,7 +89,6 @@ TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_sh
 TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift), NOISE = False)
 TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift), NOISE = False)
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
-
 
 # Calculate moments 
 M_Train_dec0 = momentos(train_dec0, order = moments_order) 
@@ -133,20 +125,15 @@ train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size =
 val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = True)
 val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = True)
 
-
 # Print information 
-print(M_Train_dec0.shape, "NM dec0 =", M_Train_dec0.shape[1])
-print(M_Train_dec1.shape, "NM dec1 =", M_Train_dec1.shape[1])
 print("Normalization parameters detector 0:", params_dec0)
 print("Normalization parameters detector 1:", params_dec1)
-
 
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-NM = M_Train_dec0.shape[1]
-architecture = [NM, 5, 1, 1]   
+architecture = [moments_order, 5, 1, 1]   
 
 model_dec0 = KAN(architecture)
 model_dec1 = KAN(architecture)
@@ -160,17 +147,18 @@ optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr)
 loss_dec0, val_loss_dec0, test_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
 loss_dec1, val_loss_dec1, test_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
 
-
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-TOF_V02 = (test_dec0[:,:TEST_00.shape[0]] - new_time_step*delays_test_dec0) - (test_dec1[:,:TEST_00.shape[0]] - new_time_step*delays_test_dec1)
-TOF_V00 = (test_dec0[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - new_time_step*delays_test_dec0) - (test_dec1[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] - new_time_step*delays_test_dec1)
-TOF_V20 = (test_dec0[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]]  - new_time_step*delays_test_dec0) - (test_dec1[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] - new_time_step*delays_test_dec1)
-TOF_V04 = (test_dec0[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]]  - new_time_step*delays_test_dec0) - (test_dec1[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] - new_time_step*delays_test_dec1)
-TOF_V40 = (test_dec0[:,4*TEST_00.shape[0]:]  - new_time_step*delays_test_dec0) - (test_dec1[:,4*TEST_00.shape[0]:] - new_time_step*delays_test_dec1)
+# Calculate TOF
+TOF = test_dec0 - test_dec1
 
+TOF_V02 = TOF[:,:TEST_00.shape[0]] 
+TOF_V00 = TOF[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] 
+TOF_V20 = TOF[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
+TOF_V04 = TOF[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
+TOF_V40 = TOF[:,4*TEST_00.shape[0]:] 
 
 # Calulate Validation error
 centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
@@ -181,12 +169,10 @@ error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - 0.2))
 error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 0.4))
 error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 0.4))
 
-Error = np.concatenate((error_V02, error_V00, error_V20, error_V04, error_V40), axis = 1)   
-
-# Print MAE
+#Get MAE
+Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40), axis = 1)   
 MAE = np.mean(Error, axis = 1)
-idx_min_MAE = np.where(MAE == np.min(MAE))[0][0]
-print(idx_min_MAE, np.min(MAE))
+print(MAE[-1])
 
 # Plot
 plt.figure(figsize = (20,5))
@@ -198,8 +184,8 @@ plt.ylabel('Log10')
 plt.legend()
 
 plt.subplot(132)
-plt.hist(test_dec0[idx_min_MAE, :delays_test_dec0.shape[0]] - new_time_step*delays_test_dec0, bins = nbins, range = [-1, 3], alpha = 0.5, label = 'Detector 0');
-plt.hist(test_dec1[idx_min_MAE, :delays_test_dec1.shape[0]] - new_time_step*delays_test_dec1, bins = nbins, range = [-1, 3], alpha = 0.5, label = 'Detector 1');
+plt.hist(test_dec0[-1, :delays_test_dec0.shape[0]] - time_step*delays_test_dec0, bins = nbins, range = [-1, 3], alpha = 0.5, label = 'Detector 0');
+plt.hist(test_dec1[-1, :delays_test_dec1.shape[0]] - time_step*delays_test_dec1, bins = nbins, range = [-1, 3], alpha = 0.5, label = 'Detector 1');
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')
@@ -215,18 +201,18 @@ plt.show()
 
   
 # Histogram and gaussian fit 
-plot_gaussian(TOF_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
-plot_gaussian(TOF_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_V00[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
-plot_gaussian(TOF_V20[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
+plot_gaussian(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
+plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
+plot_gaussian(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
 
 
-params_V04, errors_V04 = get_gaussian_params(TOF_V04[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
-params_V02, errors_V02 = get_gaussian_params(TOF_V02[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
-params_V00, errors_V00 = get_gaussian_params(TOF_V00[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
-params_V20, errors_V20 = get_gaussian_params(TOF_V20[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
-params_V40, errors_V40 = get_gaussian_params(TOF_V40[idx_min_MAE,:], centroid_V00[idx_min_MAE], range = 0.8, nbins = nbins)
+params_V04, errors_V04 = get_gaussian_params(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
+params_V02, errors_V02 = get_gaussian_params(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
+params_V00, errors_V00 = get_gaussian_params(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
+params_V20, errors_V20 = get_gaussian_params(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
+params_V40, errors_V40 = get_gaussian_params(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 
 
 print("V40: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))

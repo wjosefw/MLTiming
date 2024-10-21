@@ -22,13 +22,15 @@ dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
 train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
 val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
+test_data =  train_data[:3000,:,:] #####
+train_data = train_data[3000:,:,:] ####
 data = np.load(os.path.join(dir, 'pulsos_Na22_17_10_2023.npz'))['data']
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1                        # Max delay to training pulses in ns
+delay_time = 1                      # Max delay to training pulses in ns
 time_step = 0.2                       # Signal time step in ns
 moments_order = int(sys.argv[1])      # Max order of moments used
 set_seed(42)                          # Fix seeds
@@ -55,9 +57,14 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 #----------------------- CROP WAVEFORM ------------------------------------
 # -------------------------------------------------------------------------
 
-train_data = new_train[:,start:stop,:]  #189:213
-validation_data = new_val[:,start:stop,:] 
-test_data = new_test[:,start:stop,:]
+#train_data = new_train[:,start:stop,:]  #189:213
+#validation_data = new_val[:,start:stop,:] 
+#test_data = new_test[:,start:stop,:]
+
+train_data = new_train  #189:213
+validation_data = new_val 
+test_data = new_test
+
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -67,7 +74,7 @@ print('Número de casos de test: ', test_data.shape[0])
 
 #train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_time = delay_time)
 #train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time_step, delay_time = delay_time)
-
+#
 #val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
 #val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
@@ -78,11 +85,11 @@ train_dec1, REF_train_dec1 = create_positive_and_negative_delays(train_data[:,:,
 val_dec0, REF_val_dec0 = create_positive_and_negative_delays(validation_data[:,:,0], time_step, start = 50, stop = 74,  delay_time = delay_time)
 val_dec1, REF_val_dec1 = create_positive_and_negative_delays(validation_data[:,:,1], time_step, start = 50, stop = 74,  delay_time = delay_time)
 
-TEST_00 = test_data
-TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift, NOISE = False)
-TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift, NOISE = False)
-TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift), NOISE = False)
-TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift), NOISE = False)
+TEST_00 = test_data[:,start:stop,:]
+TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
+TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)
+TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
+TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
 
@@ -235,7 +242,7 @@ plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
-## Combine the two numbers
+### Combine the two numbers
 #num = f"{sys.argv[1]}{sys.argv[2]}"
 #
 ## Your existing variables
