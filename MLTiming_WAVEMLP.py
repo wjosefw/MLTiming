@@ -24,22 +24,22 @@ test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1    # Max delay to training pulses in ns
-time_step = 0.2   # Signal time step in ns
-nbins = 71        # Num bins for all histograms                          
-t_shift = 1       # Time steps to move for the new positions
+delay_time = 0.75    # Max delay to training pulses in ns
+time_step = 0.2      # Signal time step in ns
+nbins = 71           # Num bins for all histograms                          
+t_shift = 1          # Time steps to move for the new positions
 start = 50
 stop = 74
-set_seed(42)      # Fix seeds
+set_seed(42)         # Fix seeds
 lr = 1e-3
-epochs = 200
+epochs = 500
 Num_Neurons = 64
 
 # -------------------------------------------------------------------------
 #----------------------- ALIGN PULSES -------------------------------
 # -------------------------------------------------------------------------
 
-align_time = 0.6
+align_time = 0.5
 new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
@@ -66,13 +66,12 @@ train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time
 val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
-
 # Test set
 TEST_00 = test_data 
-TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift, NOISE = False)
-TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift, NOISE = False)
-TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift), NOISE = False)
-TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift), NOISE = False)
+TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
+TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)
+TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
+TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
 
@@ -86,8 +85,8 @@ val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec1).flo
 train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
 train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
 
-val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = True)
-val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = True)
+val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = False)
+val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
@@ -187,4 +186,3 @@ plt.legend()
 plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
-
