@@ -476,7 +476,7 @@ def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop =
             idel_0 = int(NRD0[i] / time_step) 
             if idel_0 <= -1:
                 INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
-                INPUT_2[i,idel_0:,0] = pulse_set[i, stop + 1:stop + abs(idel_0) + 1]
+                INPUT_2[i,idel_0:,0] = pulse_set[i, stop + 1 : stop + abs(idel_0) + 1]
             else:
                 INPUT_2[i,:,0] = INPUT[i,:,0]
 
@@ -501,7 +501,7 @@ def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop =
            idel_1 = int(NRD1[i] / time_step) 
            if idel_1 != 0:
             INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
-            INPUT_2[i,idel_1:,1] = pulse_set[i, stop + 1:stop + abs(idel_1) + 1]
+            INPUT_2[i,idel_1:,1] = pulse_set[i, stop + 1 : stop + abs(idel_1) + 1]
            else:
             INPUT_2[i,:,1] = INPUT[i,:,1]
         
@@ -871,3 +871,30 @@ def continuous_delay(vector, time_step = 0.2, delay_time = 1, channel_to_fix = 0
     new_vector[:,:,channel_to_fix] = vector[:,:,channel_to_fix]
 
     return new_vector
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+
+def extract_signal_window_by_fraction(vector, fraction = 0.2, window_low = 140, window_high = 10):
+
+    new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
+        
+    for i in range(vector.shape[0]):
+        # Find indices where the signal in each channel exceeds the fraction threshold
+        indices_channel0 = np.where(vector[i,:, 0] >= fraction)[0]
+        indices_channel1 = np.where(vector[i,:, 1] >= fraction)[0]
+        
+        # Calculate the low and high indices to truncate around the fraction threshold
+        low_index_channel0 = indices_channel0[0] - window_low
+        low_index_channel1 = indices_channel1[0] - window_low
+
+        high_index_channel0 = indices_channel0[0] + window_high
+        high_index_channel1 = indices_channel1[0] + window_high
+        
+        # Set values outside the specified windows to zero for each channel
+        new_vector[i,:, 0] =  vector[i,low_index_channel0:high_index_channel0, 0]
+        new_vector[i,:, 1] =  vector[i,low_index_channel1:high_index_channel1, 1]
+        
+
+    return new_vector  

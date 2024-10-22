@@ -29,7 +29,7 @@ delay_time = 1          # Max delay to training pulses in ns
 time_step = 0.2         # Signal time step in ns
 moments_order = 5       # Max order of moments used
 set_seed(42)            # Fix seeds
-nbins = 91              # Num bins for all histograms                   
+nbins = 71              # Num bins for all histograms                   
 normalization_method = 'standardization'
 start = 50
 stop = 74

@@ -18,35 +18,35 @@ Commit = 'October 17, 2024 at 4:46 PM'
 
 
 # MLP
-FWHM_MLP = np.array([222.5, 223.6, 222.2, 223.7, 220.0])
-err_FWHM_MLP = np.array([1.2, 1.4, 1.0, 1.2, 1.3])
-centroid_MLP = np.array([-399.0, -199.0, 0.0, 200.8, 400.7])
-err_centroid_MLP = np.array([1.2, 1.1, 0.9, 1.3, 1.1])
-parameter_count = 8769
-MAE = 0.08441
-Commit =  'September 22, 2024 at 5:21 PM'
+FWHM_MLP = np.array([222.2, 220.8, 218.6, 219.5, 221.3])
+err_FWHM_MLP = np.array([1.5, 1.1, 0.9, 1.0, 1.2])
+centroid_MLP = np.array([-401.1, -200.8, -0.4, 199.7, 399.7])
+err_centroid_MLP = np.array([1.4, 1.0, 0.8, 1.0, 1.1])
+parameter_count = 657
+MAE = 0.08082
+Commit =  'October 21, 2024 at 9:58 PM'
 
 
 # Wave-MLP
-FWHM_WAVEMLP = np.array([232.0, 231.6, 230.6, 230.6, 230.9])
-err_FWHM_WAVEMLP = np.array([1.9, 1.3, 1.6, 1.6, 1.3])
-centroid_WAVEMLP = np.array([-398.3, -198.2, 0.2, 201.7, 401.8])
-err_centroid_WAVEMLP = np.array([1.8, 1.2, 1.5, 1.5, 1.2])
-parameter_count = 20737
-MAE = 0.08540
-Commit = 'September 22, 2024 at 10:17 PM'
+FWHM_WAVEMLP = np.array([229.5, 230.1, 229.9, 228.0, 229.0])
+err_FWHM_WAVEMLP = np.array([1.3, 1.3, 1.4, 1.5, 1.3])
+centroid_WAVEMLP = np.array([-401.7, -202.2, -0.1, 199.0, 398.5])
+err_centroid_WAVEMLP = np.array([1.2, 1.2, 1.3, 1.4, 1.2])
+parameter_count = 9985
+MAE = 0.08485
+Commit = 'October 21, 2024 at 11:41 PM'
 
 
 
 # Convolutional
-FWHM_Conv = np.array([218.1, 222.0, 218.6, 220.8, 219.0])
-err_FWHM_Conv = np.array([1.2, 1.4, 1.3, 0.9, 1.2])
-centroid_Conv = np.array([-409.0, -203.5, 0.0, 197.9, 400.1])
-err_centroid_Conv = np.array([0.9, 0.8, 1.0, 1.3, 1.0])
-parameter_count = 2065 
-MAE = 0.08622
-Commit = 'September 22, 2024 at 10:50 PM'
-model = 'September 22, 2024 at 10:50 PM'
+FWHM_Conv = np.array([218.0, 217.0, 217.5, 217.2, 218.1])
+err_FWHM_Conv = np.array([1.0, 0.9, 1.1, 1.1, 1.2])
+centroid_Conv = np.array([-400.0, -199.4, 0.8, 199.7, 399.9])
+err_centroid_Conv = np.array([0.9, 0.9, 1.0, 1.0, 1.1])
+parameter_count = 1393
+MAE = 0.08835
+Commit = 'October 22, 2024 at 12:14 PM'
+model = 'October 22, 2024 at 12:15 PM'
 
 
 

@@ -56,9 +56,13 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 #----------------------- CROP WAVEFORM ------------------------------------
 # -------------------------------------------------------------------------
 
-train_data = new_train[:,start:stop,:]  #189:213
-validation_data = new_val[:,start:stop,:] 
-test_data = new_test[:,start:stop,:]
+#train_data = new_train[:,start:stop,:]  #189:213
+#validation_data = new_val[:,start:stop,:] 
+#test_data = new_test[:,start:stop,:]
+
+train_data = new_train  #189:213
+validation_data = new_val 
+test_data = new_test
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -66,20 +70,20 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_time = delay_time)
-train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time_step, delay_time = delay_time)
-
-val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
-val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
-
-#from functions import create_positive_and_negative_delays
-#train_dec0, REF_train_dec0 = create_positive_and_negative_delays(train_data[:,:,0], time_step, start = 50, stop = 74, delay_time = delay_time)
-#train_dec1, REF_train_dec1 = create_positive_and_negative_delays(train_data[:,:,1], time_step, start = 50, stop = 74, delay_time = delay_time)
+#train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_time = delay_time)
+#train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time_step, delay_time = delay_time)
 #
-#val_dec0, REF_val_dec0 = create_positive_and_negative_delays(validation_data[:,:,0], time_step, start = 50, stop = 74,  delay_time = delay_time)
-#val_dec1, REF_val_dec1 = create_positive_and_negative_delays(validation_data[:,:,1], time_step, start = 50, stop = 74,  delay_time = delay_time)
+#val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
+#val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
-TEST_00 = test_data
+from functions import create_positive_and_negative_delays
+train_dec0, REF_train_dec0 = create_positive_and_negative_delays(train_data[:,:,0], time_step, start = 50, stop = 74, delay_time = delay_time)
+train_dec1, REF_train_dec1 = create_positive_and_negative_delays(train_data[:,:,1], time_step, start = 50, stop = 74, delay_time = delay_time)
+
+val_dec0, REF_val_dec0 = create_positive_and_negative_delays(validation_data[:,:,0], time_step, start = 50, stop = 74,  delay_time = delay_time)
+val_dec1, REF_val_dec1 = create_positive_and_negative_delays(validation_data[:,:,1], time_step, start = 50, stop = 74,  delay_time = delay_time)
+
+TEST_00 = test_data[:,start:stop,:]
 TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
 TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)
 TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))

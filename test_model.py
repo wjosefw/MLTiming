@@ -51,30 +51,37 @@ TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_sh
 TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
-# Calculate moments 
-MOMENTS_TEST = momentos(TEST, order = moments_order)
-
-# Normalize moments
-params_dec0 = (np.array([0.38123475, 0.38367176, 0.36448884, 0.34427001, 0.32574118]), np.array([0.40531052, 0.3211757 , 0.28093212, 0.25361035, 0.23289862]))
-params_dec1 = (np.array([0.34459084, 0.36008492, 0.34417236, 0.32550077, 0.30801989]), np.array([0.43774342, 0.33152184, 0.28260705, 0.25142029, 0.22891419]))
-
-MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
-MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
-MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
+## Calculate moments 
+#MOMENTS_TEST = momentos(TEST, order = moments_order)
+#
+## Normalize moments
+#params_dec0 = (np.array([0.38123475, 0.38367176, 0.36448884, 0.34427001, 0.32574118]), np.array([0.40531052, 0.3211757 , 0.28093212, 0.25361035, 0.23289862]))
+#params_dec1 = (np.array([0.34459084, 0.36008492, 0.34417236, 0.32550077, 0.30801989]), np.array([0.43774342, 0.33152184, 0.28260705, 0.25142029, 0.22891419]))
+#
+#MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
+#MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
+#MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
 
 
 # -------------------------------------------------------------------------
 #--------------------------- LOAD MODELS ----------------------------------
 # -------------------------------------------------------------------------
 
-dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
-model_dec0_dir = os.path.join(dir, 'model_dec0_495')
-model_dec1_dir = os.path.join(dir, 'model_dec1_495')
+#dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
+dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/Convolutional'
+#model_dec0_dir = os.path.join(dir, 'model_dec0_495')
+#model_dec1_dir = os.path.join(dir, 'model_dec1_495')
+model_dec0_dir = os.path.join(dir, 'Conv_model_dec0')
+model_dec1_dir = os.path.join(dir, 'Conv_model_dec1')
 
 architecture = [moments_order, 5, 1, 1]    
 
-model_dec0 = KAN(architecture)
-model_dec1 = KAN(architecture)
+#model_dec0 = KAN(architecture)
+#model_dec1 = KAN(architecture)
+from Models import ConvolutionalModel
+model_dec0 = ConvolutionalModel(int(stop-start))
+model_dec1 = ConvolutionalModel(int(stop-start))
+
 
 model_dec0.load_state_dict(torch.load(model_dec0_dir))
 model_dec1.load_state_dict(torch.load(model_dec1_dir))
@@ -83,9 +90,11 @@ model_dec1.load_state_dict(torch.load(model_dec1_dir))
 #--------------------------- GET RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-test_dec0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST[:,:,0]).float()).detach().numpy())
-test_dec1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST[:,:,1]).float()).detach().numpy())
+#test_dec0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST[:,:,0]).float()).detach().numpy())
+#test_dec1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST[:,:,1]).float()).detach().numpy())
 
+test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,None,:,0]).float()).detach().numpy())
+test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,None,:,1]).float()).detach().numpy())
 
 # Calculate TOF
 TOF = test_dec0 - test_dec1
@@ -160,6 +169,11 @@ dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/'
 energy_dec0 = np.load(os.path.join(dir,'pulsos_Na22_energy_dec0_test_val.npz'), allow_pickle = True)['data']
 energy_dec1 = np.load(os.path.join(dir,'pulsos_Na22_energy_dec1_test_val.npz'), allow_pickle = True)['data']
 
+a = np.where((TOF_V00 > -16))[0]
+print(np.where((TOF_V00 < -16))[0])
+Error = np.concatenate((error_V02[a], error_V20[a], error_V00[a], error_V04[a], error_V40[a]))   
+MAE = np.mean(Error)
+print('MAE: ', MAE)
 
 plt.plot(energy_dec0 - energy_dec1,  TOF_V00, 'b.', markersize = 1)
 plt.xlabel('Moment 0 diff')
