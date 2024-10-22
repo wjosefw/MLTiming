@@ -29,12 +29,13 @@ class ConvolutionalModel(nn.Module):
     
     def forward(self, x):
         x = self.conv1(x)
-        x = self.bn1(x)
-        x = F.relu(x)
+        #x = self.bn1(x)
+        #x = F.relu(x)
         x = self.pool1(x)
         
         x = self.conv2(x)
-        x = self.bn2(x)
+        #x = self.bn2(x)
+        #x = F.relu(x)
         x = self.pool2(x)
         
         x = x.view(x.size(0), -1)  # Flatten
@@ -75,7 +76,7 @@ class MLP_Torch(nn.Module):
 #----------------------------------------------------------------------------------------------
 
 
-def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPOCHS = 75, checkpoint = 15, name = 'model', save = False):
+def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
     """
     Args:
     model (torch.nn.Module): The model to be trained.
@@ -84,7 +85,6 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
     val_loader (torch.utils.data.DataLoader): DataLoader containing the validation data.
     test_tensor (torch.Tensor): Tensor used for testing.
     EPOCHS (int, optional): The number of epochs to train the model. Default is 75.
-    checkpoint (int, optional): The frequency (in epochs) at which the model is saved. Default is 15.
     name (str, optional): Base name for the saved model files. Default is 'model'.
     save (bool, optional): Whether to save the model at specified checkpoints. Default is False.
 
@@ -159,11 +159,9 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
             print(f'LOSS val {val_loss / len(val_loader)}')
 
 
-        # Save the model at the specified checkpoint frequency if 'save' is True
-        if save:
-            if epoch % checkpoint == 0:
-                model_name = name + '_' + str(epoch)
-                torch.save(model.state_dict(), model_name)
+    # Save the model at the specified checkpoint frequency if 'save' is True
+    if save:
+       torch.save(model.state_dict(), name)
 
     
 
@@ -172,7 +170,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, checkpoint = 15, name = 'model', save = False):
+def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     test_tensor = test_tensor.to(device)
@@ -233,9 +231,8 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
         print(f'LOSS val {val_loss / len(val_loader)}')
 
 
-        if save and (epoch + 1) % checkpoint == 0:
-            model_name = f'{name}_{epoch + 1}.pth'
-            torch.save(model.state_dict(), model_name)
+    if save:
+        torch.save(model.state_dict(), name)
 
     # Convert lists to numpy arrays
     loss_array = np.array(loss_list, dtype = 'object')
