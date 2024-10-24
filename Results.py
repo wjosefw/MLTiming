@@ -39,14 +39,14 @@ Commit = 'October 21, 2024 at 11:41 PM'
 
 
 # Convolutional
-FWHM_Conv = np.array([218.0, 217.0, 217.5, 217.2, 218.1])
-err_FWHM_Conv = np.array([1.0, 0.9, 1.1, 1.1, 1.2])
-centroid_Conv = np.array([-400.0, -199.4, 0.8, 199.7, 399.9])
-err_centroid_Conv = np.array([0.9, 0.9, 1.0, 1.0, 1.1])
-parameter_count = 1393
-MAE = 0.08835
-Commit = 'October 22, 2024 at 12:14 PM'
-model = 'October 22, 2024 at 12:15 PM'
+FWHM_Conv = np.array([216.2, 216.9, 217.3, 216.2, 216.3])
+err_FWHM_Conv = np.array([0.8, 1.0, 1.1, 1.0, 0.8])
+centroid_Conv = np.array([-396.5, -197.9, 0.5, 198.7, 397.1])
+err_centroid_Conv = np.array([0.7, 0.9, 1.0, 0.9, 0.7])
+parameter_count = 6097
+MAE = 0.07739
+Commit = 'October 24, 2024 at 6:03 PM'
+model = 'October 24, 2024 at 6:06 PM'
 
 
 
