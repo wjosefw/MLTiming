@@ -21,14 +21,14 @@ test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 0.5    # Max delay to training pulses in ns
-time_step = 0.2   # Signal time step in ns
-nbins = 71        # Num bins for all histograms                          
-t_shift = 1       # Time steps to move for the new positions
-start = 50
+delay_time = 1    # Max delay to training pulses in ns
+time_step = 0.2     # Signal time step in ns
+nbins = 71          # Num bins for all histograms                          
+t_shift = 1         # Time steps to move for the new positions
+start = 45
 stop = 74
-set_seed(42)      # Fix seeds
-epochs = 500
+set_seed(42)        # Fix seeds
+epochs = 1000
 lr = 1e-3
 
 
@@ -63,13 +63,6 @@ train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time
 val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
-#from functions import create_delays_uniform
-#train_dec0, REF_train_dec0 = create_delays_uniform(train_data[:,:,0], time_step, start = 50, stop = 74, delay_time = delay_time)
-#train_dec1, REF_train_dec1 = create_delays_uniform(train_data[:,:,1], time_step, start = 50, stop = 74, delay_time = delay_time)
-#
-#val_dec0, REF_val_dec0 = create_delays_uniform(validation_data[:,:,0], time_step, start = 50, stop = 74,  delay_time = delay_time)
-#val_dec1, REF_val_dec1 = create_delays_uniform(validation_data[:,:,1], time_step, start = 50, stop = 74,  delay_time = delay_time)
-
 TEST_00 = test_data
 TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
 TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)  
@@ -89,6 +82,7 @@ train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size =
 
 val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = False)
 val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = False)
+
 
 
 # -------------------------------------------------------------------------
