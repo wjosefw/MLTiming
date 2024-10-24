@@ -675,45 +675,7 @@ def move_to_reference(reference, pulse_set, start = 50, stop = 80, max_delay = 1
 
     return np.array(delays), np.array(moved_pulses)
 
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-    
-def cut_pulse_by_fraction(vector, fraction = 0.2, window_low = 140, window_high = 10):
-    """
-    Truncates pulse data in the input vector based on a specified fraction.
-
-    Parameters:
-    vector (ndarray): Input 3D array of shape (n_samples, n_points, n_channels).
-    fraction (float): Fraction threshold to determine the start of the pulse. Default is 0.2.
-    window_low (int): Number of points before the fraction threshold to retain. Default is 140.
-    window_high (int): Number of points after the fraction threshold to retain. Default is 10.
-
-    Returns:
-    ndarray: A new vector with truncated pulse data.
-    """
-    new_vector = np.copy(vector)
-        
-    for i in range(vector.shape[0]):
-        # Find indices where the signal in each channel exceeds the fraction threshold
-        indices_channel0 = np.where(vector[i,:, 0] >= fraction)[0]
-        indices_channel1 = np.where(vector[i,:, 1] >= fraction)[0]
-        
-        # Calculate the low and high indices to truncate around the fraction threshold
-        low_index_channel0 = indices_channel0[0] - window_low
-        low_index_channel1 = indices_channel1[0] - window_low
-
-        high_index_channel0 = indices_channel0[0] + window_high
-        high_index_channel1 = indices_channel1[0] + window_high
-        
-        # Set values outside the specified windows to zero for each channel
-        new_vector[i,:low_index_channel0, 0] = 0.0
-        new_vector[i,:low_index_channel1, 1] = 0.0
-        
-        new_vector[i,high_index_channel0:, 0] = 0.0
-        new_vector[i,high_index_channel1:, 1] = 0.0
-    
-    return new_vector    
-
+   
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
     
@@ -879,7 +841,7 @@ def continuous_delay(vector, time_step = 0.2, delay_time = 1, channel_to_fix = 0
 def extract_signal_window_by_fraction(vector, fraction = 0.2, window_low = 140, window_high = 10):
 
     new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
-        
+    
     for i in range(vector.shape[0]):
         # Find indices where the signal in each channel exceeds the fraction threshold
         indices_channel0 = np.where(vector[i,:, 0] >= fraction)[0]
@@ -897,4 +859,75 @@ def extract_signal_window_by_fraction(vector, fraction = 0.2, window_low = 140, 
         new_vector[i,:, 1] =  vector[i,low_index_channel1:high_index_channel1, 1]
         
 
-    return new_vector  
+    return new_vector
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def extract_signal_along_time(vector, fraction = 0.2, window_low = 140, window_high = 10):
+
+    new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
+    time_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
+    t = np.linspace(0, 1, vector.shape[1])
+        
+    for i in range(vector.shape[0]):
+        # Find indices where the signal in each channel exceeds the fraction threshold
+        indices_channel0 = np.where(vector[i,:, 0] >= fraction)[0]
+        indices_channel1 = np.where(vector[i,:, 1] >= fraction)[0]
+        
+        # Calculate the low and high indices to truncate around the fraction threshold
+        low_index_channel0 = indices_channel0[0] - window_low
+        low_index_channel1 = indices_channel1[0] - window_low
+
+        high_index_channel0 = indices_channel0[0] + window_high
+        high_index_channel1 = indices_channel1[0] + window_high
+        
+        # Set values outside the specified windows to zero for each channel
+        new_vector[i,:, 0] =  vector[i,low_index_channel0:high_index_channel0, 0]
+        new_vector[i,:, 1] =  vector[i,low_index_channel1:high_index_channel1, 1]
+
+        time_vector[i,:,0] = t[low_index_channel0:high_index_channel0]
+        time_vector[i,:,1] = t[low_index_channel1:high_index_channel1]
+
+    return new_vector, time_vector    
+
+def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, delay_time = 1):
+    
+
+    INPUT = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
+    INPUT_2 = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
+    Time_delayed = np.zeros((time_vector.shape[0], time_vector.shape[1], 2))
+    REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
+
+    NRD0 = np.random.uniform(low = 0, high = delay_time, size = pulse_set.shape[0])
+    NRD1 = np.random.uniform(low = 0, high = delay_time, size = pulse_set.shape[0])
+    
+    for i in range(pulse_set.shape[0]):
+        
+        res_0 = NRD0[i] % time_step  # Fractional part of the delay
+        for j in range(pulse_set.shape[1] - 1, 0, -1):
+            slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
+            INPUT[i, j, 0] = pulse_set[i, j] - slope * res_0 
+        INPUT[i, 0, 0] = pulse_set[i, 0] 
+
+        idel_0 = int( NRD0[i] / time_step) 
+        INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
+        INPUT_2[i,:idel_0,0] = INPUT[i,:idel_0,0]
+
+
+        res_1 = NRD1[i] % time_step  #
+        for j in range(pulse_set.shape[1] - 1, 0, -1):
+            slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
+            INPUT[i, j, 1] = pulse_set[i, j] - slope * res_1 
+        INPUT[i, 0, 1] = pulse_set[i, 1] 
+
+        idel_1 = int( NRD1[i] / time_step) 
+        INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
+        INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
+        
+        
+        REF[i] = NRD0[i] - NRD1[i]
+        print(NRD0[i].shape)
+        Time_delayed[i,:,0] = time_vector[i,:] + NRD0[i]
+        Time_delayed[i,:,1] = time_vector[i,:] + NRD1[i]
+    return INPUT_2, REF, Time_delayed
