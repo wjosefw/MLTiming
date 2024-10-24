@@ -450,8 +450,8 @@ def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop =
     INPUT_2 = np.zeros((pulse_set.shape[0], int(stop-start), 2))
     REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
 
-    NRD0 = np.random.uniform(low = -0.1, high = delay_time, size = pulse_set.shape[0])
-    NRD1 = np.random.uniform(low = -0.1, high = delay_time, size = pulse_set.shape[0])
+    NRD0 = np.random.uniform(low = -0.05, high = delay_time, size = pulse_set.shape[0])
+    NRD1 = np.random.uniform(low = -0.05, high = delay_time, size = pulse_set.shape[0])
     
     for i in range(pulse_set.shape[0]):
         
@@ -520,7 +520,7 @@ def create_delays_uniform(pulse_set, time_step, start = 50, stop = 74, delay_tim
     INPUT_2 = np.zeros((pulse_set.shape[0], int(stop-start), 2))
     REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
 
-    NRD = np.random.uniform(low = -0.1, high = delay_time, size = pulse_set.shape[0])
+    NRD = np.random.triangular(-0.1, 0, delay_time, size = pulse_set.shape[0]) #np.random.uniform(low = -0.1, high = delay_time, size = pulse_set.shape[0])
     
     for i in range(pulse_set.shape[0]):
         

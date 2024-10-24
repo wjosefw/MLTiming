@@ -7,9 +7,7 @@ import torch
 from functions import (create_and_delay_pulse_pair, create_position, 
                        calculate_gaussian_center_sigma, plot_gaussian, 
                        get_gaussian_params, set_seed, continuous_delay)
-from Models import ConvolutionalModel, train_loop_convolutional
-from functions_KAN import count_parameters
-
+from Models import ConvolutionalModel, train_loop_convolutional, count_parameters
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
@@ -23,7 +21,7 @@ test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1    # Max delay to training pulses in ns
+delay_time = 0.5    # Max delay to training pulses in ns
 time_step = 0.2   # Signal time step in ns
 nbins = 71        # Num bins for all histograms                          
 t_shift = 1       # Time steps to move for the new positions
@@ -51,6 +49,7 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 train_data = new_train[:,start:stop,:] 
 validation_data = new_val[:,start:stop,:] 
 test_data = new_test[:,start:stop,:]
+
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -63,6 +62,13 @@ train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time
 
 val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
+
+#from functions import create_delays_uniform
+#train_dec0, REF_train_dec0 = create_delays_uniform(train_data[:,:,0], time_step, start = 50, stop = 74, delay_time = delay_time)
+#train_dec1, REF_train_dec1 = create_delays_uniform(train_data[:,:,1], time_step, start = 50, stop = 74, delay_time = delay_time)
+#
+#val_dec0, REF_val_dec0 = create_delays_uniform(validation_data[:,:,0], time_step, start = 50, stop = 74,  delay_time = delay_time)
+#val_dec1, REF_val_dec1 = create_delays_uniform(validation_data[:,:,1], time_step, start = 50, stop = 74,  delay_time = delay_time)
 
 TEST_00 = test_data
 TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
@@ -139,8 +145,8 @@ plt.ylabel('Log10')
 plt.legend()
 
 plt.subplot(132)
-plt.hist(test_dec0[-1,:], bins = nbins, range = [-1, 5], alpha = 0.5, label = 'Detector 0');
-plt.hist(test_dec1[-1,:], bins = nbins, range = [-1, 5], alpha = 0.5, label = 'Detector 1');
+plt.hist(test_dec0[-1,:], bins = nbins, range = [-5, 10], alpha = 0.5, label = 'Detector 0');
+plt.hist(test_dec1[-1,:], bins = nbins, range = [-5, 10], alpha = 0.5, label = 'Detector 1');
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')

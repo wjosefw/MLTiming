@@ -14,7 +14,7 @@ from functions import (get_mean_pulse_from_set, momentos, move_to_reference,
                        calculate_gaussian_center_sigma, normalize, 
                        normalize_given_params, plot_gaussian, get_gaussian_params, 
                        continuous_delay)
-from functions_KAN import count_parameters, train_loop_KAN
+from Models import count_parameters, train_loop_KAN, train_loop_MLP, MLP_Torch
 
 
 # Load data 
@@ -39,6 +39,7 @@ start = 50
 stop = 74
 lr = 1e-4
 epochs = 500
+Num_Neurons = 16
 
 # -------------------------------------------------------------------------
 #----------------------- ALIGN PULSES -------------------------------------
@@ -54,9 +55,9 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-train_data = new_train[:,start:stop,:] 
-validation_data = new_val[:,start:stop,:] 
-test_data = new_test[:,start:stop,:]
+train_data = new_train
+validation_data = new_val
+test_data = new_test
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -84,10 +85,10 @@ val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(moved_pulses_val_dec0, time
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(moved_pulses_val_dec1, time_step, delay_time = delay_time)
 
 TEST_00 = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
-TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift, NOISE = False)
-TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift, NOISE = False)
-TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift), NOISE = False)
-TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift), NOISE = False)
+TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
+TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)
+TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
+TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
 # Calculate moments 
@@ -135,17 +136,22 @@ print("Normalization parameters detector 1:", params_dec1)
 
 architecture = [moments_order, 5, 1, 1]   
 
-model_dec0 = KAN(architecture)
-model_dec1 = KAN(architecture)
-         
+#model_dec0 = KAN(architecture)
+#model_dec1 = KAN(architecture)
+model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+                  
+
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
 optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr) 
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr)  
 
 # Execute train loop
-loss_dec0, val_loss_dec0, test_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
-loss_dec1, val_loss_dec1, test_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
+#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, save = False) 
+#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, save = False)
+loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec0', save = False) 
+loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec1', save = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------

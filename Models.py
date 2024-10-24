@@ -9,37 +9,94 @@ import torch.optim as optim
 from Losses import custom_loss_MAE, custom_loss_bounded
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
+#
+#class ConvolutionalModel(nn.Module):
+#    def __init__(self, N_points):
+#        super(ConvolutionalModel, self).__init__()
+#        
+#        self.conv1 = nn.Conv2d(in_channels = 1, out_channels = 8, kernel_size = 3, padding = 1, stride = 1)
+#        self.bn1 = nn.BatchNorm2d(8)
+#        self.pool1 = nn.MaxPool2d((1, 2)) # Output: (batch_size, 8, 1, N_points // 2)
+#        
+#        self.conv2 = nn.Conv2d(in_channels = 8, out_channels = 16, kernel_size = 3, padding = 1, stride = 1)
+#        self.bn2 = nn.BatchNorm2d(16)
+#        self.pool2 = nn.MaxPool2d((1, 2))  # Output: (batch_size, 8, 1, N_points // 4)
+#        
+#        self.conv3 = nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, padding = 1, stride = 1)
+#        self.bn3 = nn.BatchNorm2d(32)
+#        self.pool3 = nn.MaxPool2d((1, 2))  # Output: (batch_size, 8, 1, N_points // 8)
+#        # Calculate the flattened size after the convolutions and pooling
+#        self.flatten_size = 32 * (N_points // 8)  # Adjust according to pooling layers
+#        
+#        self.fc1 = nn.Linear(self.flatten_size, 1)
+#    
+#    def forward(self, x):
+#        x = self.conv1(x)
+#        #x = self.bn1(x)
+#        #x = F.relu(x)
+#        x = self.pool1(x)
+#    
+#        x = self.conv2(x)
+#        #x = self.bn2(x)
+#        #x = F.relu(x)
+#        x = self.pool2(x)
+#
+#        x = self.conv3(x)
+#        #x = self.bn2(x)
+#        #x = F.relu(x)
+#        x = self.pool3(x)
+#        
+#        x = x.view(x.size(0), -1)  # Flatten
+#        x = self.fc1(x)
+#     
+#        return x
+    
 class ConvolutionalModel(nn.Module):
     def __init__(self, N_points):
         super(ConvolutionalModel, self).__init__()
-        
-        self.conv1 = nn.Conv2d(in_channels = 1, out_channels = 8, kernel_size = 3, padding = 1, stride = 1)
+
+        # Convolutional Layer 1
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1, stride=1)
         self.bn1 = nn.BatchNorm2d(8)
-        self.pool1 = nn.MaxPool2d((1, 2)) # Output: (batch_size, 8, 1, N_points // 2)
+        self.pool1 = nn.MaxPool2d((1, 2))  # Reduces width by half
         
-        self.conv2 = nn.Conv2d(in_channels = 8, out_channels = 16, kernel_size = 3, padding = 1, stride = 1)
+        # Convolutional Layer 2
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding=1, stride=1)
         self.bn2 = nn.BatchNorm2d(16)
-        self.pool2 = nn.MaxPool2d((1, 2))  # Output: (batch_size, 8, 1, N_points // 4)
+        self.pool2 = nn.MaxPool2d((1, 2))  # Reduces width by half
         
-        # Calculate the flattened size after the convolutions and pooling
-        self.flatten_size = 16 * (N_points // 4)  # Adjust according to pooling layers
+        # Convolutional Layer 3
+        self.conv3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1, stride=1)
+        self.bn3 = nn.BatchNorm2d(32)
+        self.pool3 = nn.MaxPool2d((1, 2))  # Reduces width by half
+
+        # Calculate the flattened size after convolutions and pooling
+        self.flatten_size = 32 * (N_points // 8)  # Adjust according to pooling layers
         
+        # Fully Connected Layer
         self.fc1 = nn.Linear(self.flatten_size, 1)
-    
+        
+        # Optional Dropout for regularization
+        self.dropout = nn.Dropout(p = 0.05)  # Dropout with 5% probability
+
     def forward(self, x):
+        # Convolutional Block 1
         x = self.conv1(x)
-        #x = self.bn1(x)
-        #x = F.relu(x)
         x = self.pool1(x)
-        
+
+        # Convolutional Block 2
         x = self.conv2(x)
-        #x = self.bn2(x)
-        #x = F.relu(x)
         x = self.pool2(x)
+
+        # Convolutional Block 3
+        x = self.conv3(x)
+        x = self.pool3(x)
         
+        # Flattening the output for the fully connected layer
         x = x.view(x.size(0), -1)  # Flatten
         
+        # Fully Connected Layer with Dropout
+        x = self.dropout(x)
         x = self.fc1(x)
      
         return x
