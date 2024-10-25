@@ -25,12 +25,10 @@ def custom_loss_MSE(outputs_0, outputs_1, labels):
 #----------------------------------------------------------------------------------------------
 
 
-def custom_loss_Threshold(outputs_0, outputs_1, labels):
-    loss = (torch.mean((outputs_0 - outputs_1 - labels) ** 2) +  
-            torch.sum(torch.relu(-outputs_0)) +
-            torch.sum(torch.relu(-outputs_1)) +
-            torch.mean(torch.maximum(torch.tensor(0.0, device=outputs_0.device), 
-                                     torch.abs(outputs_1 - outputs_0) - 1)))
+def custom_loss_Threshold(outputs_0, outputs_1, labels, threshold = 1):
+    loss = (torch.mean(abs(outputs_0 - outputs_1 - labels)) +
+            torch.mean(torch.maximum(torch.tensor(0.0, device = outputs_0.device), 
+                                     torch.abs(outputs_1 - outputs_0) - threshold)))
     return loss
 
 
@@ -56,6 +54,32 @@ def custom_loss_bounded(outputs_0, outputs_1, labels, lower_limit, upper_limit):
     penalty_upper_1 = torch.sum(torch.relu(outputs_1 - upper_limit_tensor))
     loss += penalty_upper_0 + penalty_upper_1
 
+    return loss
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def custom_loss_with_huber(outputs_0, outputs_1, labels):
+    delta = 0.9
+    penalty_weight = 1  
+    threshold = 1.0  # Threshold for penalty term
+
+    # Compute the predicted difference
+    pred_diff = outputs_0 - outputs_1
+    error = pred_diff - labels
+
+    # Compute Huber loss
+    is_small_error = torch.abs(error) <= delta
+    squared_loss = 0.5 * error ** 2
+    linear_loss = delta * (torch.abs(error) - 0.5 * delta)
+    regression_loss = torch.where(is_small_error, squared_loss, linear_loss).mean()
+
+    # Penalty term for deviations beyond the threshold
+    deviation = torch.abs(pred_diff) - threshold
+    penalty = torch.mean(torch.relu(deviation) ** 2)
+
+    # Total loss
+    loss = regression_loss + penalty_weight * penalty
     return loss
 
 
