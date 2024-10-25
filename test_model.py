@@ -25,6 +25,7 @@ normalization_method = 'standardization'
 start= 50
 stop = 74
 time_step = 0.2         # Signal time step
+positions = np.array([0.4, 0.2, 0.0, -0.2, -0.4])
 
 # -------------------------------------------------------------------------
 #----------------------- ALIGN PULSES -------------------------------------
@@ -52,49 +53,51 @@ TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_sh
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
 ## Calculate moments 
-#MOMENTS_TEST = momentos(TEST, order = moments_order)
-#
-## Normalize moments
-#params_dec0 = (np.array([0.38123475, 0.38367176, 0.36448884, 0.34427001, 0.32574118]), np.array([0.40531052, 0.3211757 , 0.28093212, 0.25361035, 0.23289862]))
-#params_dec1 = (np.array([0.34459084, 0.36008492, 0.34417236, 0.32550077, 0.30801989]), np.array([0.43774342, 0.33152184, 0.28260705, 0.25142029, 0.22891419]))
-#
-#MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
-#MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
-#MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
+MOMENTS_TEST = momentos(TEST, order = moments_order)
+
+# Normalize moments
+params_dec0 = (np.array([0.38123475, 0.38367176, 0.36448884, 0.34427001, 0.32574118]), np.array([0.40531052, 0.3211757 , 0.28093212, 0.25361035, 0.23289862]))
+params_dec1 = (np.array([0.34459084, 0.36008492, 0.34417236, 0.32550077, 0.30801989]), np.array([0.43774342, 0.33152184, 0.28260705, 0.25142029, 0.22891419]))
+
+MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
+MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
+MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
 
 
 # -------------------------------------------------------------------------
 #--------------------------- LOAD MODELS ----------------------------------
 # -------------------------------------------------------------------------
 
-#dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
-dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/Convolutional'
-#model_dec0_dir = os.path.join(dir, 'model_dec0_495')
-#model_dec1_dir = os.path.join(dir, 'model_dec1_495')
-model_dec0_dir = os.path.join(dir, 'Conv_model_dec0')
-model_dec1_dir = os.path.join(dir, 'Conv_model_dec1')
+dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
+#dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/Convolutional'
+model_dec0_dir = os.path.join(dir, 'model_dec0')
+model_dec1_dir = os.path.join(dir, 'model_dec1')
+#model_dec0_dir = os.path.join(dir, 'Conv_model_dec0')
+#model_dec1_dir = os.path.join(dir, 'Conv_model_dec1')
 
 architecture = [moments_order, 5, 1, 1]    
 
-#model_dec0 = KAN(architecture)
-#model_dec1 = KAN(architecture)
-from Models import ConvolutionalModel
-model_dec0 = ConvolutionalModel(int(stop-start))
-model_dec1 = ConvolutionalModel(int(stop-start))
+model_dec0 = KAN(architecture)
+model_dec1 = KAN(architecture)
+#from Models import ConvolutionalModel
+#model_dec0 = ConvolutionalModel(int(stop-start))
+#model_dec1 = ConvolutionalModel(int(stop-start))
 
 
 model_dec0.load_state_dict(torch.load(model_dec0_dir))
 model_dec1.load_state_dict(torch.load(model_dec1_dir))
+#model_dec0.eval()
+#model_dec1.eval()
 
 # -------------------------------------------------------------------------
 #--------------------------- GET RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-#test_dec0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST[:,:,0]).float()).detach().numpy())
-#test_dec1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST[:,:,1]).float()).detach().numpy())
+test_dec0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST[:,:,0]).float()).detach().numpy())
+test_dec1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST[:,:,1]).float()).detach().numpy())
 
-test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,None,:,0]).float()).detach().numpy())
-test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,None,:,1]).float()).detach().numpy())
+#test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,None,:,0]).float()).detach().numpy())
+#test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,None,:,1]).float()).detach().numpy())
 
 # Calculate TOF
 TOF = test_dec0 - test_dec1
@@ -160,7 +163,6 @@ plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
 
-
 # -------------------------------------------------------------------------
 #--------------------------- ENERGY DEPENDENCE ----------------------------
 # -------------------------------------------------------------------------
@@ -169,9 +171,7 @@ dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/'
 energy_dec0 = np.load(os.path.join(dir,'pulsos_Na22_energy_dec0_test_val.npz'), allow_pickle = True)['data']
 energy_dec1 = np.load(os.path.join(dir,'pulsos_Na22_energy_dec1_test_val.npz'), allow_pickle = True)['data']
 
-a = np.where((TOF_V00 > -16))[0]
-print(np.where((TOF_V00 < -16))[0])
-Error = np.concatenate((error_V02[a], error_V20[a], error_V00[a], error_V04[a], error_V40[a]))   
+Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40))   
 MAE = np.mean(Error)
 print('MAE: ', MAE)
 
@@ -192,81 +192,73 @@ plt.show()
 # -------------------------------------------------------------------------
 
 resolution_list = []
-for i in range(6):
-    a = np.random.choice(np.arange(0, test_data.shape[0]), size = 500, replace = False)
+bias_list = []
+MAE_list = []
+for i in range(1000):
+    a = np.random.choice(np.arange(0, TOF_V00.shape[0]), size = TOF_V00.shape[0], replace = True)
     
-    params_V04, errors_V04 = get_gaussian_params(TOF_V04[a], centroid_V00, range = 0.8, nbins = nbins-20)
-    params_V02, errors_V02 = get_gaussian_params(TOF_V02[a], centroid_V00, range = 0.8, nbins = nbins-20)
-    params_V00, errors_V00 = get_gaussian_params(TOF_V00[a], centroid_V00, range = 0.8, nbins = nbins-20)
-    params_V20, errors_V20 = get_gaussian_params(TOF_V20[a], centroid_V00, range = 0.8, nbins = nbins-20)
-    params_V40, errors_V40 = get_gaussian_params(TOF_V40[a], centroid_V00, range = 0.8, nbins = nbins-20)
-
+    centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00[None,a], np.zeros((TOF_V00[a].shape[0])), nbins = nbins) 
+    params_V04, errors_V04 = get_gaussian_params(TOF_V04[a], centroid_V00, range = 0.8, nbins = nbins)
+    params_V02, errors_V02 = get_gaussian_params(TOF_V02[a], centroid_V00, range = 0.8, nbins = nbins)
+    params_V00, errors_V00 = get_gaussian_params(TOF_V00[a], centroid_V00, range = 0.8, nbins = nbins)
+    params_V20, errors_V20 = get_gaussian_params(TOF_V20[a], centroid_V00, range = 0.8, nbins = nbins)
+    params_V40, errors_V40 = get_gaussian_params(TOF_V40[a], centroid_V00, range = 0.8, nbins = nbins)
+    
     resolution = np.mean((params_V40[3], params_V20[3], params_V00[3], params_V02[3], params_V04[3]))
     resolution_list.append(resolution)
+    
+    centroids = np.array([params_V40[2], params_V20[2], params_V00[2], params_V02[2], params_V04[2]])
+    bias = np.mean(abs(centroids - positions))
+    bias_list.append(bias)
+
+    error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + time_step*t_shift))
+    error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
+    error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - time_step*t_shift))
+    error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 2*time_step*t_shift))
+    error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 2*time_step*t_shift))
+
+    Error = np.concatenate((error_V02, error_V00, error_V20, error_V04, error_V40), axis = 1)   
+    MAE_list.append(np.mean(Error)) 
 
 print('Mean CTR: ', np.mean(np.array(resolution_list))*1000)
 print('Std CTR: ', np.std(np.array(resolution_list))*1000)
-
+print('Mean bias: ', np.mean(np.array(bias_list))*1000)
+print('Std bias: ', np.std(np.array(bias_list))*1000)
+print('Mean MAE: ', np.mean(np.array(MAE_list))*1000)
+print('Std MAE: ', np.std(np.array(MAE_list))*1000)
 
 # -------------------------------------------------------------------------
-#------------------------------ AVERAGE -----------------------------------
+#-------------------------- INFERENCE TIME --------------------------------
 # -------------------------------------------------------------------------
 
-MOMENTS_TEST = momentos(TEST, order = moments_order)
-MOMENTS_TEST_norm_dec00 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
-MOMENTS_TEST_norm_dec01 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 0, method = normalization_method)
+import time
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+time_test = np.tile(MOMENTS_TEST[0,:,:] , (1000000, 1,1))
+model_dec0 = model_dec0.to(device)
+time_list_moments = []
+# Start timer moments
+for i in range(10):
+    start_time_momentos = time.time()
+    M_time_test = momentos(time_test, order = moments_order)
+    end_time_momentos = time.time()
+    elapsed_time_momentos = end_time_momentos - start_time_momentos
+    time_list_moments.append(elapsed_time_momentos)
+time_array_moments = np.array(time_list_moments)
+
+time_list_inference = []
+# Start timer inference
+for i in range(100):
+    start_time_inference= time.time()
+    with torch.no_grad():
+        assert not torch.is_grad_enabled()
+        output_time_test = model_dec0(torch.tensor(M_time_test[:,:,0]).float().to(device))
+    end_time_inference = time.time()
+    elapsed_time_inference = end_time_inference - start_time_inference
+    time_list_inference.append(elapsed_time_inference)
+time_array_inference = np.array(time_list_inference)
 
 
-MOMENTS_TEST_norm_dec10 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 1, method = normalization_method)
-MOMENTS_TEST_norm_dec11 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
 
-
-
-test_dec0_model0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST_norm_dec00).float()).detach().numpy())
-test_dec0_model1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST_norm_dec01).float()).detach().numpy())
-
-test_dec1_model0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST_norm_dec10).float()).detach().numpy())
-test_dec1_model1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST_norm_dec11).float()).detach().numpy())
-
-test_dec0 = (test_dec0_model0 + test_dec0_model1) / 2
-test_dec1 = (test_dec1_model0 + test_dec1_model1) / 2
-
-
-# Calculate TOF
-TOF = test_dec0 - test_dec1
-
-TOF_V02 = TOF[:TEST_00.shape[0]] 
-TOF_V00 = TOF[TEST_00.shape[0] : 2*TEST_00.shape[0]] 
-TOF_V20 = TOF[2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
-TOF_V04 = TOF[3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
-TOF_V40 = TOF[4*TEST_00.shape[0]:] 
-    
-
-# Calulate Test error
-centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00[np.newaxis,:], np.zeros((TOF_V00[np.newaxis,:].shape[0])), nbins = nbins) 
-
-error_V02 = abs((TOF_V02 - centroid_V00 + time_step*t_shift))
-error_V00 = abs((TOF_V00 - centroid_V00))
-error_V20 = abs((TOF_V20 - centroid_V00 - time_step*t_shift))
-error_V04 = abs((TOF_V04 - centroid_V00 + 2*time_step*t_shift))
-error_V40 = abs((TOF_V40 - centroid_V00 - 2*time_step*t_shift))
-
-
-#Get MAE
-Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40))   
-MAE = np.mean(Error)
-print('MAE: ', MAE)
-
-params_V04, errors_V04 = get_gaussian_params(TOF_V04, centroid_V00, range = 0.8, nbins = nbins)
-params_V02, errors_V02 = get_gaussian_params(TOF_V02, centroid_V00, range = 0.8, nbins = nbins)
-params_V00, errors_V00 = get_gaussian_params(TOF_V00, centroid_V00, range = 0.8, nbins = nbins)
-params_V20, errors_V20 = get_gaussian_params(TOF_V20, centroid_V00, range = 0.8, nbins = nbins)
-params_V40, errors_V40 = get_gaussian_params(TOF_V40, centroid_V00, range = 0.8, nbins = nbins)
-
-
-print("V40: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
-print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
-print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
-print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-print("V04: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
-
+print('Elapsed time momentos:', np.mean(time_array_moments), np.std(time_array_moments))
+print('Elapsed time inference:', np.mean(time_array_inference), np.std(time_array_inference))
