@@ -15,21 +15,21 @@ dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
 train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
 val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
-
+data = np.load(os.path.join(dir, 'pulsos_Na22_17_10_2023.npz'))['data']
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1    # Max delay to training pulses in ns
+delay_time = 1      # Max delay to training pulses in ns
 time_step = 0.2     # Signal time step in ns
 nbins = 71          # Num bins for all histograms                          
 t_shift = 1         # Time steps to move for the new positions
 start = 45
 stop = 74
 set_seed(42)        # Fix seeds
-epochs = 1000
-lr = 1e-3
+epochs = 500
+lr = 1e-4
 
 
 # -------------------------------------------------------------------------
@@ -46,10 +46,13 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-train_data = new_train[:,start:stop,:] 
+train_data = np.concatenate((new_test[:,start:stop,:],new_train[:3000,start:stop,:]),axis = 0) 
 validation_data = new_val[:,start:stop,:] 
-test_data = new_test[:,start:stop,:]
+test_data = new_train[3000:,start:stop,:]
 
+#train_data = new_train[:,start:stop,:]
+#validation_data = new_val[:,start:stop,:] 
+#test_data = new_test[:,start:stop,:]
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -80,8 +83,8 @@ val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec1).flo
 train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
 train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
 
-val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 32, shuffle = False)
-val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 32, shuffle = False)
+val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
+val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
 
 
 
@@ -94,12 +97,12 @@ model_dec1 = ConvolutionalModel(int(stop-start))
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
-optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr) 
-optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr) 
+optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr, weight_decay = 1e-5) 
+optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr, weight_decay = 1e-5) 
 
 #Execute train loop
-loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = True) 
-loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = True)
+loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = False) 
+loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -139,17 +142,19 @@ plt.ylabel('Log10')
 plt.legend()
 
 plt.subplot(132)
-plt.hist(test_dec0[-1,:], bins = nbins, range = [-5, 10], alpha = 0.5, label = 'Detector 0');
-plt.hist(test_dec1[-1,:], bins = nbins, range = [-5, 10], alpha = 0.5, label = 'Detector 1');
+plt.hist(test_dec0[-1,:], bins = nbins, range = [-2, 5], alpha = 0.5, label = 'Detector 0');
+plt.hist(test_dec1[-1,:], bins = nbins, range = [-2, 5], alpha = 0.5, label = 'Detector 1');
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')
 plt.legend()
 
 plt.subplot(133)
-plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Detector 0')
-plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Detector 1')
-plt.title('Training loss')
+plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Log Training loss Detector 0')
+plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Log Training loss Detector 1')
+plt.plot(np.log10(val_dec0.astype('float32')), label = 'Log Validation loss Detector 0')
+plt.plot(np.log10(val_dec1.astype('float32')), label = 'Log Validation loss Detector 1')
+plt.ylabel('Logarithmic losses')
 plt.xlabel('Epochs')
 plt.legend()
 plt.show()
