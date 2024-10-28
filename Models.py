@@ -6,61 +6,49 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-from Losses import custom_loss_MAE, custom_loss_bounded, custom_loss_MSE, custom_loss_Threshold
+from Losses import custom_loss_MAE, custom_loss_bounded, custom_loss_MSE, custom_loss_Threshold, custom_loss_with_huber
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-    
 class ConvolutionalModel(nn.Module):
-    def __init__(self, N_points):
+    def __init__(self, N_points, num_outputs=1):
         super(ConvolutionalModel, self).__init__()
 
-        # Convolutional Layer 1
-        self.conv1 = nn.Conv2d(in_channels = 1, out_channels = 8, kernel_size = 3, padding = 1, stride = 1)
-        self.bn1 = nn.BatchNorm2d(8)
-        self.pool1 = nn.MaxPool2d((1, 2))  # Reduces width by half
-        
-        # Convolutional Layer 2
-        self.conv2 = nn.Conv2d(in_channels = 8, out_channels = 16, kernel_size = 3, padding = 1, stride = 1)
-        self.bn2 = nn.BatchNorm2d(16)
-        self.pool2 = nn.MaxPool2d((1, 2))  # Reduces width by half
-        
-        # Convolutional Layer 3
-        self.conv3 = nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, padding = 1, stride = 1)
-        self.bn3 = nn.BatchNorm2d(32)
-        self.pool3 = nn.MaxPool2d((1, 2))  # Reduces width by half
+        # Define convolutional blocks with batch normalization and ReLU
+        self.conv1 = self.conv_block(1, 8)
+        self.conv2 = self.conv_block(8, 16)
+        self.conv3 = self.conv_block(16, 32)
 
-        # Calculate the flattened size after convolutions and pooling
-        self.flatten_size = 32 * (N_points // 8)  # Adjust according to pooling layers
-        
-        # Fully Connected Layer
-        self.fc1 = nn.Linear(self.flatten_size, 1)
-        
-        # Optional Dropout for regularization
-        self.dropout = nn.Dropout(p = 0.05)  # Dropout with 5% probability
+        # Calculate flattened size for fully connected layer
+        self.flatten_size = 32 * (N_points // 8)  
+
+        # Fully connected layer with output
+        self.fc1 = nn.Linear(self.flatten_size, num_outputs)
+
+        # Dropout for regularization
+        self.dropout = nn.Dropout(p = 0.05)
+
+    def conv_block(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size = 3, padding = 1, stride = 1),
+            #nn.BatchNorm2d(out_channels),
+            #nn.ReLU(),
+            nn.MaxPool2d((1, 2)),
+        )
 
     def forward(self, x):
-        # Convolutional Block 1
+        # Pass through convolutional blocks
         x = self.conv1(x)
-        x = self.pool1(x)
-
-        # Convolutional Block 2
         x = self.conv2(x)
-        x = self.pool2(x)
-
-        # Convolutional Block 3
         x = self.conv3(x)
-        x = self.pool3(x)
-        
-        # Flattening the output for the fully connected layer
-        x = x.view(x.size(0), -1)  # Flatten
-        
-        # Fully Connected Layer with Dropout
+
+        # Flatten and pass through fully connected layer
+        x = x.view(x.size(0), -1)
         x = self.dropout(x)
         x = self.fc1(x)
-     
-        return x
+        x = nn.ReLU()(x)
 
+        return x
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
 
@@ -74,12 +62,12 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     test = []
 
     # Cosine Annealing Scheduler
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
 
     for epoch in range(EPOCHS):
         running_loss = 0.0
         model.train()
-        for i, data in enumerate(train_loader):
+        for data in train_loader:
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
 
@@ -104,7 +92,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
         scheduler.step()
 
         # Calculate average loss per epoch
-        avg_loss_epoch = running_loss / (i)  
+        avg_loss_epoch = running_loss / len(train_loader)  
         loss_list.append(avg_loss_epoch)
 
         print(f'EPOCH {epoch + 1}: LOSS train {avg_loss_epoch}')
@@ -115,13 +103,14 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
             test_epoch = model(test_tensor[:,None, None, :])
             test.append(np.squeeze(test_epoch.cpu().numpy()))
 
-            val_loss = 0
+            val_loss = 0.0
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
+                mask = val_labels != 0 
                 val_0 = model(val_data[:, None, None, :, 0])
                 val_1 = model(val_data[:, None, None, :, 1])
-                val_loss += custom_loss_MAE(val_0, val_1, val_labels)
-        val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
+                val_loss += custom_loss_MAE(val_0[mask], val_1[mask], val_labels[mask]).item()
+        val_loss_list.append(val_loss / len(val_loader))
         print(f'LOSS val {val_loss / len(val_loader)}')
 
 
@@ -266,7 +255,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
 
 
 
-def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, checkpoint = 15, name = 'model', save = False):
+def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
     
     loss_list = []
     val_loss_list = []
@@ -327,8 +316,8 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
             val_loss_list.append(val_loss.item() / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
 
-        if save and epoch % checkpoint == 0:
-            torch.save(model.state_dict(), f'{name}_{epoch}')
+    if save:
+        torch.save(model.state_dict(), name)
 
     return (
         np.array(loss_list, dtype = 'object'), 
