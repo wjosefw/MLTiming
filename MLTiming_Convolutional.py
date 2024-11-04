@@ -11,11 +11,10 @@ from Models import ConvolutionalModel, train_loop_convolutional, count_parameter
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-
 train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
 val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
-data = np.load(os.path.join(dir, 'pulsos_Na22_17_10_2023.npz'))['data']
+
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -25,11 +24,12 @@ delay_time = 1      # Max delay to training pulses in ns
 time_step = 0.2     # Signal time step in ns
 nbins = 71          # Num bins for all histograms                          
 t_shift = 1         # Time steps to move for the new positions
-start = 45
+start = 47
 stop = 74
 set_seed(42)        # Fix seeds
 epochs = 500
 lr = 1e-4
+save = True
 
 
 # -------------------------------------------------------------------------
@@ -41,18 +41,19 @@ new_train = continuous_delay(train_data, time_step = time_step, delay_time = ali
 new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 
-
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
+
+#train_data = new_train[:,start:stop,:] 
+#validation_data = new_val[:,start:stop,:] 
+#test_data = new_test[:,start:stop,:]
+
 
 train_data = np.concatenate((new_test[:,start:stop,:],new_train[:3000,start:stop,:]),axis = 0) 
 validation_data = new_val[:,start:stop,:] 
 test_data = new_train[3000:,start:stop,:]
 
-#train_data = new_train[:,start:stop,:]
-#validation_data = new_val[:,start:stop,:] 
-#test_data = new_test[:,start:stop,:]
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -87,7 +88,6 @@ val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len
 val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
 
 
-
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
@@ -101,8 +101,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr, weight_deca
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr, weight_decay = 1e-5) 
 
 #Execute train loop
-loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = False) 
-loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = False)
+loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = save) 
+loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -187,3 +187,28 @@ plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
+
+### Combine the two numbers
+#num = f"{sys.argv[1]}{sys.argv[2]}"
+#
+## Your existing variables
+#FWHM = np.array([params_V04[3], params_V02[3], params_V00[3], params_V20[3], params_V40[3]])  # ps
+#FWHM_err = np.array([errors_V04[3],  errors_V02[3],  errors_V00[3],  errors_V20[3],  errors_V40[3]])        # ps
+#centroid = np.array([params_V04[2], params_V02[2], params_V00[2], params_V20[2], params_V40[2]])  # ps
+#centroid_err = np.array([errors_V04[2],  errors_V02[2],  errors_V00[2],  errors_V20[2],  errors_V40[2]])        # ps
+#
+## Multiply by 1000
+#FWHM = FWHM * 1000
+#FWHM_err = FWHM_err * 1000
+#centroid = centroid * 1000
+#centroid_err = centroid_err * 1000
+#
+#
+## Open the file in append mode
+#with open('results_FS.txt', 'a') as file:
+#    file.write(f"FWHM_{num} = np.array([{', '.join(f'{v:.1f}' for v in FWHM)}])  # ps\n")
+#    file.write(f"FWHM_err_{num} = np.array([{', '.join(f'{v:.1f}' for v in FWHM_err)}])  # ps\n")
+#    file.write(f"centroid_{num} = np.array([{', '.join(f'{v:.1f}' for v in centroid)}])  # ps\n")
+#    file.write(f"centroid_err_{num} = np.array([{', '.join(f'{v:.1f}' for v in centroid_err)}])  # ps\n")
+#    file.write(f"MAE_{num} = {MAE[-1]:.7f}  # ps\n")  # Write MAE with one decima
+#    file.write("\n")  # Add a new line for better separation
