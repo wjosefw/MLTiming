@@ -9,8 +9,7 @@ from functions import (momentos, create_and_delay_pulse_pair, create_position,
                        set_seed, calculate_gaussian_center_sigma, normalize, 
                        normalize_given_params, plot_gaussian, get_gaussian_params,
                        continuous_delay)
-from functions_KAN import  count_parameters, train_loop_KAN
-from Models import train_loop_MLP, MLP_Torch
+from Models import train_loop_MLP, MLP_Torch,  count_parameters, train_loop_KAN
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -23,25 +22,25 @@ train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
 val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 
-data = np.load(os.path.join(dir, 'pulsos_Na22_17_10_2023.npz'))['data']
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1                      # Max delay to training pulses in ns
+delay_time = 1                        # Max delay to training pulses in ns
 time_step = 0.2                       # Signal time step in ns
 moments_order = int(sys.argv[1])      # Max order of moments used
 set_seed(42)                          # Fix seeds
 nbins = 71                            # Num bins for all histograms                   
 t_shift = 1                           # Time steps to move for the new positions
 normalization_method = 'standardization'
-start = 50
+start = 47
 stop = 74
 lr = 1e-3
 epochs = 500
 Num_Neurons = 16
 architecture = [moments_order, int(sys.argv[2]), 1, 1]    # KAN architecture
+save = False
 
 # -------------------------------------------------------------------------
 #----------------------- ALIGN PULSES -------------------------------------
@@ -59,10 +58,10 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 #train_data = new_train[:,start:stop,:]  #189:213
 #validation_data = new_val[:,start:stop,:] 
 #test_data = new_test[:,start:stop,:]
+train_data = np.concatenate((new_test[:,start:stop,:],new_train[:3000,start:stop,:]),axis = 0) 
+validation_data = new_val[:,start:stop,:] 
+test_data = new_train[3000:,start:stop,:]
 
-train_data = new_train  #189:213
-validation_data = new_val 
-test_data = new_test
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
@@ -70,20 +69,14 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-#train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_time = delay_time)
-#train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time_step, delay_time = delay_time)
-#
-#val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
-#val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
+train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_time = delay_time)
+train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time_step, delay_time = delay_time)
 
-from functions import create_positive_and_negative_delays
-train_dec0, REF_train_dec0 = create_positive_and_negative_delays(train_data[:,:,0], time_step, start = 50, stop = 74, delay_time = delay_time)
-train_dec1, REF_train_dec1 = create_positive_and_negative_delays(train_data[:,:,1], time_step, start = 50, stop = 74, delay_time = delay_time)
+val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
+val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
-val_dec0, REF_val_dec0 = create_positive_and_negative_delays(validation_data[:,:,0], time_step, start = 50, stop = 74,  delay_time = delay_time)
-val_dec1, REF_val_dec1 = create_positive_and_negative_delays(validation_data[:,:,1], time_step, start = 50, stop = 74,  delay_time = delay_time)
 
-TEST_00 = test_data[:,start:stop,:]
+TEST_00 = test_data
 TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
 TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)
 TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
@@ -127,8 +120,8 @@ val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec1).f
 train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
 train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
 
-val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = 64, shuffle = False)
-val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = 64, shuffle = False)
+val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
+val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
 
 # Print information 
 print("Normalization parameters detector 0:", params_dec0)
@@ -138,10 +131,10 @@ print("Normalization parameters detector 1:", params_dec1)
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-#model_dec0 = KAN(architecture)
-#model_dec1 = KAN(architecture)
-model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
-model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+model_dec0 = KAN(architecture)
+model_dec1 = KAN(architecture)
+#model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+#model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
          
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
@@ -149,10 +142,10 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr)  
 
 # Execute train loop
-#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec0', save = False) 
-#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec1', save = False)
-loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec0', save = False) 
-loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec1', save = False)
+loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec0', save = save) 
+loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec1', save = save)
+#loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec0', save = save) 
+#loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec1', save = save)
 
 
 # -------------------------------------------------------------------------
