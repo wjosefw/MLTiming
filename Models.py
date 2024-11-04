@@ -15,25 +15,25 @@ class ConvolutionalModel(nn.Module):
         super(ConvolutionalModel, self).__init__()
 
         # Define convolutional blocks with batch normalization and ReLU
-        self.conv1 = self.conv_block(1, 8)
-        self.conv2 = self.conv_block(8, 16)
-        self.conv3 = self.conv_block(16, 32)
+        self.conv1 = self.conv_block(1, 16, 5)
+        self.conv2 = self.conv_block(16, 32, 5)
+        self.conv3 = self.conv_block(32, 64, 3)
+        
 
         # Calculate flattened size for fully connected layer
-        self.flatten_size = 32 * (N_points // 8)  
+        self.flatten_size = 64 * (N_points // 8)  
 
         # Fully connected layer with output
-        self.fc1 = nn.Linear(self.flatten_size, num_outputs)
-
+        self.fc1 = nn.Linear(self.flatten_size, 32)
+        self.fc2 = nn.Linear(32, num_outputs)
+        
         # Dropout for regularization
         self.dropout = nn.Dropout(p = 0.05)
 
-    def conv_block(self, in_channels, out_channels):
+    def conv_block(self, in_channels, out_channels, kernel_size):
         return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size = 3, padding = 1, stride = 1),
-            #nn.BatchNorm2d(out_channels),
-            #nn.ReLU(),
-            nn.MaxPool2d((1, 2)),
+            nn.Conv1d(in_channels, out_channels, kernel_size = kernel_size, padding = 'same', stride = 1),
+            nn.MaxPool1d(kernel_size = 2),
         )
 
     def forward(self, x):
@@ -41,12 +41,14 @@ class ConvolutionalModel(nn.Module):
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
-
+       
+        
         # Flatten and pass through fully connected layer
         x = x.view(x.size(0), -1)
         x = self.dropout(x)
         x = self.fc1(x)
-        x = nn.ReLU()(x)
+        x = self.fc2(x)
+        x = F.softplus(x)
 
         return x
 #----------------------------------------------------------------------------------------------
@@ -75,16 +77,19 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
             optimizer.zero_grad()
 
             # Make predictions for this batch 
-            outputs_0 = model(inputs[:, None, None, :, 0])
-            outputs_1 = model(inputs[:, None, None, :, 1])
+            #outputs_0 = model(inputs[:, None, None, :, 0])
+            #outputs_1 = model(inputs[:, None, None, :, 1])
 
+            outputs_0 = model(inputs[:, None, :, 0])
+            outputs_1 = model(inputs[:, None, :, 1])
+            
             # Compute the loss and its gradients
             loss = custom_loss_MAE(outputs_0, outputs_1, labels)
             loss.backward()
 
             # Adjust learning weights
             optimizer.step()
-            
+
             # Accumulate running loss
             running_loss += loss.item()
 
@@ -100,15 +105,19 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
         # Calculate predictions on test_tensor
         model.eval()
         with torch.no_grad():
-            test_epoch = model(test_tensor[:,None, None, :])
+            #test_epoch = model(test_tensor[:,None, None, :])
+            test_epoch = model(test_tensor[:, None, :])
             test.append(np.squeeze(test_epoch.cpu().numpy()))
 
             val_loss = 0.0
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
                 mask = val_labels != 0 
-                val_0 = model(val_data[:, None, None, :, 0])
-                val_1 = model(val_data[:, None, None, :, 1])
+                #val_0 = model(val_data[:, None, None, :, 0])
+                #val_1 = model(val_data[:, None, None, :, 1])
+
+                val_0 = model(val_data[:, None, :, 0])
+                val_1 = model(val_data[:, None, :, 1])
                 val_loss += custom_loss_MAE(val_0[mask], val_1[mask], val_labels[mask]).item()
         val_loss_list.append(val_loss / len(val_loader))
         print(f'LOSS val {val_loss / len(val_loader)}')
