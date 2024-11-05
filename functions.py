@@ -13,7 +13,6 @@ from scipy.optimize import curve_fit
 def gauss(x, H, A, x0, sigma):
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
-
 def gauss_fit(x, y):
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
@@ -21,26 +20,26 @@ def gauss_fit(x, y):
     return popt
 
 
-def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
+def calculate_gaussian_center(vector, nbins = 51, limits = 3):
     """
-    Calculate the Gaussian fit parameters (centroid and standard deviation) for each row of the input vector.
+    Calculate the Gaussian fit centroid for each row of the input vector.
 
     Parameters:
-    vector (numpy.ndarray): Input 2D array where each row represents a set of data points.
-    shift (numpy.ndarray): Array of shift values to be subtracted from each row of the input vector.
-    nbins (int, optional): Number of bins to use for the histogram. Default is 51.
+    vector (numpy.ndarray): A 2D array where each row represents a set of data points to be analyzed.
+    nbins (int, optional): Number of bins to use for the histogram.
+    limits (float, optional): Range of the histogram. 
 
     Returns:
-    numpy.ndarray: Array of centroid values for each row of the input vector.
-    numpy.ndarray: Array of standard deviation values for each row of the input vector.
+    numpy.ndarray: Array of centroid values (x0) for each row of the input vector. 
     """
     
-    centroid = []
-    std = []
-    
-    for i in range(vector.shape[0]):
+    centroid = [] 
 
-        histogN, binsN = np.histogram(vector[i, :] - shift[i], bins = nbins)
+    for i in range(vector.shape[0]):
+        # Calculate the histogram of the current row of data
+        histogN, binsN = np.histogram(vector[i, :], bins = nbins, range = [-limits, limits])
+        
+        # Calculate the bin centers
         cbinsN = 0.5 * (binsN[1:] + binsN[:-1]) 
         
         try:
@@ -54,17 +53,16 @@ def calculate_gaussian_center_sigma(vector, shift, nbins = 51):
         except:
             # Handle exceptions by setting default values
             x0N, sigmaN = 10, 10
-        
-        # Append the results to the respective lists
+            
         centroid.append(x0N)
-        std.append(sigmaN)
     
-    centroid = np.array(centroid, dtype = 'float64')
-    std = np.array(std, dtype = 'float64')
-    return centroid, std
+    centroid = np.array(centroid, dtype='float64')
+
+    return centroid
 
 def plot_gaussian(array, shift, range = 0.8, nbins = 51, label = ' '):
     """Plot histogram as points and overlay the Gaussian fit."""
+
     # Calculate the histogram data
     histog, bins, patches = plt.hist(array - shift, bins = nbins, range = [-range, range], alpha = 0.5, label = label)
     cbins = 0.5 * (bins[1:] + bins[:-1])
@@ -75,6 +73,7 @@ def plot_gaussian(array, shift, range = 0.8, nbins = 51, label = ' '):
     x_fit = np.linspace(-range, range, 500)
     y_fit = gauss(x_fit, *popt)
     plt.plot(x_fit, y_fit, color = hist_color)
+
 
 def get_gaussian_params(array, shift, range = 0.8, nbins = 51):
     histog, bins = np.histogram(array - shift, bins = nbins, range = [-range, range])
@@ -869,27 +868,35 @@ def extract_signal_along_time(vector, fraction = 0.2, window_low = 140, window_h
     new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
     time_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
     t = np.linspace(0, 1, vector.shape[1])
-        
+
+    a = 0
+    b = 0    
     for i in range(vector.shape[0]):
         # Find indices where the signal in each channel exceeds the fraction threshold
         indices_channel0 = np.where(vector[i,:, 0] >= fraction)[0]
         indices_channel1 = np.where(vector[i,:, 1] >= fraction)[0]
         
-        # Calculate the low and high indices to truncate around the fraction threshold
-        low_index_channel0 = indices_channel0[0] - window_low
-        low_index_channel1 = indices_channel1[0] - window_low
+        if indices_channel0[0] < indices_channel1[0]:
+            index = indices_channel0[0]
+            a += 1
+        if indices_channel1[0] < indices_channel0[0]:
+            index = indices_channel1[0]
+            b += 1 
+        elif indices_channel0[0] == indices_channel1[0]:
+            index = indices_channel0[0]
+             
+        # Calculate the low and high indices to extraction
+        index_low = index - window_low
+        index_high = index + window_high
 
-        high_index_channel0 = indices_channel0[0] + window_high
-        high_index_channel1 = indices_channel1[0] + window_high
-        
-        # Set values outside the specified windows to zero for each channel
-        new_vector[i,:, 0] =  vector[i,low_index_channel0:high_index_channel0, 0]
-        new_vector[i,:, 1] =  vector[i,low_index_channel1:high_index_channel1, 1]
+        # Extract cropped waveform and put into new vector
+        new_vector[i,:, 0] =  vector[i,index_low:index_high, 0]
+        new_vector[i,:, 1] =  vector[i,index_low:index_high, 1]
 
-        time_vector[i,:,0] = t[low_index_channel0:high_index_channel0]
-        time_vector[i,:,1] = t[low_index_channel1:high_index_channel1]
+        time_vector[i,:,0] = t[index_low:index_high]
+        time_vector[i,:,1] = t[index_low:index_high]
 
-    return new_vector, time_vector    
+    return new_vector, time_vector, a, b    
 
 def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, delay_time = 1):
     
@@ -927,7 +934,7 @@ def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, de
         
         
         REF[i] = NRD0[i] - NRD1[i]
-        print(NRD0[i].shape)
+        
         Time_delayed[i,:,0] = time_vector[i,:] + NRD0[i]
         Time_delayed[i,:,1] = time_vector[i,:] + NRD1[i]
     return INPUT_2, REF, Time_delayed
