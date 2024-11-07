@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 
 
-from functions import (create_position, momentos, calculate_gaussian_center_sigma, 
+from functions import (create_position, calculate_gaussian_center, 
                        plot_gaussian, get_gaussian_params, continuous_delay)
 from Models import ConvolutionalModel
 
@@ -18,7 +18,7 @@ data = data[3000:,:,:]
 # -------------------------------------------------------------------------
 
 t_shift = 1             # Time steps to move for the new positions
-nbins = 91              # Num bins for all histograms  
+nbins = 71              # Num bins for all histograms  
 start= 47
 stop = 74
 time_step = 0.2         # Signal time step
@@ -29,7 +29,7 @@ positions = np.array([0.4, 0.2, 0.0, -0.2, -0.4])
 #----------------------- ALIGN PULSES -------------------------------------
 # -------------------------------------------------------------------------
 
-align_time = 0.6 # In ns
+align_time = 0.5 # In ns
 new_data = continuous_delay(data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 
 # -------------------------------------------------------------------------
@@ -85,7 +85,7 @@ TOF_V40 = TOF[4*TEST_00.shape[0]:]
     
 
 # Calulate Test error
-centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00[np.newaxis,:], np.zeros((TOF_V00[np.newaxis,:].shape[0])), nbins = nbins) 
+centroid_V00 = calculate_gaussian_center(TOF_V00[np.newaxis,:], nbins = nbins, limits = 3) 
 
 error_V02 = abs((TOF_V02 - centroid_V00 + time_step*t_shift))
 error_V00 = abs((TOF_V00 - centroid_V00))
@@ -172,7 +172,7 @@ MAE_list = []
 for i in range(1000):
     a = np.random.choice(np.arange(0, TOF_V00.shape[0]), size = TOF_V00.shape[0], replace = True)
     
-    centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00[None,a], np.zeros((TOF_V00[a].shape[0])), nbins = nbins) 
+    centroid_V00 = calculate_gaussian_center(TOF_V00[None, a], nbins = nbins, limits = 3) 
     params_V04, errors_V04 = get_gaussian_params(TOF_V04[a], centroid_V00, range = 0.8, nbins = nbins)
     params_V02, errors_V02 = get_gaussian_params(TOF_V02[a], centroid_V00, range = 0.8, nbins = nbins)
     params_V00, errors_V00 = get_gaussian_params(TOF_V00[a], centroid_V00, range = 0.8, nbins = nbins)

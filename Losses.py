@@ -20,10 +20,10 @@ def custom_loss_MSE(outputs_0, outputs_1, labels):
 #----------------------------------------------------------------------------------------------
 
 
-def custom_loss_Threshold(outputs_0, outputs_1, labels, threshold = 1):
+def custom_loss_Limit(outputs_0, outputs_1, labels, limit = 1):
     loss = (torch.mean(abs(outputs_0 - outputs_1 - labels)) +
             torch.mean(torch.maximum(torch.tensor(0.0, device = outputs_0.device), 
-                                     torch.abs(outputs_1 - outputs_0) - threshold)))
+                                     torch.abs(outputs_1 - outputs_0) - limit)))
     return loss
 
 
@@ -55,7 +55,7 @@ def custom_loss_bounded(outputs_0, outputs_1, labels, lower_limit, upper_limit):
 #----------------------------------------------------------------------------------------------
 
 def custom_loss_with_huber(outputs_0, outputs_1, labels):
-    delta = 0.9
+    delta = 0.015
     penalty_weight = 1  
     threshold = 1.0  # Threshold for penalty term
 
@@ -77,4 +77,11 @@ def custom_loss_with_huber(outputs_0, outputs_1, labels):
     loss = regression_loss + penalty_weight * penalty
     return loss
 
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
 
+def loss_MAE_KAN(outputs_0, outputs_1, labels):
+    loss = (torch.mean(abs(outputs_0 - outputs_1 - labels)) +
+            torch.sum(torch.relu(-outputs_0)) +
+            torch.sum(torch.relu(-outputs_1)))
+    return loss

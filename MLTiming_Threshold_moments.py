@@ -8,10 +8,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 
-from functions import (create_position, set_seed, calculate_gaussian_center, 
+from functions import (momentos_threshold, create_position, set_seed, calculate_gaussian_center, 
                        normalize, normalize_given_params, plot_gaussian, get_gaussian_params, 
                        continuous_delay, extract_signal_along_time, create_and_delay_pulse_pair_along_time)
-from Models import train_loop_KAN
+from Train_loops import train_loop_KAN
 
 
 # Load data 
@@ -21,27 +21,6 @@ train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
 val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 
-def momentos(vector, time_vector, order = 4):
-    
-    if  len(np.shape(vector)) == 2:
-        Nev, Nt = np.shape(vector)
-        MOMENT = np.zeros((Nev, order))
-        for i in range(Nev):
-                for j in range(order): 
-                    W = time_vector[i,:]**(j)
-                    MOMENT[i,j] = np.sum(W*vector[i,:])       
-   
-    
-    if  len(np.shape(vector)) == 3:
-        Nev, Nt, Nc = np.shape(vector) # Nev: Núm eventos, Nt: Núm puntos temporales, Nc: Número canales
-        MOMENT = np.zeros((Nev, order, Nc))
-        for i in range(Nev):
-            for j in range(order): # Number of moments used
-                for k in range(Nc):
-                    W = time_vector[i,:,k]**(j)
-                    MOMENT[i,j,k] = np.sum(W*vector[i,:,k])
-    
-    return MOMENT
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -50,14 +29,14 @@ def momentos(vector, time_vector, order = 4):
 delay_time = 1                             # Max delay to training pulses in ns
 moments_order = 5                          # Order of moments used
 set_seed(42)                               # Fix seeds
-nbins = 151                                # Num bins for all histograms
+nbins = 71                                 # Num bins for all histograms
 t_shift = 1                                # Time steps to move for the new positions
 normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
 epochs = 500                               # Number of epochs for training
 lr = 1e-3                                  # Model learning rate
-total_time = time_step*train_data.shape[1]
-save = False                               # Save models or not
+total_time = time_step*train_data.shape[1] - time_step #120
+save = True                              # Save models or not
 architecture = [moments_order, 5, 1, 1]   
 fraction = 0.1                             # Fraction to trigger the pulse cropping   
 window_low = 14                            # Number of steps to take before trigger
@@ -80,9 +59,9 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-train_array, train_time_array, a, b = extract_signal_along_time(new_train, fraction = fraction, window_low = window_low, window_high = window_high)
-val_array, val_time_array, _ , _ = extract_signal_along_time(new_val, fraction = fraction, window_low = window_low, window_high = window_high)
-test_array, test_time_array, _ , _ = extract_signal_along_time(new_test, fraction = fraction, window_low = window_low, window_high = window_high)
+train_array, train_time_array, a, b = extract_signal_along_time(new_train, time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+val_array, val_time_array, _ , _    = extract_signal_along_time(new_val, time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array, test_time_array, _ , _  = extract_signal_along_time(new_test, time_step, fraction = fraction, window_low = window_low, window_high = window_high)
 
 train_dec0, REF_train_dec0, time_train_dec0 = create_and_delay_pulse_pair_along_time(train_array[:,:,0], train_time_array[:,:,0], time_step, total_time, delay_time = delay_time)
 train_dec1, REF_train_dec1, time_train_dec1 = create_and_delay_pulse_pair_along_time(train_array[:,:,1], train_time_array[:,:,1], time_step, total_time, delay_time = delay_time)
@@ -96,29 +75,30 @@ TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_sh
 TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
 TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
 
+
 # Calculate moments
-M_Train_dec0 = momentos(train_dec0, time_train_dec0, order = moments_order) 
-M_Train_dec1 = momentos(train_dec1, time_train_dec1, order = moments_order) 
+M_Train_dec0 = momentos_threshold(train_dec0, time_train_dec0, order = moments_order) 
+M_Train_dec1 = momentos_threshold(train_dec1, time_train_dec1, order = moments_order) 
 
-M_Val_dec0 = momentos(val_dec0, val_time_dec0, order = moments_order) 
-M_Val_dec1 = momentos(val_dec1, val_time_dec1, order = moments_order)
+M_Val_dec0 = momentos_threshold(val_dec0, val_time_dec0, order = moments_order) 
+M_Val_dec1 = momentos_threshold(val_dec1, val_time_dec1, order = moments_order)
 
-MOMENTS_TEST_00 = momentos(TEST_00, test_time_array, order = moments_order)
+MOMENTS_TEST_00 = momentos_threshold(TEST_00, test_time_array, order = moments_order)
 
-MOMENTS_TEST_02_0 = momentos(TEST_02[:,:,0], test_time_array[:,:,0], order = moments_order)
-MOMENTS_TEST_02_1 = momentos(TEST_02[:,:,1], test_time_array[:,:,1] + t_shift*time_step/total_time, order = moments_order)
+MOMENTS_TEST_02_0 = momentos_threshold(TEST_02[:,:,0], test_time_array[:,:,0], order = moments_order)
+MOMENTS_TEST_02_1 = momentos_threshold(TEST_02[:,:,1], test_time_array[:,:,1] + t_shift*time_step/total_time, order = moments_order)
 MOMENTS_TEST_02 = np.stack((MOMENTS_TEST_02_0, MOMENTS_TEST_02_1), axis = -1)
 
-MOMENTS_TEST_04_0 = momentos(TEST_04[:,:,0], test_time_array[:,:,0], order = moments_order)
-MOMENTS_TEST_04_1 = momentos(TEST_04[:,:,1], test_time_array[:,:,1] + 2*t_shift*time_step/total_time, order = moments_order)
+MOMENTS_TEST_04_0 = momentos_threshold(TEST_04[:,:,0], test_time_array[:,:,0], order = moments_order)
+MOMENTS_TEST_04_1 = momentos_threshold(TEST_04[:,:,1], test_time_array[:,:,1] + 2*t_shift*time_step/total_time, order = moments_order)
 MOMENTS_TEST_04 = np.stack((MOMENTS_TEST_04_0, MOMENTS_TEST_04_1), axis = -1)
                            
-MOMENTS_TEST_20_1 = momentos(TEST_20[:,:,1], test_time_array[:,:,1], order = moments_order)
-MOMENTS_TEST_20_0 = momentos(TEST_20[:,:,0], test_time_array[:,:,0] + t_shift*time_step/total_time, order = moments_order)
+MOMENTS_TEST_20_1 = momentos_threshold(TEST_20[:,:,1], test_time_array[:,:,1], order = moments_order)
+MOMENTS_TEST_20_0 = momentos_threshold(TEST_20[:,:,0], test_time_array[:,:,0] + t_shift*time_step/total_time, order = moments_order)
 MOMENTS_TEST_20 = np.stack((MOMENTS_TEST_20_0, MOMENTS_TEST_20_1), axis = -1)
 
-MOMENTS_TEST_40_1 = momentos(TEST_40[:,:,1], test_time_array[:,:,1], order = moments_order)
-MOMENTS_TEST_40_0 = momentos(TEST_40[:,:,0], test_time_array[:,:,0] + 2*t_shift*time_step/total_time, order = moments_order)
+MOMENTS_TEST_40_1 = momentos_threshold(TEST_40[:,:,1], test_time_array[:,:,1], order = moments_order)
+MOMENTS_TEST_40_0 = momentos_threshold(TEST_40[:,:,0], test_time_array[:,:,0] + 2*t_shift*time_step/total_time, order = moments_order)
 MOMENTS_TEST_40 = np.stack((MOMENTS_TEST_40_0, MOMENTS_TEST_40_1), axis = -1)
 
 MOMENTS_TEST = np.concatenate((MOMENTS_TEST_02, MOMENTS_TEST_00, MOMENTS_TEST_20, MOMENTS_TEST_04, MOMENTS_TEST_40), axis = 0)
@@ -126,7 +106,7 @@ MOMENTS_TEST = np.concatenate((MOMENTS_TEST_02, MOMENTS_TEST_00, MOMENTS_TEST_20
 # Normalize moments 
 M_Train_dec0, params_dec0 =  normalize(M_Train_dec0, method = normalization_method)
 M_Train_dec1, params_dec1 =  normalize(M_Train_dec1, method = normalization_method)
-print(params_dec0,params_dec1)
+
 
 M_Val_dec0_channel0 =  normalize_given_params(M_Val_dec0, params_dec0, channel = 0, method = normalization_method)
 M_Val_dec0_channel1 =  normalize_given_params(M_Val_dec0, params_dec0, channel = 1, method = normalization_method)
@@ -152,8 +132,8 @@ val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec0).f
 val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
 
 # Create DataLoaders
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 128, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 128, shuffle = True)
+train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 64, shuffle = True)
+train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 64, shuffle = True)
 
 val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
 val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)

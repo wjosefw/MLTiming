@@ -867,8 +867,8 @@ def extract_signal_along_time(vector, time_step, fraction = 0.2, window_low = 14
 
     new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
     time_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
-    #t = np.arange(0, time_step*vector.shape[1], time_step) / (time_step*vector.shape[1] - time_step)
-    t = np.linspace(0, 1, vector.shape[1])
+    t = np.arange(0, time_step*vector.shape[1], time_step) / (time_step*vector.shape[1] - time_step)
+    #t = np.linspace(0, 1, vector.shape[1])
     #t = np.arange(0, time_step*vector.shape[1], time_step)
     
     a = 0

@@ -5,7 +5,7 @@ import torch
 
 # Import functions
 from functions import (create_and_delay_pulse_pair, create_position, 
-                       calculate_gaussian_center_sigma, plot_gaussian, 
+                       calculate_gaussian_center, plot_gaussian, 
                        get_gaussian_params, set_seed, continuous_delay)
 from Models import ConvolutionalModel, train_loop_convolutional, count_parameters
 
@@ -29,14 +29,14 @@ stop = 74
 set_seed(42)        # Fix seeds
 epochs = 500
 lr = 1e-4
-save = True
+save = False
 
 
 # -------------------------------------------------------------------------
 #----------------------- ALIGN PULSES -------------------------------------
 # -------------------------------------------------------------------------
 
-align_time = 0.6
+align_time = 0.5
 new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
@@ -45,14 +45,18 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-#train_data = new_train[:,start:stop,:] 
-#validation_data = new_val[:,start:stop,:] 
-#test_data = new_test[:,start:stop,:]
-
-
 train_data = np.concatenate((new_test[:,start:stop,:],new_train[:3000,start:stop,:]),axis = 0) 
 validation_data = new_val[:,start:stop,:] 
 test_data = new_train[3000:,start:stop,:]
+
+#data = np.load(os.path.join(dir, 'pulsos_Na22_17_10_2023.npz'))['data']
+#align_time = 0.15
+#new_data = continuous_delay(data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+#start = 183
+#stop = 210
+#train_data = new_data[:30000,start:stop,:] 
+#validation_data = new_data[30000:33000,start:stop,:] 
+#test_data = new_data[33000:,start:stop,:]
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
@@ -119,7 +123,7 @@ TOF_V40 = TOF[:,4*TEST_00.shape[0]:]
     
 
 # Calulate Validation error
-centroid_V00, sigma_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
+centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
     
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + t_shift*time_step))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))

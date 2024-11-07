@@ -6,7 +6,7 @@ import torch
 from efficient_kan.src.efficient_kan import KAN
 
 from functions import (momentos, create_and_delay_pulse_pair, create_position, 
-                       set_seed, calculate_gaussian_center_sigma, normalize, 
+                       set_seed, calculate_gaussian_center, normalize, 
                        normalize_given_params, plot_gaussian, get_gaussian_params,
                        continuous_delay)
 from Models import train_loop_MLP, MLP_Torch,  count_parameters, train_loop_KAN
@@ -17,7 +17,6 @@ print(f'Using device: {device}')
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-
 train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
 val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
@@ -46,7 +45,7 @@ save = False
 #----------------------- ALIGN PULSES -------------------------------------
 # -------------------------------------------------------------------------
 
-align_time = 0.6
+align_time = 0.5
 new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
@@ -55,9 +54,11 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 #----------------------- CROP WAVEFORM ------------------------------------
 # -------------------------------------------------------------------------
 
+
 #train_data = new_train[:,start:stop,:]  #189:213
 #validation_data = new_val[:,start:stop,:] 
 #test_data = new_test[:,start:stop,:]
+
 train_data = np.concatenate((new_test[:,start:stop,:],new_train[:3000,start:stop,:]),axis = 0) 
 validation_data = new_val[:,start:stop,:] 
 test_data = new_train[3000:,start:stop,:]
@@ -117,8 +118,8 @@ train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec
 val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
 val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
 
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
+train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 128, shuffle = True)
+train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 128, shuffle = True)
 
 val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
 val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
@@ -152,9 +153,6 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optim
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec0_Na22.npz', data = test_dec0)
-#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec1_Na22.npz', data = test_dec1)
-
 # Calculate TOF
 TOF = test_dec0 - test_dec1
 
@@ -166,7 +164,7 @@ TOF_V40 = TOF[:,4*TEST_00.shape[0]:]
     
 
 # Calulate Test error
-centroid_V00, sigmaN_V00 = calculate_gaussian_center_sigma(TOF_V00, np.zeros((TOF_V00.shape[0])), nbins = nbins) 
+centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
 
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + time_step*t_shift))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))

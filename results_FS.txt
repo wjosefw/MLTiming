@@ -1,147 +1,326 @@
 
 
-FWHM_13 = np.array([214.9, 215.8, 221.6, 243.4, 240.2])  # ps
-FWHM_err_13 = np.array([0.9, 0.8, 1.7, 1.9, 1.8])  # ps
-centroid_13 = np.array([-380.1, -184.6, -0.3, 190.6, 387.9])  # ps
-centroid_err_13 = np.array([0.8, 0.8, 1.6, 1.7, 1.7])  # ps
-MAE_13 = 0.0807894  # ps
+FWHM_4372 = np.array([232.8, 230.0, 225.6, 229.0, 229.5])  # ps
+FWHM_err_4372 = np.array([0.5, 0.6, 0.6, 0.6, 0.5])  # ps
+centroid_4372 = np.array([-399.2, -199.7, -0.0, 200.5, 400.3])  # ps
+centroid_err_4372 = np.array([0.5, 0.5, 0.5, 0.6, 0.4])  # ps
+MAE_4372 = 0.0821046  # ps
 
-FWHM_23 = np.array([211.4, 212.1, 209.0, 232.6, 231.9])  # ps
-FWHM_err_23 = np.array([0.9, 0.7, 0.9, 0.9, 1.2])  # ps
-centroid_23 = np.array([-387.3, -188.2, 0.7, 193.7, 393.7])  # ps
-centroid_err_23 = np.array([0.8, 0.7, 0.9, 0.9, 1.2])  # ps
-MAE_23 = 0.0789617  # ps
+FWHM_4373 = np.array([221.1, 219.5, 218.8, 219.4, 219.9])  # ps
+FWHM_err_4373 = np.array([0.5, 0.5, 0.4, 0.4, 0.5])  # ps
+centroid_4373 = np.array([-399.5, -199.9, -0.1, 200.4, 400.1])  # ps
+centroid_err_4373 = np.array([0.4, 0.4, 0.4, 0.3, 0.4])  # ps
+MAE_4373 = 0.0789075  # ps
 
-FWHM_33 = np.array([209.6, 208.9, 205.1, 227.5, 229.3])  # ps
-FWHM_err_33 = np.array([1.0, 0.9, 0.8, 1.1, 0.9])  # ps
-centroid_33 = np.array([-387.1, -188.4, 0.5, 193.7, 393.6])  # ps
-centroid_err_33 = np.array([0.9, 0.9, 0.8, 1.0, 0.8])  # ps
-MAE_33 = 0.0774672  # ps
+FWHM_4374 = np.array([216.5, 215.2, 216.6, 218.6, 218.0])  # ps
+FWHM_err_4374 = np.array([0.5, 0.4, 0.4, 0.5, 0.5])  # ps
+centroid_4374 = np.array([-398.9, -199.4, 0.1, 200.0, 400.1])  # ps
+centroid_err_4374 = np.array([0.4, 0.3, 0.4, 0.5, 0.5])  # ps
+MAE_4374 = 0.0779059  # ps
 
-FWHM_43 = np.array([205.8, 204.9, 201.0, 223.6, 223.5])  # ps
-FWHM_err_43 = np.array([0.7, 0.8, 0.9, 0.9, 1.1])  # ps
-centroid_43 = np.array([-388.7, -189.1, 0.2, 193.6, 393.6])  # ps
-centroid_err_43 = np.array([0.7, 0.7, 0.8, 0.8, 1.0])  # ps
-MAE_43 = 0.0760493  # ps
+FWHM_4375 = np.array([219.3, 218.3, 220.3, 220.6, 220.1])  # ps
+FWHM_err_4375 = np.array([0.5, 0.4, 0.4, 0.4, 0.5])  # ps
+centroid_4375 = np.array([-399.9, -200.0, -0.2, 200.0, 399.6])  # ps
+centroid_err_4375 = np.array([0.4, 0.4, 0.4, 0.4, 0.5])  # ps
+MAE_4375 = 0.0787383  # ps
 
-FWHM_53 = np.array([203.8, 201.2, 198.4, 221.1, 222.1])  # ps
-FWHM_err_53 = np.array([0.8, 0.7, 0.5, 1.1, 1.1])  # ps
-centroid_53 = np.array([-388.8, -189.1, 0.6, 194.4, 394.3])  # ps
-centroid_err_53 = np.array([0.7, 0.7, 0.5, 1.0, 1.0])  # ps
-MAE_53 = 0.0755219  # ps
+FWHM_4376 = np.array([222.9, 223.4, 226.9, 226.3, 226.2])  # ps
+FWHM_err_4376 = np.array([0.5, 0.5, 0.6, 0.6, 0.5])  # ps
+centroid_4376 = np.array([-399.9, -199.7, -0.2, 199.8, 399.2])  # ps
+centroid_err_4376 = np.array([0.4, 0.5, 0.6, 0.5, 0.4])  # ps
+MAE_4376 = 0.0803066  # ps
 
-FWHM_63 = np.array([203.2, 202.2, 197.5, 219.1, 220.1])  # ps
-FWHM_err_63 = np.array([0.6, 0.8, 0.7, 1.2, 1.3])  # ps
-centroid_63 = np.array([-389.7, -190.3, 0.1, 194.6, 394.5])  # ps
-centroid_err_63 = np.array([0.5, 0.7, 0.7, 1.1, 1.2])  # ps
-MAE_63 = 0.0746422  # ps
+FWHM_4377 = np.array([231.7, 232.1, 235.1, 235.1, 235.1])  # ps
+FWHM_err_4377 = np.array([0.5, 0.5, 0.6, 0.6, 0.5])  # ps
+centroid_4377 = np.array([-399.5, -199.9, 0.0, 200.1, 399.9])  # ps
+centroid_err_4377 = np.array([0.5, 0.5, 0.5, 0.5, 0.5])  # ps
+MAE_4377 = 0.0829458  # ps
 
-FWHM_73 = np.array([201.2, 199.4, 195.9, 217.9, 220.1])  # ps
-FWHM_err_73 = np.array([0.6, 0.8, 0.9, 1.4, 1.2])  # ps
-centroid_73 = np.array([-388.7, -189.1, 0.7, 195.2, 394.8])  # ps
-centroid_err_73 = np.array([0.5, 0.7, 0.9, 1.3, 1.1])  # ps
-MAE_73 = 0.0742025  # ps
+FWHM_4472 = np.array([229.3, 226.8, 222.4, 224.7, 225.2])  # ps
+FWHM_err_4472 = np.array([0.6, 0.5, 0.5, 0.6, 0.6])  # ps
+centroid_4472 = np.array([-399.4, -199.7, -0.1, 200.7, 400.3])  # ps
+centroid_err_4472 = np.array([0.6, 0.5, 0.5, 0.5, 0.5])  # ps
+MAE_4472 = 0.0809420  # ps
 
-FWHM_83 = np.array([201.0, 198.7, 195.2, 217.4, 218.8])  # ps
-FWHM_err_83 = np.array([0.5, 0.7, 0.8, 1.2, 1.4])  # ps
-centroid_83 = np.array([-389.0, -189.5, -0.0, 194.6, 394.1])  # ps
-centroid_err_83 = np.array([0.5, 0.7, 0.7, 1.2, 1.3])  # ps
-MAE_83 = 0.0736588  # ps
+FWHM_4473 = np.array([216.7, 215.1, 215.1, 217.2, 217.5])  # ps
+FWHM_err_4473 = np.array([0.5, 0.5, 0.5, 0.4, 0.5])  # ps
+centroid_4473 = np.array([-399.5, -199.7, -0.2, 200.3, 399.9])  # ps
+centroid_err_4473 = np.array([0.4, 0.5, 0.5, 0.4, 0.4])  # ps
+MAE_4473 = 0.0773889  # ps
 
-FWHM_93 = np.array([201.5, 198.8, 196.1, 216.1, 216.9])  # ps
-FWHM_err_93 = np.array([0.7, 0.8, 0.9, 1.2, 1.2])  # ps
-centroid_93 = np.array([-389.2, -189.6, -0.5, 195.6, 395.3])  # ps
-centroid_err_93 = np.array([0.6, 0.7, 0.8, 1.1, 1.1])  # ps
-MAE_93 = 0.0736050  # ps
+FWHM_4474 = np.array([215.5, 214.9, 215.9, 218.3, 217.5])  # ps
+FWHM_err_4474 = np.array([0.5, 0.4, 0.4, 0.4, 0.4])  # ps
+centroid_4474 = np.array([-399.1, -199.9, -0.2, 199.7, 399.5])  # ps
+centroid_err_4474 = np.array([0.4, 0.4, 0.4, 0.4, 0.4])  # ps
+MAE_4474 = 0.0776171  # ps
 
-FWHM_15 = np.array([214.8, 215.6, 221.6, 243.5, 240.3])  # ps
-FWHM_err_15 = np.array([0.9, 0.6, 1.7, 1.9, 1.8])  # ps
-centroid_15 = np.array([-379.8, -184.3, 0.0, 190.9, 388.1])  # ps
-centroid_err_15 = np.array([0.8, 0.6, 1.6, 1.8, 1.7])  # ps
-MAE_15 = 0.0810600  # ps
+FWHM_4475 = np.array([218.1, 217.9, 219.6, 221.1, 220.9])  # ps
+FWHM_err_4475 = np.array([0.4, 0.5, 0.4, 0.4, 0.5])  # ps
+centroid_4475 = np.array([-399.3, -199.8, 0.1, 199.7, 399.2])  # ps
+centroid_err_4475 = np.array([0.4, 0.5, 0.4, 0.4, 0.4])  # ps
+MAE_4475 = 0.0785588  # ps
 
-FWHM_25 = np.array([213.3, 214.2, 212.3, 234.1, 233.1])  # ps
-FWHM_err_25 = np.array([1.1, 1.0, 0.9, 0.8, 1.1])  # ps
-centroid_25 = np.array([-387.8, -188.5, -0.0, 193.3, 393.4])  # ps
-centroid_err_25 = np.array([1.0, 0.9, 0.9, 0.7, 1.1])  # ps
-MAE_25 = 0.0797731  # ps
+FWHM_4476 = np.array([223.6, 224.3, 226.7, 226.8, 226.1])  # ps
+FWHM_err_4476 = np.array([0.5, 0.5, 0.6, 0.6, 0.5])  # ps
+centroid_4476 = np.array([-400.0, -200.1, -0.3, 199.8, 399.6])  # ps
+centroid_err_4476 = np.array([0.5, 0.5, 0.6, 0.5, 0.5])  # ps
+MAE_4476 = 0.0805401  # ps
 
-FWHM_35 = np.array([208.5, 208.5, 205.3, 228.9, 229.1])  # ps
-FWHM_err_35 = np.array([0.9, 1.0, 0.8, 1.0, 0.7])  # ps
-centroid_35 = np.array([-387.8, -188.8, -0.2, 193.2, 392.8])  # ps
-centroid_err_35 = np.array([0.8, 1.0, 0.7, 0.9, 0.7])  # ps
-MAE_35 = 0.0774396  # ps
+FWHM_4477 = np.array([232.8, 233.3, 236.4, 236.5, 235.9])  # ps
+FWHM_err_4477 = np.array([0.5, 0.6, 0.6, 0.7, 0.6])  # ps
+centroid_4477 = np.array([-399.9, -199.9, -0.2, 200.0, 399.7])  # ps
+centroid_err_4477 = np.array([0.4, 0.5, 0.5, 0.6, 0.6])  # ps
+MAE_4477 = 0.0832299  # ps
 
-FWHM_45 = np.array([205.7, 203.9, 200.8, 223.9, 223.8])  # ps
-FWHM_err_45 = np.array([0.8, 0.7, 0.9, 0.8, 0.9])  # ps
-centroid_45 = np.array([-388.6, -189.0, -0.3, 193.4, 393.7])  # ps
-centroid_err_45 = np.array([0.8, 0.7, 0.8, 0.7, 0.8])  # ps
-MAE_45 = 0.0760644  # ps
+FWHM_4572 = np.array([230.8, 228.6, 224.0, 225.3, 226.4])  # ps
+FWHM_err_4572 = np.array([0.5, 0.5, 0.6, 0.5, 0.6])  # ps
+centroid_4572 = np.array([-400.0, -200.1, 0.1, 200.5, 400.3])  # ps
+centroid_err_4572 = np.array([0.5, 0.4, 0.6, 0.5, 0.5])  # ps
+MAE_4572 = 0.0819255  # ps
 
-FWHM_55 = np.array([203.8, 202.7, 198.6, 220.9, 222.5])  # ps
-FWHM_err_55 = np.array([0.8, 0.6, 0.8, 1.1, 1.0])  # ps
-centroid_55 = np.array([-389.5, -189.7, 0.0, 194.0, 393.8])  # ps
-centroid_err_55 = np.array([0.8, 0.6, 0.7, 1.0, 0.9])  # ps
-MAE_55 = 0.0754714  # ps
+FWHM_4573 = np.array([215.9, 214.3, 213.5, 216.8, 216.3])  # ps
+FWHM_err_4573 = np.array([0.5, 0.6, 0.4, 0.3, 0.5])  # ps
+centroid_4573 = np.array([-400.0, -200.1, 0.1, 200.5, 400.2])  # ps
+centroid_err_4573 = np.array([0.4, 0.6, 0.4, 0.3, 0.5])  # ps
+MAE_4573 = 0.0771926  # ps
 
-FWHM_65 = np.array([202.8, 201.4, 197.0, 219.0, 220.8])  # ps
-FWHM_err_65 = np.array([0.7, 0.7, 0.8, 1.1, 1.3])  # ps
-centroid_65 = np.array([-389.1, -189.8, 0.5, 194.5, 394.4])  # ps
-centroid_err_65 = np.array([0.7, 0.7, 0.7, 1.1, 1.2])  # ps
-MAE_65 = 0.0747956  # ps
+FWHM_4574 = np.array([213.5, 212.9, 215.2, 217.1, 215.9])  # ps
+FWHM_err_4574 = np.array([0.4, 0.4, 0.3, 0.4, 0.4])  # ps
+centroid_4574 = np.array([-399.1, -199.1, -0.1, 199.7, 399.3])  # ps
+centroid_err_4574 = np.array([0.4, 0.4, 0.3, 0.3, 0.3])  # ps
+MAE_4574 = 0.0768127  # ps
 
-FWHM_75 = np.array([202.2, 200.0, 196.9, 217.5, 219.4])  # ps
-FWHM_err_75 = np.array([0.7, 0.6, 1.0, 1.3, 1.2])  # ps
-centroid_75 = np.array([-388.6, -189.1, 0.4, 195.5, 395.1])  # ps
-centroid_err_75 = np.array([0.6, 0.5, 1.0, 1.2, 1.1])  # ps
-MAE_75 = 0.0743702  # ps
+FWHM_4575 = np.array([217.6, 217.1, 219.4, 221.4, 221.0])  # ps
+FWHM_err_4575 = np.array([0.4, 0.5, 0.4, 0.5, 0.4])  # ps
+centroid_4575 = np.array([-399.2, -199.7, 0.1, 199.8, 399.4])  # ps
+centroid_err_4575 = np.array([0.4, 0.5, 0.4, 0.4, 0.4])  # ps
+MAE_4575 = 0.0785090  # ps
 
-FWHM_85 = np.array([200.7, 198.2, 195.2, 218.2, 219.2])  # ps
-FWHM_err_85 = np.array([0.7, 0.8, 0.9, 1.4, 1.4])  # ps
-centroid_85 = np.array([-389.3, -189.6, 0.5, 194.3, 394.1])  # ps
-centroid_err_85 = np.array([0.7, 0.8, 0.8, 1.3, 1.3])  # ps
-MAE_85 = 0.0740218  # ps
+FWHM_4576 = np.array([223.1, 224.3, 227.6, 227.8, 226.2])  # ps
+FWHM_err_4576 = np.array([0.4, 0.4, 0.4, 0.6, 0.4])  # ps
+centroid_4576 = np.array([-398.9, -199.1, -0.3, 199.7, 399.2])  # ps
+centroid_err_4576 = np.array([0.4, 0.4, 0.4, 0.5, 0.4])  # ps
+MAE_4576 = 0.0803262  # ps
 
-FWHM_95 = np.array([200.7, 198.1, 195.3, 216.1, 217.6])  # ps
-FWHM_err_95 = np.array([0.5, 0.7, 0.8, 1.4, 1.2])  # ps
-centroid_95 = np.array([-389.4, -189.9, -0.2, 194.9, 394.9])  # ps
-centroid_err_95 = np.array([0.5, 0.6, 0.8, 1.3, 1.1])  # ps
-MAE_95 = 0.0736514  # ps
+FWHM_4577 = np.array([232.6, 232.7, 235.7, 236.4, 235.8])  # ps
+FWHM_err_4577 = np.array([0.4, 0.5, 0.5, 0.7, 0.6])  # ps
+centroid_4577 = np.array([-399.8, -199.8, -0.1, 200.0, 399.8])  # ps
+centroid_err_4577 = np.array([0.4, 0.5, 0.5, 0.6, 0.6])  # ps
+MAE_4577 = 0.0831544  # ps
 
-FWHM_17 = np.array([214.9, 216.1, 222.3, 243.6, 240.3])  # ps
-FWHM_err_17 = np.array([0.9, 0.7, 1.7, 1.9, 1.8])  # ps
-centroid_17 = np.array([-379.9, -184.6, -0.1, 190.8, 388.1])  # ps
-centroid_err_17 = np.array([0.8, 0.6, 1.6, 1.7, 1.7])  # ps
-MAE_17 = 0.0810352  # ps
+FWHM_4672 = np.array([230.5, 227.8, 223.2, 223.0, 225.0])  # ps
+FWHM_err_4672 = np.array([0.6, 0.5, 0.6, 0.6, 0.5])  # ps
+centroid_4672 = np.array([-399.8, -199.8, -0.0, 200.9, 400.8])  # ps
+centroid_err_4672 = np.array([0.6, 0.4, 0.5, 0.5, 0.5])  # ps
+MAE_4672 = 0.0816304  # ps
 
-FWHM_27 = np.array([211.5, 212.6, 211.8, 233.3, 232.0])  # ps
-FWHM_err_27 = np.array([1.3, 0.9, 0.9, 0.9, 1.2])  # ps
-centroid_27 = np.array([-387.8, -188.7, -0.1, 193.6, 393.8])  # ps
-centroid_err_27 = np.array([1.2, 0.8, 0.8, 0.8, 1.1])  # ps
-MAE_27 = 0.0795713  # ps
+FWHM_4673 = np.array([216.7, 214.4, 213.8, 214.4, 215.1])  # ps
+FWHM_err_4673 = np.array([0.5, 0.5, 0.4, 0.4, 0.4])  # ps
+centroid_4673 = np.array([-400.6, -200.6, -0.2, 200.2, 400.1])  # ps
+centroid_err_4673 = np.array([0.5, 0.5, 0.4, 0.4, 0.4])  # ps
+MAE_4673 = 0.0775820  # ps
 
-FWHM_37 = np.array([208.5, 208.6, 204.0, 226.5, 227.2])  # ps
-FWHM_err_37 = np.array([1.0, 0.9, 0.7, 0.9, 0.7])  # ps
-centroid_37 = np.array([-388.7, -189.5, -0.4, 192.7, 392.5])  # ps
-centroid_err_37 = np.array([0.9, 0.8, 0.7, 0.8, 0.6])  # ps
-MAE_37 = 0.0769093  # ps
+FWHM_4674 = np.array([213.4, 212.5, 214.5, 217.1, 215.8])  # ps
+FWHM_err_4674 = np.array([0.4, 0.4, 0.3, 0.4, 0.4])  # ps
+centroid_4674 = np.array([-399.4, -199.5, -0.0, 199.8, 399.5])  # ps
+centroid_err_4674 = np.array([0.4, 0.4, 0.3, 0.4, 0.4])  # ps
+MAE_4674 = 0.0769576  # ps
 
-FWHM_47 = np.array([205.0, 204.3, 200.3, 223.1, 223.0])  # ps
-FWHM_err_47 = np.array([0.6, 0.7, 0.8, 0.8, 1.1])  # ps
-centroid_47 = np.array([-388.7, -189.2, -0.2, 193.2, 393.2])  # ps
-centroid_err_47 = np.array([0.6, 0.6, 0.7, 0.8, 1.0])  # ps
-MAE_47 = 0.0761116  # ps
+FWHM_4675 = np.array([216.9, 216.6, 219.8, 220.6, 220.4])  # ps
+FWHM_err_4675 = np.array([0.4, 0.6, 0.4, 0.5, 0.5])  # ps
+centroid_4675 = np.array([-399.1, -199.1, 0.0, 200.0, 399.3])  # ps
+centroid_err_4675 = np.array([0.4, 0.5, 0.3, 0.4, 0.4])  # ps
+MAE_4675 = 0.0780407  # ps
 
-FWHM_57 = np.array([204.1, 202.3, 198.1, 220.8, 222.7])  # ps
-FWHM_err_57 = np.array([0.9, 0.6, 0.8, 1.1, 1.2])  # ps
-centroid_57 = np.array([-388.7, -189.3, 0.9, 194.7, 394.8])  # ps
-centroid_err_57 = np.array([0.8, 0.6, 0.8, 1.0, 1.1])  # ps
-MAE_57 = 0.0752605  # ps
+FWHM_4676 = np.array([223.3, 224.4, 227.5, 227.9, 227.3])  # ps
+FWHM_err_4676 = np.array([0.4, 0.5, 0.6, 0.6, 0.4])  # ps
+centroid_4676 = np.array([-398.8, -199.3, 0.0, 200.0, 399.3])  # ps
+centroid_err_4676 = np.array([0.4, 0.4, 0.5, 0.6, 0.3])  # ps
+MAE_4676 = 0.0805134  # ps
 
-FWHM_67 = np.array([201.7, 200.8, 197.0, 218.4, 220.6])  # ps
-FWHM_err_67 = np.array([0.7, 0.6, 0.8, 1.2, 1.2])  # ps
-centroid_67 = np.array([-388.9, -189.3, 0.4, 195.0, 394.9])  # ps
-centroid_err_67 = np.array([0.7, 0.6, 0.7, 1.1, 1.1])  # ps
-MAE_67 = 0.0747419  # ps
+FWHM_4677 = np.array([230.3, 231.2, 234.5, 235.0, 234.3])  # ps
+FWHM_err_4677 = np.array([0.5, 0.6, 0.5, 0.5, 0.6])  # ps
+centroid_4677 = np.array([-398.4, -198.9, 0.2, 199.8, 399.3])  # ps
+centroid_err_4677 = np.array([0.5, 0.6, 0.5, 0.4, 0.5])  # ps
+MAE_4677 = 0.0825558  # ps
 
+FWHM_4772 = np.array([225.2, 223.0, 219.3, 220.8, 222.6])  # ps
+FWHM_err_4772 = np.array([0.5, 0.6, 0.4, 0.5, 0.5])  # ps
+centroid_4772 = np.array([-401.2, -201.0, -0.1, 200.8, 400.8])  # ps
+centroid_err_4772 = np.array([0.4, 0.5, 0.4, 0.4, 0.5])  # ps
+MAE_4772 = 0.0801934  # ps
+
+FWHM_4773 = np.array([216.0, 214.0, 213.5, 214.0, 214.4])  # ps
+FWHM_err_4773 = np.array([0.5, 0.5, 0.3, 0.4, 0.5])  # ps
+centroid_4773 = np.array([-400.4, -200.4, -0.0, 200.5, 400.6])  # ps
+centroid_err_4773 = np.array([0.4, 0.5, 0.3, 0.4, 0.4])  # ps
+MAE_4773 = 0.0774392  # ps
+
+FWHM_4774 = np.array([213.5, 212.9, 214.0, 214.3, 213.8])  # ps
+FWHM_err_4774 = np.array([0.5, 0.4, 0.5, 0.4, 0.4])  # ps
+centroid_4774 = np.array([-400.0, -200.1, -0.2, 200.1, 400.2])  # ps
+centroid_err_4774 = np.array([0.5, 0.4, 0.5, 0.4, 0.4])  # ps
+MAE_4774 = 0.0769645  # ps
+
+FWHM_4775 = np.array([216.7, 217.1, 219.7, 221.8, 220.9])  # ps
+FWHM_err_4775 = np.array([0.5, 0.4, 0.4, 0.4, 0.4])  # ps
+centroid_4775 = np.array([-399.6, -199.5, -0.1, 200.1, 399.4])  # ps
+centroid_err_4775 = np.array([0.5, 0.4, 0.4, 0.4, 0.4])  # ps
+MAE_4775 = 0.0782340  # ps
+
+FWHM_4776 = np.array([222.5, 223.5, 227.9, 228.6, 227.6])  # ps
+FWHM_err_4776 = np.array([0.6, 0.5, 0.5, 0.5, 0.5])  # ps
+centroid_4776 = np.array([-399.0, -198.7, 0.0, 200.4, 400.1])  # ps
+centroid_err_4776 = np.array([0.6, 0.4, 0.5, 0.5, 0.5])  # ps
+MAE_4776 = 0.0801601  # ps
+
+FWHM_4777 = np.array([231.2, 232.0, 235.7, 235.2, 234.5])  # ps
+FWHM_err_4777 = np.array([0.5, 0.6, 0.5, 0.7, 0.5])  # ps
+centroid_4777 = np.array([-399.0, -199.5, -0.1, 199.7, 399.1])  # ps
+centroid_err_4777 = np.array([0.5, 0.5, 0.5, 0.6, 0.5])  # ps
+MAE_4777 = 0.0828762  # ps
+
+FWHM_4872 = np.array([225.9, 223.0, 219.2, 220.1, 222.2])  # ps
+FWHM_err_4872 = np.array([0.4, 0.5, 0.4, 0.5, 0.6])  # ps
+centroid_4872 = np.array([-400.6, -200.5, 0.1, 200.5, 400.7])  # ps
+centroid_err_4872 = np.array([0.4, 0.5, 0.4, 0.4, 0.5])  # ps
+MAE_4872 = 0.0802617  # ps
+
+FWHM_4873 = np.array([214.7, 213.8, 213.1, 213.9, 214.3])  # ps
+FWHM_err_4873 = np.array([0.5, 0.4, 0.4, 0.4, 0.4])  # ps
+centroid_4873 = np.array([-401.0, -200.8, -0.2, 200.5, 400.6])  # ps
+centroid_err_4873 = np.array([0.5, 0.4, 0.3, 0.4, 0.4])  # ps
+MAE_4873 = 0.0771223  # ps
+
+FWHM_4874 = np.array([213.8, 213.4, 214.2, 214.7, 213.7])  # ps
+FWHM_err_4874 = np.array([0.4, 0.4, 0.4, 0.4, 0.5])  # ps
+centroid_4874 = np.array([-400.2, -200.2, -0.1, 200.4, 400.4])  # ps
+centroid_err_4874 = np.array([0.4, 0.4, 0.4, 0.4, 0.4])  # ps
+MAE_4874 = 0.0770584  # ps
+
+FWHM_4875 = np.array([216.9, 216.3, 218.3, 218.4, 217.8])  # ps
+FWHM_err_4875 = np.array([0.6, 0.5, 0.3, 0.4, 0.4])  # ps
+centroid_4875 = np.array([-400.0, -199.9, 0.0, 200.2, 399.9])  # ps
+centroid_err_4875 = np.array([0.5, 0.4, 0.3, 0.4, 0.4])  # ps
+MAE_4875 = 0.0780297  # ps
+
+FWHM_4876 = np.array([224.5, 225.2, 228.7, 231.2, 229.6])  # ps
+FWHM_err_4876 = np.array([0.5, 0.6, 0.7, 0.6, 0.5])  # ps
+centroid_4876 = np.array([-398.9, -199.2, -0.0, 200.1, 400.1])  # ps
+centroid_err_4876 = np.array([0.5, 0.6, 0.6, 0.5, 0.5])  # ps
+MAE_4876 = 0.0807623  # ps
+
+FWHM_4877 = np.array([231.5, 232.5, 236.6, 237.3, 236.2])  # ps
+FWHM_err_4877 = np.array([0.5, 0.5, 0.5, 0.6, 0.6])  # ps
+centroid_4877 = np.array([-399.0, -199.3, -0.2, 200.3, 399.8])  # ps
+centroid_err_4877 = np.array([0.5, 0.5, 0.4, 0.5, 0.5])  # ps
+MAE_4877 = 0.0828672  # ps
+
+FWHM_4972 = np.array([235.1, 233.0, 228.0, 228.9, 230.3])  # ps
+FWHM_err_4972 = np.array([0.6, 0.6, 0.6, 0.6, 0.7])  # ps
+centroid_4972 = np.array([-398.9, -199.5, 0.0, 200.2, 399.8])  # ps
+centroid_err_4972 = np.array([0.6, 0.5, 0.6, 0.6, 0.6])  # ps
+MAE_4972 = 0.0831564  # ps
+
+FWHM_4973 = np.array([215.1, 213.0, 212.7, 214.1, 213.4])  # ps
+FWHM_err_4973 = np.array([0.5, 0.5, 0.4, 0.4, 0.4])  # ps
+centroid_4973 = np.array([-400.6, -200.4, -0.0, 200.3, 400.2])  # ps
+centroid_err_4973 = np.array([0.5, 0.5, 0.4, 0.4, 0.4])  # ps
+MAE_4973 = 0.0770513  # ps
+
+FWHM_4974 = np.array([213.7, 213.3, 214.1, 214.6, 213.9])  # ps
+FWHM_err_4974 = np.array([0.4, 0.4, 0.3, 0.4, 0.5])  # ps
+centroid_4974 = np.array([-400.3, -200.4, -0.3, 200.2, 400.3])  # ps
+centroid_err_4974 = np.array([0.4, 0.3, 0.3, 0.4, 0.4])  # ps
+MAE_4974 = 0.0769575  # ps
+
+FWHM_4975 = np.array([217.4, 216.5, 217.8, 218.0, 217.8])  # ps
+FWHM_err_4975 = np.array([0.4, 0.4, 0.3, 0.4, 0.5])  # ps
+centroid_4975 = np.array([-399.6, -199.8, 0.0, 200.1, 399.6])  # ps
+centroid_err_4975 = np.array([0.4, 0.4, 0.3, 0.4, 0.4])  # ps
+MAE_4975 = 0.0780320  # ps
+
+FWHM_4976 = np.array([222.2, 222.5, 225.1, 224.9, 224.3])  # ps
+FWHM_err_4976 = np.array([0.5, 0.5, 0.5, 0.5, 0.4])  # ps
+centroid_4976 = np.array([-399.6, -199.7, 0.3, 200.4, 399.9])  # ps
+centroid_err_4976 = np.array([0.5, 0.4, 0.5, 0.4, 0.4])  # ps
+MAE_4976 = 0.0798045  # ps
+
+FWHM_4977 = np.array([232.8, 233.5, 236.7, 238.8, 237.5])  # ps
+FWHM_err_4977 = np.array([0.5, 0.6, 0.5, 0.6, 0.7])  # ps
+centroid_4977 = np.array([-399.3, -199.6, -0.0, 200.3, 400.0])  # ps
+centroid_err_4977 = np.array([0.4, 0.5, 0.4, 0.6, 0.6])  # ps
+MAE_4977 = 0.0833799  # ps
+
+FWHM_5072 = np.array([235.2, 233.1, 228.2, 229.3, 231.5])  # ps
+FWHM_err_5072 = np.array([0.6, 0.6, 0.7, 0.7, 0.6])  # ps
+centroid_5072 = np.array([-399.2, -199.8, -0.2, 200.2, 400.0])  # ps
+centroid_err_5072 = np.array([0.6, 0.5, 0.7, 0.6, 0.5])  # ps
+MAE_5072 = 0.0833897  # ps
+
+FWHM_5073 = np.array([219.3, 217.8, 215.0, 217.3, 217.7])  # ps
+FWHM_err_5073 = np.array([0.5, 0.3, 0.5, 0.5, 0.4])  # ps
+centroid_5073 = np.array([-400.1, -200.4, 0.0, 200.1, 399.9])  # ps
+centroid_err_5073 = np.array([0.4, 0.3, 0.4, 0.4, 0.4])  # ps
+MAE_5073 = 0.0782963  # ps
+
+FWHM_5074 = np.array([213.8, 213.1, 215.0, 216.5, 215.2])  # ps
+FWHM_err_5074 = np.array([0.4, 0.3, 0.4, 0.3, 0.4])  # ps
+centroid_5074 = np.array([-399.9, -200.1, -0.1, 200.2, 400.4])  # ps
+centroid_err_5074 = np.array([0.4, 0.3, 0.4, 0.3, 0.4])  # ps
+MAE_5074 = 0.0770181  # ps
+
+FWHM_5075 = np.array([217.1, 216.7, 219.1, 218.9, 218.6])  # ps
+FWHM_err_5075 = np.array([0.5, 0.5, 0.4, 0.5, 0.5])  # ps
+centroid_5075 = np.array([-399.7, -199.8, 0.1, 200.2, 399.9])  # ps
+centroid_err_5075 = np.array([0.5, 0.5, 0.4, 0.4, 0.4])  # ps
+MAE_5075 = 0.0780463  # ps
+
+FWHM_5076 = np.array([222.3, 222.4, 225.2, 225.2, 224.9])  # ps
+FWHM_err_5076 = np.array([0.6, 0.5, 0.5, 0.5, 0.4])  # ps
+centroid_5076 = np.array([-400.2, -200.2, -0.1, 199.9, 399.6])  # ps
+centroid_err_5076 = np.array([0.6, 0.5, 0.5, 0.5, 0.4])  # ps
+MAE_5076 = 0.0799435  # ps
+
+FWHM_5077 = np.array([230.1, 230.2, 233.7, 233.3, 232.1])  # ps
+FWHM_err_5077 = np.array([0.5, 0.5, 0.4, 0.5, 0.6])  # ps
+centroid_5077 = np.array([-399.3, -199.3, -0.0, 200.2, 399.7])  # ps
+centroid_err_5077 = np.array([0.4, 0.5, 0.4, 0.5, 0.6])  # ps
+MAE_5077 = 0.0819940  # ps
+
+FWHM_5172 = np.array([237.4, 235.3, 230.4, 231.7, 233.5])  # ps
+FWHM_err_5172 = np.array([0.5, 0.4, 0.6, 0.6, 0.6])  # ps
+centroid_5172 = np.array([-400.3, -200.5, 0.0, 199.8, 399.3])  # ps
+centroid_err_5172 = np.array([0.5, 0.4, 0.6, 0.6, 0.6])  # ps
+MAE_5172 = 0.0842705  # ps
+
+FWHM_5173 = np.array([218.6, 217.1, 215.1, 215.7, 217.0])  # ps
+FWHM_err_5173 = np.array([0.5, 0.4, 0.4, 0.4, 0.4])  # ps
+centroid_5173 = np.array([-400.4, -200.5, -0.0, 199.9, 399.9])  # ps
+centroid_err_5173 = np.array([0.4, 0.4, 0.4, 0.4, 0.4])  # ps
+MAE_5173 = 0.0780686  # ps
+
+FWHM_5174 = np.array([213.3, 212.7, 213.8, 215.5, 215.4])  # ps
+FWHM_err_5174 = np.array([0.4, 0.5, 0.4, 0.4, 0.4])  # ps
+centroid_5174 = np.array([-400.2, -200.3, 0.0, 200.1, 400.0])  # ps
+centroid_err_5174 = np.array([0.4, 0.4, 0.4, 0.4, 0.4])  # ps
+MAE_5174 = 0.0768017  # ps
+
+FWHM_5175 = np.array([217.8, 216.8, 219.2, 220.2, 219.5])  # ps
+FWHM_err_5175 = np.array([0.5, 0.5, 0.4, 0.4, 0.4])  # ps
+centroid_5175 = np.array([-399.8, -199.9, 0.1, 200.4, 400.3])  # ps
+centroid_err_5175 = np.array([0.4, 0.4, 0.3, 0.4, 0.4])  # ps
+MAE_5175 = 0.0783519  # ps
+
+FWHM_5176 = np.array([223.4, 223.7, 226.9, 226.8, 226.5])  # ps
+FWHM_err_5176 = np.array([0.7, 0.5, 0.5, 0.5, 0.5])  # ps
+centroid_5176 = np.array([-399.6, -199.7, -0.0, 200.3, 399.9])  # ps
+centroid_err_5176 = np.array([0.6, 0.4, 0.5, 0.5, 0.4])  # ps
+MAE_5176 = 0.0802539  # ps
+
+FWHM_5177 = np.array([231.1, 231.0, 233.9, 234.7, 234.4])  # ps
+FWHM_err_5177 = np.array([0.5, 0.5, 0.5, 0.6, 0.6])  # ps
+centroid_5177 = np.array([-399.5, -199.8, -0.4, 199.7, 399.5])  # ps
+centroid_err_5177 = np.array([0.4, 0.4, 0.5, 0.6, 0.5])  # ps
+MAE_5177 = 0.0824758  # ps
 
