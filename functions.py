@@ -863,12 +863,14 @@ def extract_signal_window_by_fraction(vector, fraction = 0.2, window_low = 140, 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def extract_signal_along_time(vector, fraction = 0.2, window_low = 140, window_high = 10):
+def extract_signal_along_time(vector, time_step, fraction = 0.2, window_low = 140, window_high = 10):
 
     new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
     time_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
+    #t = np.arange(0, time_step*vector.shape[1], time_step) / (time_step*vector.shape[1] - time_step)
     t = np.linspace(0, 1, vector.shape[1])
-
+    #t = np.arange(0, time_step*vector.shape[1], time_step)
+    
     a = 0
     b = 0    
     for i in range(vector.shape[0]):
@@ -898,7 +900,10 @@ def extract_signal_along_time(vector, fraction = 0.2, window_low = 140, window_h
 
     return new_vector, time_vector, a, b    
 
-def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, delay_time = 1):
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, total_time, delay_time = 1):
     
 
     INPUT = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
@@ -935,6 +940,32 @@ def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, de
         
         REF[i] = NRD0[i] - NRD1[i]
         
-        Time_delayed[i,:,0] = time_vector[i,:] + NRD0[i]
-        Time_delayed[i,:,1] = time_vector[i,:] + NRD1[i]
+        Time_delayed[i,:,0] = time_vector[i,:] + (NRD0[i]/total_time)
+        Time_delayed[i,:,1] = time_vector[i,:] + (NRD1[i]/total_time)
+
     return INPUT_2, REF, Time_delayed
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def momentos_threshold(vector, time_vector, order = 4):
+    
+    if  len(np.shape(vector)) == 2:
+        Nev, Nt = np.shape(vector)
+        MOMENT = np.zeros((Nev, order))
+        for i in range(Nev):
+                for j in range(order): 
+                    W = time_vector[i,:]**(j)
+                    MOMENT[i,j] = np.sum(W*vector[i,:])       
+   
+    
+    if  len(np.shape(vector)) == 3:
+        Nev, Nt, Nc = np.shape(vector) # Nev: Núm eventos, Nt: Núm puntos temporales, Nc: Número canales
+        MOMENT = np.zeros((Nev, order, Nc))
+        for i in range(Nev):
+            for j in range(order): # Number of moments used
+                for k in range(Nc):
+                    W = time_vector[i,:,k]**(j)
+                    MOMENT[i,j,k] = np.sum(W*vector[i,:,k])
+    
+    return MOMENT
