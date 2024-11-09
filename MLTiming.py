@@ -9,7 +9,8 @@ from functions import (momentos, create_and_delay_pulse_pair, create_position,
                        set_seed, calculate_gaussian_center, normalize, 
                        normalize_given_params, plot_gaussian, get_gaussian_params,
                        continuous_delay)
-from Models import train_loop_MLP, MLP_Torch,  count_parameters, train_loop_KAN
+from Models import MLP_Torch,  count_parameters
+from Train_loops import train_loop_MLP, train_loop_KAN
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -20,7 +21,6 @@ dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
 train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
 val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
-
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -37,6 +37,7 @@ start = 47
 stop = 74
 lr = 1e-3
 epochs = 500
+batch_size = 32
 Num_Neurons = 16
 architecture = [moments_order, int(sys.argv[2]), 1, 1]    # KAN architecture
 save = False
@@ -54,14 +55,9 @@ new_test = continuous_delay(test_data, time_step = time_step, delay_time = align
 #----------------------- CROP WAVEFORM ------------------------------------
 # -------------------------------------------------------------------------
 
-
-#train_data = new_train[:,start:stop,:]  #189:213
-#validation_data = new_val[:,start:stop,:] 
-#test_data = new_test[:,start:stop,:]
-
-train_data = np.concatenate((new_test[:,start:stop,:],new_train[:3000,start:stop,:]),axis = 0) 
+train_data = new_train[:,start:stop,:]  #189:213
 validation_data = new_val[:,start:stop,:] 
-test_data = new_train[3000:,start:stop,:]
+test_data = new_test[:,start:stop,:]
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
@@ -118,8 +114,8 @@ train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec
 val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
 val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
 
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 128, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 128, shuffle = True)
+train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = batch_size, shuffle = True)
+train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = batch_size, shuffle = True)
 
 val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
 val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
@@ -164,7 +160,7 @@ TOF_V40 = TOF[:,4*TEST_00.shape[0]:]
     
 
 # Calulate Test error
-centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
+centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 5) 
 
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + time_step*t_shift))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))

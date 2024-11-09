@@ -78,79 +78,6 @@ class MLP_Torch(nn.Module):
         out = forward_single(input)
         return out
     
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
-    
-    loss_list = []
-    val_loss_list = []
-    test = []
-    val = []  
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
-    
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-    
-    # Move model and test_tensor to the device
-    model = model.to(device)
-    test_tensor = test_tensor.to(device)
-
-    for epoch in range(EPOCHS):
-        running_loss = 0.0
-
-        for data in train_loader:
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device) 
-            optimizer.zero_grad()
-            
-            outputs_0 = model(inputs[:, :, 0])
-            outputs_1 = model(inputs[:, :, 1])
-
-            loss = loss_MAE_KAN(outputs_0, outputs_1, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
-        scheduler.step()
-        loss_list.append(running_loss / len(train_loader))
-
-        print(f'EPOCH {epoch + 1}:')
-        print(f'LOSS train {running_loss / len(train_loader)}')
-
-        with torch.no_grad():
-            test_epoch = model(test_tensor)
-            test.append(np.squeeze(test_epoch.cpu().detach().numpy()))
-
-            val_loss = 0
-            val_stack = []  # List to hold val_0 and val_1 pairs
-            
-            for val_data, val_labels in val_loader:
-                val_data, val_labels = val_data.to(device), val_labels.to(device) 
-                val_0 = model(val_data[:, :, 0])
-                val_1 = model(val_data[:, :, 1])
-                val_loss += loss_MAE_KAN(val_0, val_1, val_labels)
-
-                # Stack val_0 and val_1 along the last dimension
-                val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
-
-            # Combine all batches into a single array for this epoch
-            epoch_val = np.concatenate(val_stack, axis = 0)  
-            val.append(epoch_val)  
-            
-            val_loss_list.append(val_loss.item() / len(val_loader))
-            print(f'LOSS val {val_loss / len(val_loader)}')
-
-    if save:
-        torch.save(model.state_dict(), name)
-
-    return (
-        np.array(loss_list, dtype = 'object'), 
-        np.array(val_loss_list, dtype = 'object'), 
-        np.array(test, dtype = 'object'), 
-        np.array(val, dtype = 'object')
-    )
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -163,16 +90,16 @@ def count_parameters(model):
 
 class ConvolutionalModel_Threshold(nn.Module):
     def __init__(self, N_points, num_outputs=1):
-        super(ConvolutionalModel, self).__init__()
+        super(ConvolutionalModel_Threshold, self).__init__()
 
         # Define convolutional blocks with batch normalization and ReLU
-        self.conv1 = self.conv_block(1, 16, 5)
-        self.conv2 = self.conv_block(16, 32, 5)
-        self.conv3 = self.conv_block(32, 64, 3)
+        self.conv1 = self.conv_block(1, 16, (2,5))
+        self.conv2 = self.conv_block(16, 32, (2,5))
+        self.conv3 = self.conv_block(32, 64, (2,3))
         
 
         # Calculate flattened size for fully connected layer
-        self.flatten_size = 64 * (N_points // 8)  
+        self.flatten_size = 2 * 64 * (N_points // 8)  
 
         # Fully connected layer with output
         self.fc1 = nn.Linear(self.flatten_size, 32)
@@ -192,7 +119,7 @@ class ConvolutionalModel_Threshold(nn.Module):
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
-     
+        
         # Flatten and pass through fully connected layer
         x = x.view(x.size(0), -1)
         x = self.dropout(x)

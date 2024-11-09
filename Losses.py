@@ -1,6 +1,5 @@
 import torch
 
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -15,18 +14,14 @@ def custom_loss_MSE(outputs_0, outputs_1, labels):
     loss = torch.mean((outputs_0 - outputs_1 - labels) ** 2) 
     return loss
 
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 def custom_loss_Limit(outputs_0, outputs_1, labels, limit = 1):
     loss = (torch.mean(abs(outputs_0 - outputs_1 - labels)) +
             torch.mean(torch.maximum(torch.tensor(0.0, device = outputs_0.device), 
                                      torch.abs(outputs_1 - outputs_0) - limit)))
     return loss
-
-
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -82,6 +77,15 @@ def custom_loss_with_huber(outputs_0, outputs_1, labels):
 
 def loss_MAE_KAN(outputs_0, outputs_1, labels):
     loss = (torch.mean(abs(outputs_0 - outputs_1 - labels)) +
+            torch.sum(torch.relu(-outputs_0)) +
+            torch.sum(torch.relu(-outputs_1)))
+    return loss
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def loss_MSE_KAN(outputs_0, outputs_1, labels):
+    loss = (torch.mean(abs(outputs_0 - outputs_1 - labels)**2) +
             torch.sum(torch.relu(-outputs_0)) +
             torch.sum(torch.relu(-outputs_1)))
     return loss

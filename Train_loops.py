@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-from Losses import custom_loss_MAE, custom_loss_bounded, custom_loss_MSE, custom_loss_Limit, custom_loss_with_huber, loss_MAE_KAN
+from Losses import custom_loss_MAE, custom_loss_bounded, custom_loss_MSE, custom_loss_Limit, custom_loss_with_huber, loss_MAE_KAN, loss_MSE_KAN
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
 
@@ -205,7 +205,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
             outputs_0 = model(inputs[:, :, 0])
             outputs_1 = model(inputs[:, :, 1])
 
-            loss = loss_MAE_KAN(outputs_0, outputs_1, labels)
+            loss = loss_MSE_KAN(outputs_0, outputs_1, labels)
             loss.backward()
             optimizer.step()
 
@@ -228,7 +228,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
                 val_data, val_labels = val_data.to(device), val_labels.to(device) 
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += loss_MAE_KAN(val_0, val_1, val_labels)
+                val_loss += loss_MSE_KAN(val_0, val_1, val_labels)
 
                 # Stack val_0 and val_1 along the last dimension
                 val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
@@ -318,7 +318,7 @@ def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loade
         for data in train_loader:
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
-
+            
             # Zero gradients
             optimizer.zero_grad()
 
