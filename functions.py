@@ -820,17 +820,32 @@ def continuous_delay(vector, time_step = 0.2, delay_time = 1, channel_to_fix = 0
     
     res = delay_time % time_step  # Fractional part of the delay
     idel = int(delay_time / time_step) 
-
+    
     new_vector = np.zeros_like(vector)
-    for i in range(vector.shape[0]):
-        for j in range(vector.shape[1] - 1, 0, -1):
-                slope = (vector[i, j, channel_to_move] - vector[i, j - 1, channel_to_move]) / time_step
-                new_vector[i, j, channel_to_move] =  vector[i, j, channel_to_move] - slope * res 
-        new_vector[i,0, channel_to_move] = vector[i,0, channel_to_move]
-        new_vector[i,:,channel_to_move] = np.roll(new_vector[i,:,channel_to_move], idel)
-        new_vector[i,:idel,channel_to_move] = 0
-    new_vector[:,:,channel_to_fix] = vector[:,:,channel_to_fix]
+    if delay_time >= 0:
+        for i in range(vector.shape[0]):
+            for j in range(vector.shape[1] - 1, 0, -1):
+                    slope = (vector[i, j, channel_to_move] - vector[i, j - 1, channel_to_move]) / time_step
+                    new_vector[i, j, channel_to_move] =  vector[i, j, channel_to_move] - slope * res 
+            new_vector[i,0, channel_to_move] = vector[i,0, channel_to_move]
+            new_vector[i,:,channel_to_move] = np.roll(new_vector[i,:,channel_to_move], idel)
+            new_vector[i,:idel,channel_to_move] = 0
+        new_vector[:,:,channel_to_fix] = vector[:,:,channel_to_fix]
 
+
+    if delay_time < 0:
+        print(idel)
+        for i in range(vector.shape[0]):
+            for j in range(vector.shape[1] - 1):
+                    slope = (vector[i, j + 1, channel_to_move] - vector[i, j, channel_to_move]) / time_step
+                    new_vector[i, j, channel_to_move] =  vector[i, j, channel_to_move] + slope * res 
+            new_vector[i,-1, channel_to_move] = vector[i,-1, channel_to_move]
+            if idel <= -1:
+                new_vector[i,:,channel_to_move] = np.roll(new_vector[i,:,channel_to_move], idel)
+                new_vector[i,idel:,channel_to_move] = vector[i, idel:, channel_to_move]
+            else:
+                pass
+        new_vector[:,:,channel_to_fix] = vector[:,:,channel_to_fix]
     return new_vector
 
 #----------------------------------------------------------------------------------------------
