@@ -31,7 +31,7 @@ t_shift = 1         # Time steps to move for the new positions
 start = 47 
 stop = 74 
 set_seed(42)        # Fix seeds
-epochs = 500
+epochs = 300
 lr = 1e-4
 batch_size = 64
 save = False
