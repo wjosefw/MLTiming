@@ -834,7 +834,6 @@ def continuous_delay(vector, time_step = 0.2, delay_time = 1, channel_to_fix = 0
 
 
     if delay_time < 0:
-        print(idel)
         for i in range(vector.shape[0]):
             for j in range(vector.shape[1] - 1):
                     slope = (vector[i, j + 1, channel_to_move] - vector[i, j, channel_to_move]) / time_step
@@ -915,6 +914,27 @@ def extract_signal_along_time(vector, time_step, total_time, fraction = 0.2, win
 
     return new_vector, time_vector, a, b    
 
+def extract_signal_along_time_singles(vector, time_step, total_time, fraction = 0.2, window_low = 140, window_high = 10):
+
+    new_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
+    time_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
+    t = np.arange(0, time_step*vector.shape[1], time_step) / total_time
+ 
+    for i in range(vector.shape[0]):
+        # Find indices where the signal in each channel exceeds the fraction threshold
+        index = np.where(vector[i,:] >= fraction)[0][0]
+             
+        # Calculate the low and high indices to extraction
+        index_low = index - window_low
+        index_high = index + window_high
+
+        # Extract cropped waveform and put into new vector
+        new_vector[i,:] =  vector[i,index_low:index_high]
+        time_vector[i,:] = t[index_low:index_high]
+        
+
+    return new_vector, time_vector
+
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -970,7 +990,7 @@ def momentos_threshold(vector, time_vector, order = 4):
         MOMENT = np.zeros((Nev, order))
         for i in range(Nev):
                 for j in range(order): 
-                    W = time_vector[i,:]**(j)
+                    W = time_vector[i,:]**(j+1)
                     MOMENT[i,j] = np.sum(W*vector[i,:])       
    
     
@@ -980,7 +1000,7 @@ def momentos_threshold(vector, time_vector, order = 4):
         for i in range(Nev):
             for j in range(order): # Number of moments used
                 for k in range(Nc):
-                    W = time_vector[i,:,k]**(j)
+                    W = time_vector[i,:,k]**(j+1)
                     MOMENT[i,j,k] = np.sum(W*vector[i,:,k])
     
     return MOMENT

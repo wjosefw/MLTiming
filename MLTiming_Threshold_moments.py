@@ -29,16 +29,16 @@ data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1                           # Max delay to training pulses in ns
+delay_time = 0.3                           # Max delay to training pulses in ns
 moments_order = 5                          # Order of moments used
 set_seed(42)                               # Fix seeds
 nbins = 71                                 # Num bins for all histograms
 t_shift = 1                                # Time steps to move for the new positions
 normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
-epochs = 1000                               # Number of epochs for training
+epochs = 500                               # Number of epochs for training
 lr = 1e-3                                  # Model learning rate
-batch_size = 64                           # batch size used for training
+batch_size = 512                            # batch size used for training
 total_time = time_step*data_55.shape[1] - time_step  #time_step*train_data.shape[1] - time_step 
 save = False                               # Save models or not
 architecture = [moments_order, 5, 1, 1]   
@@ -47,26 +47,7 @@ window_low = 14                            # Number of steps to take before trig
 window_high = 10                           # Number of steps to take after trigger
 
 
-def extract_signal_along_time(vector, time_step, total_time, fraction = 0.2, window_low = 140, window_high = 10):
 
-    new_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
-    time_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
-    t = np.arange(0, time_step*vector.shape[1], time_step) / total_time
- 
-    for i in range(vector.shape[0]):
-        # Find indices where the signal in each channel exceeds the fraction threshold
-        index = np.where(vector[i,:] >= fraction)[0][0]
-             
-        # Calculate the low and high indices to extraction
-        index_low = index - window_low
-        index_high = index + window_high
-
-        # Extract cropped waveform and put into new vector
-        new_vector[i,:] =  vector[i,index_low:index_high]
-        time_vector[i,:] = t[index_low:index_high]
-        
-
-    return new_vector, time_vector
 
 new_train = np.concatenate((data_55[:6000,:,:], data_28[:6000,:,:], data_82[:6000,:,:]), axis = 0)
 new_val = np.concatenate((data_55[6000:7000,:,:], data_28[6000:7000,:,:], data_82[6000:7000,:,:]), axis = 0)

@@ -12,12 +12,12 @@ from Train_loops import train_loop_convolutional
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-#train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
-#val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
-#test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
-data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA.npz'))['data']
-data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA.npz'))['data']
-data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
+train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
+val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
+test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
+#data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA.npz'))['data']
+#data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA.npz'))['data']
+#data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
 
 
 # -------------------------------------------------------------------------
@@ -31,7 +31,7 @@ t_shift = 1         # Time steps to move for the new positions
 start = 47 
 stop = 74 
 set_seed(42)        # Fix seeds
-epochs = 300
+epochs = 500
 lr = 1e-4
 batch_size = 64
 save = False
@@ -41,28 +41,28 @@ save = False
 #----------------------- ALIGN PULSES -------------------------------------
 # -------------------------------------------------------------------------
 
-#align_time = 0.5
-#new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-#new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-#new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+align_time = 0.5
+new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
+new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 
-align_time = 0.1
-new_data_82 = continuous_delay(data_82, time_step = time_step, delay_time = align_time, channel_to_fix = 1, channel_to_move = 0)
-new_data_55 = continuous_delay(data_55, time_step = time_step, delay_time = align_time, channel_to_fix = 1, channel_to_move = 0)
-new_data_28 = continuous_delay(data_28, time_step = time_step, delay_time = align_time, channel_to_fix = 1, channel_to_move = 0)
+#align_time = 0.1
+#new_data_82 = continuous_delay(data_82, time_step = time_step, delay_time = align_time, channel_to_fix = 1, channel_to_move = 0)
+#new_data_55 = continuous_delay(data_55, time_step = time_step, delay_time = align_time, channel_to_fix = 1, channel_to_move = 0)
+#new_data_28 = continuous_delay(data_28, time_step = time_step, delay_time = align_time, channel_to_fix = 1, channel_to_move = 0)
 
 
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-#train_data = new_train[:6000,start:stop,:] 
-#validation_data = new_val[:,start:stop,:] 
-#test_data = new_train[6000:,start:stop,:]
+train_data = new_train[:6000,start:stop,:] 
+validation_data = new_val[:,start:stop,:] 
+test_data = new_train[6000:,start:stop,:]
 
-train_data = np.concatenate((new_data_55[:4000,start:stop,:], new_data_28[:4000,start:stop,:], new_data_82[:4000,start:stop,:]), axis = 0)
-validation_data = np.concatenate((new_data_55[4000:5000,start:stop,:], new_data_28[4000:5000,start:stop,:], new_data_82[4000:5000,start:stop,:]), axis = 0)
-test_data = np.concatenate((new_data_55[4000:,start:stop,:], new_data_28[4000:,start:stop,:], new_data_82[4000:,start:stop,:]), axis = 0)
+#train_data = np.concatenate((new_data_55[:4000,start:stop,:], new_data_28[:4000,start:stop,:], new_data_82[:4000,start:stop,:]), axis = 0)
+#validation_data = np.concatenate((new_data_55[4000:5000,start:stop,:], new_data_28[4000:5000,start:stop,:], new_data_82[4000:5000,start:stop,:]), axis = 0)
+#test_data = np.concatenate((new_data_55[4000:,start:stop,:], new_data_28[4000:,start:stop,:], new_data_82[4000:,start:stop,:]), axis = 0)
 
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
@@ -78,13 +78,13 @@ train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time
 val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
-#TEST_00 = test_data
-TEST = test_data
-#TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
-#TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)  
-#TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
-#TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
-#TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
+#TEST = test_data
+TEST_00 = test_data
+TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
+TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)  
+TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
+TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
+TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
 # Create Dataset / DataLoaders
 train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
@@ -123,15 +123,15 @@ loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_
 # Calculate TOF
 TOF = test_dec0 - test_dec1
 
-#TOF_V02 = TOF[:,:TEST_00.shape[0]] 
-#TOF_V00 = TOF[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] 
-#TOF_V20 = TOF[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
-#TOF_V04 = TOF[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
-#TOF_V40 = TOF[:,4*TEST_00.shape[0]:] 
+TOF_V02 = TOF[:,:TEST_00.shape[0]] 
+TOF_V00 = TOF[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] 
+TOF_V20 = TOF[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
+TOF_V04 = TOF[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
+TOF_V40 = TOF[:,4*TEST_00.shape[0]:] 
 
-TOF_V00 = TOF[:,:new_data_55[4000:,:,:].shape[0]] 
-TOF_V02 = TOF[:, new_data_55[4000:,:,:].shape[0] : new_data_55[4000:,:,:].shape[0] + new_data_28[4000:,:,:].shape[0]] 
-TOF_V20 = TOF[:, new_data_55[4000:,:,:].shape[0]  + new_data_28[4000:,:,:].shape[0]:] 
+#TOF_V00 = TOF[:,:new_data_55[4000:,:,:].shape[0]] 
+#TOF_V02 = TOF[:, new_data_55[4000:,:,:].shape[0] : new_data_55[4000:,:,:].shape[0] + new_data_28[4000:,:,:].shape[0]] 
+#TOF_V20 = TOF[:, new_data_55[4000:,:,:].shape[0]  + new_data_28[4000:,:,:].shape[0]:] 
     
 
 # Calulate Validation error
@@ -140,8 +140,8 @@ centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3)
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + t_shift*time_step))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
 error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - t_shift*time_step))
-#error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 2*t_shift*time_step))
-#error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 2*t_shift*time_step))
+error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 2*t_shift*time_step))
+error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 2*t_shift*time_step))
 
 # Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00), axis = 1) #, error_V04, error_V40), axis = 1)   
@@ -177,25 +177,25 @@ plt.show()
 
 
 # Histogram and gaussian fit 
-#plot_gaussian(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
+plot_gaussian(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
 plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
 plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
 plot_gaussian(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-#plot_gaussian(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
+plot_gaussian(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
 
 
-#params_V04, errors_V04 = get_gaussian_params(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
+params_V04, errors_V04 = get_gaussian_params(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V02, errors_V02 = get_gaussian_params(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V00, errors_V00 = get_gaussian_params(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V20, errors_V20 = get_gaussian_params(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
-#params_V40, errors_V40 = get_gaussian_params(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
+params_V40, errors_V40 = get_gaussian_params(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 
 
-#print("V40: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
+print("V40: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
 print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
 print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
 print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-#print("V04: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
+print("V04: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
 
 print('')
 plt.legend()

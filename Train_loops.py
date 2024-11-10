@@ -205,7 +205,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
             outputs_0 = model(inputs[:, :, 0])
             outputs_1 = model(inputs[:, :, 1])
 
-            loss = loss_MSE_KAN(outputs_0, outputs_1, labels)
+            loss = loss_MAE_KAN(outputs_0, outputs_1, labels)
             loss.backward()
             optimizer.step()
 
@@ -228,7 +228,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
                 val_data, val_labels = val_data.to(device), val_labels.to(device) 
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += loss_MSE_KAN(val_0, val_1, val_labels)
+                val_loss += loss_MAE_KAN(val_0, val_1, val_labels)
 
                 # Stack val_0 and val_1 along the last dimension
                 val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
