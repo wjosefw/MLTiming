@@ -5,11 +5,12 @@ import torch
 from efficient_kan.src.efficient_kan import KAN
 
 
-from functions import (momentos, create_and_delay_pulse_pair, set_seed, 
+from functions import (extract_signal_along_time_singles, momentos_threshold, set_seed, 
                        normalize, normalize_given_params, continuous_delay, 
-                       plot_gaussian, get_gaussian_params)
-from functions_KAN import  count_parameters, train_loop_KAN
-from Models import train_loop_MLP, MLP_Torch
+                       plot_gaussian, get_gaussian_params, create_and_delay_pulse_pair_along_time)
+from Models import  count_parameters
+from Train_loops import train_loop_KAN
+
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -17,86 +18,97 @@ print(f'Using device: {device}')
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
+data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA.npz'))['data']
+data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA.npz'))['data']
+data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
 
-train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
-val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
 
 # -------------------------------------------------------------------------
-#----------------------- IMPORTANT DEFINITIONS ----------------------------
+# ----------------------- IMPORTANT DEFINITIONS ---------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1          # Max delay to training pulses in ns
-time_step = 0.2         # Signal time step in ns
-moments_order = 5       # Max order of moments used
-set_seed(42)            # Fix seeds
-nbins = 71              # Num bins for all histograms                   
+channel = 1                                # Channel to train
+delay_time = 1                             # Max delay to training pulses in ns
+moments_order = 5                          # Order of moments used
+set_seed(42)                               # Fix seeds
+nbins = 71                                 # Num bins for all histograms
+t_shift = 1                                # Time steps to move for the new positions
 normalization_method = 'standardization'
-start = 50
-stop = 74
-architecture = [moments_order, 5, 1, 1]  # KAN architecture
-lr = 1e-3
-epochs = 50
-Num_Neurons = 64
+time_step = 0.2                            # Signal time step in ns
+epochs = 50                               # Number of epochs for training
+lr = 1e-3                                  # Model learning rate
+batch_size = 32                            # batch size used for training
+total_time = time_step*data_55.shape[1] - time_step  
+save = True                                # Save models or not
+save_name = 'KAN_models/model_dec' + str(channel)
+architecture = [moments_order, 5, 1, 1]   
+fraction = 0.1                             # Fraction to trigger the pulse cropping   
+window_low = 14                            # Number of steps to take before trigger
+window_high = 10                           # Number of steps to take after trigger
 
-# -------------------------------------------------------------------------
-#----------------------- ALIGN PULSES -------------------------------------
-# -------------------------------------------------------------------------
-
-align_time = 0.6
-new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 
 # -------------------------------------------------------------------------
 #----------------------- CROP WAVEFORM ------------------------------------
 # -------------------------------------------------------------------------
 
-train_data = new_train[:,start:stop,:] 
-validation_data = new_val[:,start:stop,:] 
+new_train = np.concatenate((data_55[:6000,:,:], data_28[:6000,:,:], data_82[:6000,:,:]), axis = 0) 
+new_val = np.concatenate((data_55[6000:7000,:,:], data_28[6000:7000,:,:], data_82[6000:7000,:,:]), axis = 0)
+new_test = np.concatenate((data_55[6000:,:,:], data_28[6000:,:,:], data_82[6000:,:,:]), axis = 0)
 
-print('Número de casos de entrenamiento: ', train_data.shape[0])
-print('Número de casos de validacion: ', validation_data.shape[0])
+#print('Número de casos de entrenamiento: ', train_data.shape[0])
+#print('Número de casos de validacion: ', validation_data.shape[0])
 
 # -------------------------------------------------------------------------
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-train, REF_train = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_steps = delay_time)
-val, REF_val = create_and_delay_pulse_pair(validation_data[:,:,0],time_step, delay_steps = delay_time)
+#Extract pulses
+train_array, train_time_array = extract_signal_along_time_singles(new_train[:,:,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
+val_array, val_time_array = extract_signal_along_time_singles(new_val[:,:,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array, test_time_array = extract_signal_along_time_singles(new_test[:,:,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
 
-# Calculate moments 
-M_Train = momentos(train, order = moments_order) 
-M_Val = momentos(val, order = moments_order) 
+# Create virtual coincidences
+train, REF_train, time_train = create_and_delay_pulse_pair_along_time(train_array, train_time_array, time_step, total_time, delay_time = delay_time)
+val, REF_val, val_time = create_and_delay_pulse_pair_along_time(val_array, val_time_array, time_step, total_time, delay_time = delay_time)
 
-# Normalize moments
-M_Train, params=  normalize(M_Train, method = normalization_method)
 
-M_Val_channel0 =  normalize_given_params(M_Val, params, channel = 0, method = normalization_method)
-M_Val_channel1 =  normalize_given_params(M_Val, params, channel = 1, method = normalization_method)
-M_Val = np.stack((M_Val_channel0, M_Val_channel1), axis = -1)
+# Calculate moments
+M_Train = momentos_threshold(train, time_train, order = moments_order) 
+M_Val = momentos_threshold(val, val_time, order = moments_order) 
+MOMENTS_TEST = momentos_threshold(test_array, test_time_array, order = moments_order)
+
+# Normalize moments 
+#M_Train, params =  normalize(M_Train, method = normalization_method)
+#
+#M_Val_channel0 =  normalize_given_params(M_Val, params, channel = 0, method = normalization_method)
+#M_Val_channel1 =  normalize_given_params(M_Val, params, channel = 1, method = normalization_method)
+#M_Val = np.stack((M_Val_channel0, M_Val_channel1), axis = -1)
+#
+#MOMENTS_TEST_norm = normalize_given_params(MOMENTS_TEST[:,:,None], params, channel = 0, method = normalization_method)
+#
+#print("Normalization parameters:", params)
+
 
 # Create Datasets/Dataloaders
 train_dataset = torch.utils.data.TensorDataset(torch.from_numpy(M_Train).float(), torch.from_numpy(np.expand_dims(REF_train, axis = -1)).float())
 val_dataset = torch.utils.data.TensorDataset(torch.from_numpy(M_Val).float(), torch.from_numpy(np.expand_dims(REF_val, axis = -1)).float())
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = 32, shuffle = True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size = 32, shuffle = False)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size = len(val_dataset), shuffle = False)
 
-# Print information
-print("Normalization parameters:", params)
+
 
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
 model = KAN(architecture)
-#model = MLP_Torch(NM = NM, NN = Num_Neurons, STD_INIT = 0.5)
 print(f"Total number of parameters: {count_parameters(model)}")
 
 optimizer = torch.optim.AdamW(model.parameters(), lr = lr) 
   
 # Execute train loop
-loss, val_loss, test, val = train_loop_KAN(model, optimizer, train_loader, val_loader, torch.tensor(np.zeros_like(M_Train[:,:,0])).float(), EPOCHS = epochs, name = 'KAN_models/model', save = False) 
-#loss, val_loss, test = train_loop_MLP(model, optimizer, train_loader, val_loader, torch.tensor(np.zeros_like(M_Train[:,:,0])).float(), EPOCHS = epochs, name = 'KAN_models/model', save = False) 
+loss, val_loss, test, val = train_loop_KAN(model, optimizer, train_loader, val_loader, torch.tensor(MOMENTS_TEST).float(), EPOCHS = epochs, name = save_name, save = save) 
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -110,13 +122,62 @@ plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
+plt.hist(test[-1,:], bins = nbins, alpha = 0.5, range = [0, 6], label = 'Detector 0');
+plt.title('Single detector prediction histograms')
+plt.xlabel('time (ns)')
+plt.ylabel('Counts')
+plt.legend()
+plt.show()
+
+# Decompress test positions
+test_55 = test[-1,:data_55[6000:,:,:].shape[0]]
+test_28 = test[-1, data_55[6000:,:,:].shape[0]:data_55[6000:,:,:].shape[0]+ data_28[6000:,:,:].shape[0]]
+test_82 = test[-1, data_55[6000:,:,:].shape[0]+ data_28[6000:,:,:].shape[0]:]
+
+MOMENTS_TEST_55 = MOMENTS_TEST[:data_55[6000:,:,:].shape[0], 1]
+MOMENTS_TEST_28 = MOMENTS_TEST[data_55[6000:,:,:].shape[0]:data_55[6000:,:,:].shape[0] + data_28[6000:,:,:].shape[0], 1]
+MOMENTS_TEST_82 = MOMENTS_TEST[data_55[6000:,:,:].shape[0] + data_28[6000:,:,:].shape[0]:, 1]
+
+# Plot histograms of predictions for the different positions
+plt.hist(test_55, bins = nbins, alpha = 0.5, label = '55')
+plt.hist(test_28, bins = nbins, alpha = 0.5, label = '28')
+plt.hist(test_82, bins = nbins, alpha = 0.5, label = '82')
+plt.title('Prediction times histograms')
+plt.legend()
+plt.show()
+
+
+#plot validation delays hists
+plt.hist(val[-1,:,0] - val[-1,:,1], bins = nbins, alpha = 0.5)
+plt.hist(REF_val, bins = nbins, alpha = 0.5)
+plt.show()
+
 # Get validation error
 err_val = val[-1,:,0] - val[-1,:,1] - REF_val
 print('MAE validation: ', np.mean(abs(err_val)))
 
+#Plot validation delay vs error
+plt.plot(val[-1,:,0] - val[-1,:,1], err_val, 'b.', markersize = 1.5)
+plt.ylabel('Validation Error')
+plt.xlabel('Validation target delay')
+plt.show()
+
+# Plot moment zero vs validation values
+plt.plot(MOMENTS_TEST_55, test_55, 'b.', label = '55')
+plt.plot(MOMENTS_TEST_28, test_28, 'r.', label = '28')
+#plt.plot(MOMENTS_TEST_82, test_82, 'g.', label = '82')
+plt.legend()
+plt.show()
+
+# Plot representation of moments diff vs ref delay
+plt.plot(M_Val[:,1,0]- M_Val[:,1,1], REF_val,'b.')
+plt.title('Diff moment vs ref delay')
+plt.show()
+
+
 # Plot Histogram and gaussian fit 
-plot_gaussian(err_val, 0.0, range = 0.05, label = 'Validation errors', nbins = nbins)
-params, errors = get_gaussian_params(err_val, 0.0, range = 0.05, nbins = nbins)
+plot_gaussian(err_val, 0.0, range = 0.005, label = 'Validation errors', nbins = nbins)
+params, errors = get_gaussian_params(err_val, 0.0, range = 0.005, nbins = nbins)
 print("CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params[2], errors[2], params[3], errors[3]))
 
 plt.legend()
