@@ -592,7 +592,7 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
         INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
         
         
-        REF[i] = NRD0[i] - NRD1[i]
+        REF[i] = NRD0[i] - NRD1[i]  
 
     return INPUT_2, REF
 
@@ -850,7 +850,6 @@ def continuous_delay(vector, time_step = 0.2, delay_time = 1, channel_to_fix = 0
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-
 def extract_signal_window_by_fraction(vector, fraction = 0.2, window_low = 140, window_high = 10):
 
     new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
@@ -921,13 +920,14 @@ def extract_signal_along_time_singles(vector, time_step, total_time, fraction = 
     t = np.arange(0, time_step*vector.shape[1], time_step) / total_time
  
     for i in range(vector.shape[0]):
+
         # Find indices where the signal in each channel exceeds the fraction threshold
-        index = np.where(vector[i,:] >= fraction)[0][0]
-             
+        index = np.where(vector[i,:] <= fraction)[0][-1]
+            
         # Calculate the low and high indices to extraction
         index_low = index - window_low
         index_high = index + window_high
-
+        
         # Extract cropped waveform and put into new vector
         new_vector[i,:] =  vector[i,index_low:index_high]
         time_vector[i,:] = t[index_low:index_high]
@@ -942,43 +942,23 @@ def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, to
     
 
     INPUT = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
-    INPUT_2 = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
     Time_delayed = np.zeros((time_vector.shape[0], time_vector.shape[1], 2))
     REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
 
     NRD0 = np.random.uniform(low = 0, high = delay_time, size = pulse_set.shape[0])
     NRD1 = np.random.uniform(low = 0, high = delay_time, size = pulse_set.shape[0])
     
+    INPUT[:,:,0] = pulse_set
+    INPUT[:,:,1] = pulse_set
+
     for i in range(pulse_set.shape[0]):
-        
-        res_0 = NRD0[i] % time_step  # Fractional part of the delay
-        for j in range(pulse_set.shape[1] - 1, 0, -1):
-            slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
-            INPUT[i, j, 0] = pulse_set[i, j] - slope * res_0 
-        INPUT[i, 0, 0] = pulse_set[i, 0] 
-
-        idel_0 = int( NRD0[i] / time_step) 
-        INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
-        INPUT_2[i,:idel_0,0] = INPUT[i,:idel_0,0]
-
-
-        res_1 = NRD1[i] % time_step  #
-        for j in range(pulse_set.shape[1] - 1, 0, -1):
-            slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
-            INPUT[i, j, 1] = pulse_set[i, j] - slope * res_1 
-        INPUT[i, 0, 1] = pulse_set[i, 1] 
-
-        idel_1 = int( NRD1[i] / time_step) 
-        INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
-        INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
-        
         
         REF[i] = NRD0[i] - NRD1[i]
         
         Time_delayed[i,:,0] = time_vector[i,:] + (NRD0[i]/total_time)
         Time_delayed[i,:,1] = time_vector[i,:] + (NRD1[i]/total_time)
 
-    return INPUT_2, REF, Time_delayed
+    return INPUT, REF, Time_delayed
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -990,7 +970,7 @@ def momentos_threshold(vector, time_vector, order = 4):
         MOMENT = np.zeros((Nev, order))
         for i in range(Nev):
                 for j in range(order): 
-                    W = time_vector[i,:]**(j+1)
+                    W = (time_vector[i,:])**(j)
                     MOMENT[i,j] = np.sum(W*vector[i,:])       
    
     
@@ -1000,7 +980,7 @@ def momentos_threshold(vector, time_vector, order = 4):
         for i in range(Nev):
             for j in range(order): # Number of moments used
                 for k in range(Nc):
-                    W = time_vector[i,:,k]**(j+1)
+                    W = (time_vector[i,:,k])**(j)
                     MOMENT[i,j,k] = np.sum(W*vector[i,:,k])
     
     return MOMENT
