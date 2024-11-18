@@ -128,4 +128,55 @@ class ConvolutionalModel_Threshold(nn.Module):
         x = F.softplus(x)
 
         return x
-    
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+class GradCAM:
+    def __init__(self, model, target_layer):
+        self.model = model
+        self.target_layer = target_layer
+        self.gradients = None
+        self.activations = None
+        self._register_hooks()
+
+    def _register_hooks(self):
+        def forward_hook(module, input, output):
+            self.activations = output
+
+        def backward_hook(module, grad_in, grad_out):
+            self.gradients = grad_out[0]
+
+        target_layer = dict(self.model.named_modules())[self.target_layer]
+        target_layer.register_forward_hook(forward_hook)
+        target_layer.register_backward_hook(backward_hook)
+
+    def generate_cam(self, input_tensor, target_index=None):
+        self.model.eval()
+        input_tensor.requires_grad = True
+
+        # Forward pass
+        output = self.model(input_tensor)
+        if target_index is None:
+            target_index = output.argmax(dim=1).item()
+
+        # Backward pass
+        self.model.zero_grad()
+        output[0, target_index].backward()
+
+        # Compute weights
+        gradients = self.gradients.cpu().detach().numpy()
+        activations = self.activations.cpu().detach().numpy()
+        weights = np.mean(gradients, axis=(2, 3))  # Global average pooling on gradients
+
+        # Compute Grad-CAM
+        cam = np.zeros(activations.shape[2:], dtype=np.float32)
+        for i, w in enumerate(weights[0]):
+            cam += w * activations[0, i, :, :]
+
+        # Apply ReLU and normalize
+        cam = np.maximum(cam, 0)
+        cam = cam / cam.max()
+
+        return cam
+

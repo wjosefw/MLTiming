@@ -18,6 +18,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     loss_list = []
     val_loss_list = []
     test = []
+    val_list = []
 
     # Cosine Annealing Scheduler
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
@@ -62,14 +63,24 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
             test.append(np.squeeze(test_epoch.cpu().numpy()))
 
             val_loss = 0.0
+            val_stack = []  # List to hold val_0 and val_1 pairs
+
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
                 mask = val_labels != 0 
                 val_0 = model(val_data[:, None, :, 0])
                 val_1 = model(val_data[:, None, :, 1])
                 val_loss += custom_loss_with_huber(val_0[mask], val_1[mask], val_labels[mask]).item()
-        val_loss_list.append(val_loss / len(val_loader))
-        print(f'LOSS val {val_loss / len(val_loader)}')
+        
+                # Stack val_0 and val_1 along the last dimension
+                val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
+
+            # Combine all batches into a single array for this epoch
+            epoch_val = np.concatenate(val_stack, axis = 0)  
+            val_list.append(epoch_val)  
+        
+            val_loss_list.append(val_loss / len(val_loader))
+            print(f'LOSS val {val_loss / len(val_loader)}')
 
 
     if save:
@@ -78,9 +89,10 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     # Convert lists to numpy arrays
     loss_array = np.array(loss_list, dtype = 'object')
     test = np.array(test, dtype = 'object')
-    val = np.array(val_loss_list, dtype = 'object')
+    val_loss = np.array(val_loss_list, dtype = 'object')
+    val = np.array(val_list, dtype = 'object')
     
-    return loss_array, test, val
+    return loss_array, test, val_loss, val
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  

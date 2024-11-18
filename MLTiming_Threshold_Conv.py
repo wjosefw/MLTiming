@@ -11,8 +11,8 @@ print(device)
 from functions import (create_position, set_seed, calculate_gaussian_center, plot_gaussian, 
                        get_gaussian_params, continuous_delay, extract_signal_along_time, 
                        create_and_delay_pulse_pair_along_time)
-from Models import count_parameters, ConvolutionalModel_Threshold
-from Train_loops import  train_loop_convolutional_Threshold
+from Models import count_parameters, ConvolutionalModel
+from Train_loops import  train_loop_convolutional
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
@@ -29,15 +29,14 @@ test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 delay_time = 0.5                           # Max delay to training pulses in ns
 moments_order = 5                          # Order of moments used
 set_seed(42)                               # Fix seeds
-nbins = 101                                # Num bins for all histograms
+nbins = 71                                # Num bins for all histograms
 t_shift = 1                                # Time steps to move for the new positions
 normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
 epochs = 500                               # Number of epochs for training
 lr = 1e-4                                  # Model learning rate
 total_time = time_step*train_data.shape[1]
-save = False                               # Save models or not
-architecture = [moments_order, 5, 1, 1]   
+save = False                               # Save models or not 
 fraction = 0.1                             # Fraction to trigger the pulse cropping   
 window_low = 14                            # Number of steps to take before trigger
 window_high = 10                           # Number of steps to take after trigger
@@ -95,17 +94,17 @@ test_time_array_40[:,:,1] = test_time_array[:,:,1]
 test_time_array_40[:,:,0] = test_time_array[:,:,0] + 2*t_shift*time_step/total_time
 
 # Concatenate
-train_dec0 = np.concatenate((train_dec0[:, None, :, :],time_train_dec0[:, None, :, :]), axis = 1)
-train_dec1 = np.concatenate((train_dec1[:, None, :, :],time_train_dec1[:, None, :, :]), axis = 1)
-print(train_dec0.shape)
-val_dec0 = np.concatenate((val_dec0[:, None, :, :], val_time_dec0[:, None, :, :]), axis = 1)
-val_dec1 = np.concatenate((val_dec1[:, None, :, :], val_time_dec1[:, None, :, :]), axis = 1)
+train_dec0 = train_dec0 * time_train_dec0
+train_dec1 = train_dec1 * time_train_dec1
 
-TEST_00 = np.concatenate((TEST_00[:, None, :, :], test_time_array[:, None, :, :]), axis = 1)
-TEST_02 = np.concatenate((TEST_02[:, None, :, :], test_time_array_02[:, None, :, :]), axis = 1)
-TEST_20 = np.concatenate((TEST_20[:, None, :, :], test_time_array_20[:, None, :, :]), axis = 1)
-TEST_04 = np.concatenate((TEST_04[:, None, :, :], test_time_array_04[:, None, :, :]), axis = 1)
-TEST_40 = np.concatenate((TEST_40[:, None, :, :], test_time_array_40[:, None, :, :]), axis = 1)
+val_dec0 = val_dec0 * val_time_dec0
+val_dec1 = val_dec1 * val_time_dec1
+
+TEST_00 = TEST_00 * test_time_array
+TEST_02 = TEST_02 * test_time_array_02
+TEST_20 = TEST_20 * test_time_array_20
+TEST_04 = TEST_04 * test_time_array_04
+TEST_40 = TEST_40 * test_time_array_40
 TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
 
@@ -116,8 +115,8 @@ train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec1)
 val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
 val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
 
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 32, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 32, shuffle = True)
+train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = 16, shuffle = True)
+train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = 16, shuffle = True)
 
 val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
 val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
@@ -127,8 +126,8 @@ val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-model_dec0 = ConvolutionalModel_Threshold(int(window_low + window_high))
-model_dec1 = ConvolutionalModel_Threshold(int(window_low + window_high))
+model_dec0 = ConvolutionalModel(int(window_low + window_high))
+model_dec1 = ConvolutionalModel(int(window_low + window_high))
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
@@ -136,8 +135,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr, weight_deca
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr, weight_decay = 1e-5) 
 
 #Execute train loop
-loss_dec0, test_dec0, val_dec0 = train_loop_convolutional_Threshold(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,:, 0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = save) 
-loss_dec1, test_dec1, val_dec1 = train_loop_convolutional_Threshold(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,:, 1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = save)
+loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:, 0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = save) 
+loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:, 1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = save)
 
 
 # -------------------------------------------------------------------------

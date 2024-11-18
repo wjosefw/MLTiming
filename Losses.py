@@ -69,7 +69,7 @@ def custom_loss_with_huber(outputs_0, outputs_1, labels):
     penalty = torch.mean(torch.relu(deviation) ** 2)
 
     # Total loss
-    loss = regression_loss + penalty_weight * penalty
+    loss = regression_loss + penalty_weight * penalty #+ 0.001*torch.mean(outputs_0)
     return loss
 
 #----------------------------------------------------------------------------------------------
@@ -79,7 +79,7 @@ def loss_MAE_KAN(outputs_0, outputs_1, labels):
     loss = (torch.mean(abs(outputs_0 - outputs_1 - labels)) +
             torch.sum(torch.relu(-outputs_0)) +
             torch.sum(torch.relu(-outputs_1)))
-    return loss
+    return loss 
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------

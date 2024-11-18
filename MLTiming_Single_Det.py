@@ -37,13 +37,13 @@ normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
 epochs = 50                               # Number of epochs for training
 lr = 1e-3                                  # Model learning rate
-batch_size = 32                            # batch size used for training
+batch_size = 16                            # batch size used for training
 total_time = time_step*data_55.shape[1] - time_step  
 save = True                                # Save models or not
 save_name = 'KAN_models/model_dec' + str(channel)
 architecture = [moments_order, 5, 1, 1]   
-fraction = 0.1                             # Fraction to trigger the pulse cropping   
-window_low = 14                            # Number of steps to take before trigger
+fraction = 0.01                            # Fraction to trigger the pulse cropping   
+window_low = 10                            # Number of steps to take before trigger
 window_high = 10                           # Number of steps to take after trigger
 
 
@@ -63,9 +63,9 @@ new_test = np.concatenate((data_55[6000:,:,:], data_28[6000:,:,:], data_82[6000:
 # -------------------------------------------------------------------------
 
 #Extract pulses
-train_array, train_time_array = extract_signal_along_time_singles(new_train[:,:,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
-val_array, val_time_array = extract_signal_along_time_singles(new_val[:,:,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
-test_array, test_time_array = extract_signal_along_time_singles(new_test[:,:,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
+train_array, train_time_array = extract_signal_along_time_singles(new_train[:,:100,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
+val_array, val_time_array = extract_signal_along_time_singles(new_val[:,:100,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array, test_time_array = extract_signal_along_time_singles(new_test[:,:100,channel], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
 
 # Create virtual coincidences
 train, REF_train, time_train = create_and_delay_pulse_pair_along_time(train_array, train_time_array, time_step, total_time, delay_time = delay_time)
@@ -165,7 +165,9 @@ plt.show()
 # Plot moment zero vs validation values
 plt.plot(MOMENTS_TEST_55, test_55, 'b.', label = '55')
 plt.plot(MOMENTS_TEST_28, test_28, 'r.', label = '28')
-#plt.plot(MOMENTS_TEST_82, test_82, 'g.', label = '82')
+plt.plot(MOMENTS_TEST_82, test_82, 'g.', label = '82')
+plt.xlabel('Moment one')
+plt.label('Time (ns)')
 plt.legend()
 plt.show()
 

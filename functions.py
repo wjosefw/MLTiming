@@ -591,7 +591,8 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
         INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
         INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
         
-        
+        #INPUT_2[i,:,0] = INPUT_2[i,:,0] + np.random.normal(0, 0.01, pulse_set.shape[1]) 
+        #INPUT_2[i,:,1] = INPUT_2[i,:,1] + np.random.normal(0, 0.01, pulse_set.shape[1])
         REF[i] = NRD0[i] - NRD1[i]  
 
     return INPUT_2, REF
@@ -920,10 +921,10 @@ def extract_signal_along_time_singles(vector, time_step, total_time, fraction = 
     t = np.arange(0, time_step*vector.shape[1], time_step) / total_time
  
     for i in range(vector.shape[0]):
-
+        
         # Find indices where the signal in each channel exceeds the fraction threshold
         index = np.where(vector[i,:] <= fraction)[0][-1]
-            
+        
         # Calculate the low and high indices to extraction
         index_low = index - window_low
         index_high = index + window_high

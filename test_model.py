@@ -4,112 +4,62 @@ import matplotlib.pyplot as plt
 import torch
 from efficient_kan.src.efficient_kan import KAN
 
-from functions import (create_position, momentos, normalize_given_params, 
+from functions import (create_position, momentos_threshold, normalize_given_params, 
                        calculate_gaussian_center, plot_gaussian, get_gaussian_params,
-                       continuous_delay, extract_signal_along_time, set_seed)
+                       continuous_delay, extract_signal_along_time_singles, set_seed)
 
 
 #Load data
-data_dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-data = np.load(os.path.join(data_dir, 'Na22_test_val.npz'))['data']
+dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
+data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA.npz'))['data']
+data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA.npz'))['data']
+data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
 
-def momentos(vector, time_vector, order = 4):
-    
-    if  len(np.shape(vector)) == 2:
-        Nev, Nt = np.shape(vector)
-        MOMENT = np.zeros((Nev, order))
-        for i in range(Nev):
-                for j in range(order): 
-                    W = time_vector[i,:]**(j)
-                    MOMENT[i,j] = np.sum(W*vector[i,:])       
-   
-    
-    if  len(np.shape(vector)) == 3:
-        Nev, Nt, Nc = np.shape(vector) # Nev: Núm eventos, Nt: Núm puntos temporales, Nc: Número canales
-        MOMENT = np.zeros((Nev, order, Nc))
-        for i in range(Nev):
-            for j in range(order): # Number of moments used
-                for k in range(Nc):
-                    W = time_vector[i,:,k]**(j)
-                    MOMENT[i,j,k] = np.sum(W*vector[i,:,k])
-    
-    return MOMENT
+test_data  = np.concatenate((data_55[6000:,:,:], data_28[6000:,:,:], data_82[6000:,:,:]), axis = 0)
+print('Número de casos de test: ', test_data.shape[0])
+
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1                             # Max delay to training pulses in ns
 moments_order = 5                          # Order of moments used
 set_seed(42)                               # Fix seeds
-nbins = 151                                # Num bins for all histograms
+nbins = 71                                # Num bins for all histograms
 t_shift = 1                                # Time steps to move for the new positions
 normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
-epochs = 500                               # Number of epochs for training
-lr = 1e-3                                  # Model learning rate
-total_time = time_step*data.shape[1]
-save = False                               # Save models or not
+total_time = time_step*data_55.shape[1] - time_step 
 architecture = [moments_order, 5, 1, 1]   
-fraction = 0.1                             # Fraction to trigger the pulse cropping   
-window_low = 14                            # Number of steps to take before trigger
+fraction = 0.01                             # Fraction to trigger the pulse cropping   
+window_low = 10                            # Number of steps to take before trigger
 window_high = 10                           # Number of steps to take after trigger
 positions = np.array([0.4, 0.2, 0.0, -0.2, -0.4])
 
-# -------------------------------------------------------------------------
-#----------------------- ALIGN PULSES -------------------------------------
-# -------------------------------------------------------------------------
-
-align_time = 0.56 # In ns
-new_data = continuous_delay(data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-print('Número de casos de test: ', new_data.shape[0])
 
 # -------------------------------------------------------------------------
 # ------------------------ PREPROCESS DATA --------------------------------
 # -------------------------------------------------------------------------
 
-test_array, test_time_array, _ , _ = extract_signal_along_time(new_data, time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array_dec0, test_time_array_dec0 = extract_signal_along_time_singles(test_data[:,:100,0], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array_dec1, test_time_array_dec1 = extract_signal_along_time_singles(test_data[:,:100,1], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
 
-
-TEST_00 = test_array 
-TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
-TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)
-TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
-TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
-TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
+test_array = np.stack((test_array_dec0, test_array_dec1), axis = -1)
+test_time_array = np.stack((test_time_array_dec0, test_time_array_dec1), axis = -1)
 
 ## Calculate moments 
-MOMENTS_TEST_00 = momentos(TEST_00, test_time_array, order = moments_order)
-
-MOMENTS_TEST_02_0 = momentos(TEST_02[:,:,0], test_time_array[:,:,0], order = moments_order)
-MOMENTS_TEST_02_1 = momentos(TEST_02[:,:,1], test_time_array[:,:,1] + t_shift*time_step/total_time, order = moments_order)
-MOMENTS_TEST_02 = np.stack((MOMENTS_TEST_02_0, MOMENTS_TEST_02_1), axis = -1)
-
-MOMENTS_TEST_04_0 = momentos(TEST_04[:,:,0], test_time_array[:,:,0], order = moments_order)
-MOMENTS_TEST_04_1 = momentos(TEST_04[:,:,1], test_time_array[:,:,1] + 2*t_shift*time_step/total_time, order = moments_order)
-MOMENTS_TEST_04 = np.stack((MOMENTS_TEST_04_0, MOMENTS_TEST_04_1), axis = -1)
-                           
-MOMENTS_TEST_20_1 = momentos(TEST_20[:,:,1], test_time_array[:,:,1], order = moments_order)
-MOMENTS_TEST_20_0 = momentos(TEST_20[:,:,0], test_time_array[:,:,0] + t_shift*time_step/total_time, order = moments_order)
-MOMENTS_TEST_20 = np.stack((MOMENTS_TEST_20_0, MOMENTS_TEST_20_1), axis = -1)
-
-MOMENTS_TEST_40_1 = momentos(TEST_40[:,:,1], test_time_array[:,:,1], order = moments_order)
-MOMENTS_TEST_40_0 = momentos(TEST_40[:,:,0], test_time_array[:,:,0] + 2*t_shift*time_step/total_time, order = moments_order)
-MOMENTS_TEST_40 = np.stack((MOMENTS_TEST_40_0, MOMENTS_TEST_40_1), axis = -1)
-
-MOMENTS_TEST = np.concatenate((MOMENTS_TEST_02, MOMENTS_TEST_00, MOMENTS_TEST_20, MOMENTS_TEST_04, MOMENTS_TEST_40), axis = 0)
-
-# Normalize moments
-params_dec0 =  (np.array([2.38287501e+00, 3.12087015e-01, 4.09378311e-02, 5.37847834e-03, 7.07756739e-04]), np.array([7.68760611e-01, 9.40423977e-02, 1.15396996e-02, 1.42225810e-03,
-       1.76399986e-04]))
-params_dec1 = (np.array([2.52182863e+00, 3.30564023e-01, 4.33958957e-02, 5.70572481e-03, 7.51363683e-04]), np.array([8.31561137e-01, 1.02347413e-01, 1.26452304e-02, 1.57037226e-03,
-       1.96356277e-04]))
-
-
-
-MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
-MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
-MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
-
+MOMENTS_TEST = momentos_threshold(test_array, test_time_array, order = moments_order)
+#
+#params_dec1 =  (np.array([3.68875700e+00, 4.82522064e-01, 6.32268770e-02, 8.29974908e-03,
+#       1.09150562e-03]), np.array([2.64585153e-01, 3.87722669e-02, 6.11491434e-03, 9.75909816e-04,
+#       1.53876365e-04]))
+#
+#params_dec0 =  (np.array([3.69254424e+00, 4.79422013e-01, 6.23606115e-02, 8.12694738e-03,
+#       1.06116437e-03]), np.array([2.46847211e-01, 3.55539483e-02, 5.61759587e-03, 9.02041860e-04,
+#       1.42868234e-04]))
+#
+#MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
+#MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
+#MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
 
 # -------------------------------------------------------------------------
 #--------------------------- LOAD MODELS ----------------------------------
@@ -140,32 +90,29 @@ test_dec1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST[:,:,1]).float()).det
 # Calculate TOF
 TOF = test_dec0 - test_dec1
 
-TOF_V02 = TOF[:TEST_00.shape[0]] 
-TOF_V00 = TOF[TEST_00.shape[0] : 2*TEST_00.shape[0]] 
-TOF_V20 = TOF[2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
-TOF_V04 = TOF[3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
-TOF_V40 = TOF[4*TEST_00.shape[0]:] 
+
+TOF_V00 = TOF[:data_55[6000:,:,:].shape[0]] 
+TOF_V02 = TOF[data_55[6000:,:,:].shape[0] : data_55[6000:,:,:].shape[0] + data_28[6000:,:,:].shape[0]] 
+TOF_V20 = TOF[data_55[6000:,:,:].shape[0] + data_28[6000:,:,:].shape[0]:] 
     
 
 # Calulate Test error
 centroid_V00 = calculate_gaussian_center(TOF_V00[np.newaxis,:], nbins = nbins, limits = 3) 
 
-error_V02 = abs((TOF_V02 - centroid_V00 + time_step*t_shift))
-error_V00 = abs((TOF_V00 - centroid_V00))
-error_V20 = abs((TOF_V20 - centroid_V00 - time_step*t_shift))
-error_V04 = abs((TOF_V04 - centroid_V00 + 2*time_step*t_shift))
-error_V40 = abs((TOF_V40 - centroid_V00 - 2*time_step*t_shift))
+error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + t_shift*time_step))
+error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
+error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - t_shift*time_step))
 
-
-#Get MAE
-Error = np.concatenate((error_V02, error_V20, error_V00, error_V04, error_V40))   
-MAE = np.mean(Error)
-print('MAE: ', MAE)
+Error = np.concatenate((error_V02, error_V20, error_V00), axis = 1)
+   
+# Print MAE
+MAE = np.mean(Error, axis = 1)
+print(MAE[-1])
 
 
 # Plot
-plt.hist(test_dec0, bins = nbins, range = [-1, 4], alpha = 0.5, label = 'Detector 0');
-plt.hist(test_dec1, bins = nbins, range = [-1, 4], alpha = 0.5, label = 'Detector 1');
+plt.hist(test_dec0, bins = nbins, range = [0, 3], alpha = 0.5, label = 'Detector 0');
+plt.hist(test_dec1, bins = nbins, range = [0, 3], alpha = 0.5, label = 'Detector 1');
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')
@@ -174,32 +121,23 @@ plt.show()
 
 
 # Histogram and gaussian fit 
-plot_gaussian(TOF_V04, centroid_V00, range = 0.8, label = '-0.4 ns offset', nbins = nbins)
 plot_gaussian(TOF_V02, centroid_V00, range = 0.8, label = '-0.2 ns offset', nbins = nbins)
 plot_gaussian(TOF_V00, centroid_V00, range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
 plot_gaussian(TOF_V20, centroid_V00, range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_V40, centroid_V00, range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
 
-
-params_V04, errors_V04 = get_gaussian_params(TOF_V04, centroid_V00, range = 0.8, nbins = nbins)
 params_V02, errors_V02 = get_gaussian_params(TOF_V02, centroid_V00, range = 0.8, nbins = nbins)
 params_V00, errors_V00 = get_gaussian_params(TOF_V00, centroid_V00, range = 0.8, nbins = nbins)
 params_V20, errors_V20 = get_gaussian_params(TOF_V20, centroid_V00, range = 0.8, nbins = nbins)
-params_V40, errors_V40 = get_gaussian_params(TOF_V40, centroid_V00, range = 0.8, nbins = nbins)
 
-
-print("V40: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
-print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
-print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
-print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-print("V04: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
+print("V20: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
+print("V00: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
+print("V02: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
 
 print('')
 plt.legend()
-plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
-plt.ylabel('Counts', fontsize = 14)
+plt.xlabel('$\Delta t$ (ns)')
+plt.ylabel('Counts')
 plt.show()
-
 
 # -------------------------------------------------------------------------
 #--------------------------- ENERGY DEPENDENCE ----------------------------

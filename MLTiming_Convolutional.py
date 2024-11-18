@@ -23,7 +23,7 @@ data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1      # Max delay to training pulses in ns
+delay_time = 1     # Max delay to training pulses in ns
 time_step = 0.2     # Signal time step in ns
 nbins = 71          # Num bins for all histograms                          
 t_shift = 1         # Time steps to move for the new positions
@@ -32,27 +32,8 @@ stop = 74
 set_seed(42)        # Fix seeds
 epochs = 500
 lr = 1e-4
-batch_size = 32
+batch_size = 32  
 save = False
-
-
-# -------------------------------------------------------------------------
-#----------------------- ALIGN PULSES -------------------------------------
-# -------------------------------------------------------------------------
-
-#align_time = 0.5
-#new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-#new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-#new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-
-#align_time = -0.1
-#new_data_82 = continuous_delay(data_82, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-#new_data_55 = continuous_delay(data_55, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-#new_data_28 = continuous_delay(data_28, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-
-new_data_82 = data_82
-new_data_55 = data_55
-new_data_28 = data_28
 
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
@@ -62,9 +43,9 @@ new_data_28 = data_28
 #validation_data = new_val[:,start:stop,:] 
 #test_data = new_train[6000:,start:stop,:]
 
-train_data = np.concatenate((new_data_55[:2000,start:stop,:], new_data_28[:2000,start:stop,:], new_data_82[:2000,start:stop,:]), axis = 0)
-validation_data = np.concatenate((new_data_55[4000:5000,start:stop,:], new_data_28[4000:5000,start:stop,:], new_data_82[4000:5000,start:stop,:]), axis = 0)
-test_data = np.concatenate((new_data_55[2000:,start:stop,:], new_data_28[2000:,start:stop,:], new_data_82[2000:,start:stop,:]), axis = 0)
+train_data = np.concatenate((data_55[:2000,start:stop,:], data_28[:2000,start:stop,:], data_82[:2000,start:stop,:]), axis = 0)
+validation_data = np.concatenate((data_55[4000:5000,start:stop,:], data_28[4000:5000,start:stop,:], data_82[4000:5000,start:stop,:]), axis = 0)
+test_data = np.concatenate((data_55[2000:,start:stop,:], data_28[2000:,start:stop,:], data_82[2000:,start:stop,:]), axis = 0)
 
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
@@ -81,12 +62,6 @@ val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], tim
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
 TEST = test_data
-#TEST_00 = test_data
-#TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
-#TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)  
-#TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
-#TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
-#TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
 # Create Dataset / DataLoaders
 train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
@@ -105,20 +80,87 @@ val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class ConvolutionalModelWithTransformer(nn.Module):
+    def __init__(self, N_points, num_outputs=1, num_heads=4, num_transformer_layers=2):
+        super(ConvolutionalModelWithTransformer, self).__init__()
+
+        # Define convolutional blocks with batch normalization and ReLU
+        self.conv1 = self.conv_block(1, 16, 5)
+        self.conv2 = self.conv_block(16, 32, 5)
+        self.conv3 = self.conv_block(32, 64, 3)
+
+        # Transformer configuration
+        self.embedding_dim = 64  # Transformer expects this as the feature dimension
+        self.seq_length = N_points // 8  # Sequence length after convolutional layers
+
+        self.transformer = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=self.embedding_dim,
+                nhead=num_heads,
+                dim_feedforward=128,
+                activation='relu',
+                dropout=0.1
+            ),
+            num_layers=num_transformer_layers
+        )
+
+        # Fully connected layers
+        self.fc1 = nn.Linear(self.seq_length * self.embedding_dim, 32)
+        self.fc2 = nn.Linear(32, num_outputs)
+        
+        # Dropout for regularization
+        self.dropout = nn.Dropout(p=0.05)
+
+    def conv_block(self, in_channels, out_channels, kernel_size):
+        return nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, padding='same', stride=1),
+            nn.MaxPool1d(kernel_size=2),
+        )
+
+    def forward(self, x):
+        # Pass through convolutional blocks
+        x = self.conv1(x)  # (batch_size, 16, N_points/2)
+        x = self.conv2(x)  # (batch_size, 32, N_points/4)
+        x = self.conv3(x)  # (batch_size, 64, N_points/8)
+
+        # Prepare input for the Transformer
+        x = x.permute(0, 2, 1)  # (batch_size, seq_length, embedding_dim)
+        
+        # Pass through Transformer
+        x = self.transformer(x)  # (batch_size, seq_length, embedding_dim)
+
+        # Flatten for fully connected layers
+        x = x.reshape(x.size(0), -1)  # (batch_size, seq_length * embedding_dim)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.fc2(x)
+        x = F.softplus(x)
+
+        return x
+
+
+#set_seed(42)
+#model_dec0 = ConvolutionalModel(int(stop-start))
+#set_seed(42)
+#model_dec1 = ConvolutionalModel(int(stop-start))
+
 
 set_seed(42)
-model_dec0 = ConvolutionalModel(int(stop-start))
+model_dec0 = ConvolutionalModelWithTransformer(int(stop-start))
 set_seed(42)
-model_dec1 = ConvolutionalModel(int(stop-start))
-
+model_dec1 = ConvolutionalModelWithTransformer(int(stop-start))
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
 optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr, weight_decay = 1e-5) 
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr, weight_decay = 1e-5) 
 
 #Execute train loop
-loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = save) 
-loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = save)
+loss_dec0, test_dec0, val_loss_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = save) 
+loss_dec1, test_dec1, val_loss_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -127,15 +169,9 @@ loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_
 # Calculate TOF
 TOF = test_dec0 - test_dec1
 
-#TOF_V02 = TOF[:,:TEST_00.shape[0]] 
-#TOF_V00 = TOF[:,TEST_00.shape[0] : 2*TEST_00.shape[0]] 
-#TOF_V20 = TOF[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
-#TOF_V04 = TOF[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
-#TOF_V40 = TOF[:,4*TEST_00.shape[0]:] 
-
-TOF_V00 = TOF[:,:new_data_55[2000:,:,:].shape[0]] 
-TOF_V02 = TOF[:, new_data_55[2000:,:,:].shape[0] : new_data_55[2000:,:,:].shape[0] + new_data_28[2000:,:,:].shape[0]] 
-TOF_V20 = TOF[:, new_data_55[2000:,:,:].shape[0]  + new_data_28[2000:,:,:].shape[0]:] 
+TOF_V00 = TOF[:,:data_55[2000:,:,:].shape[0]] 
+TOF_V02 = TOF[:, data_55[2000:,:,:].shape[0] : data_55[2000:,:,:].shape[0] + data_28[2000:,:,:].shape[0]] 
+TOF_V20 = TOF[:, data_55[2000:,:,:].shape[0]  + data_28[2000:,:,:].shape[0]:] 
     
 
 # Calulate Validation error
@@ -172,8 +208,8 @@ plt.legend()
 plt.subplot(133)
 plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Log Training loss Detector 0')
 plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Log Training loss Detector 1')
-plt.plot(np.log10(val_dec0.astype('float32')), label = 'Log Validation loss Detector 0')
-plt.plot(np.log10(val_dec1.astype('float32')), label = 'Log Validation loss Detector 1')
+plt.plot(np.log10(val_loss_dec0.astype('float32')), label = 'Log Validation loss Detector 0')
+plt.plot(np.log10(val_loss_dec1.astype('float32')), label = 'Log Validation loss Detector 1')
 plt.ylabel('Logarithmic losses')
 plt.xlabel('Epochs')
 plt.legend()
@@ -210,12 +246,13 @@ plt.show()
 
 ### Combine the two numbers
 #num = f"{sys.argv[1]}{sys.argv[2]}"
+#num = f"{sys.argv[1]}"
 #
 ## Your existing variables
-#FWHM = np.array([params_V04[3], params_V02[3], params_V00[3], params_V20[3], params_V40[3]])  # ps
-#FWHM_err = np.array([errors_V04[3],  errors_V02[3],  errors_V00[3],  errors_V20[3],  errors_V40[3]])        # ps
-#centroid = np.array([params_V04[2], params_V02[2], params_V00[2], params_V20[2], params_V40[2]])  # ps
-#centroid_err = np.array([errors_V04[2],  errors_V02[2],  errors_V00[2],  errors_V20[2],  errors_V40[2]])        # ps
+#FWHM = np.array([params_V02[3], params_V00[3], params_V20[3]])  # ps
+#FWHM_err = np.array([errors_V02[3],  errors_V00[3],  errors_V20[3]])        # ps
+#centroid = np.array([params_V02[2], params_V00[2], params_V20[2]])  # ps
+#centroid_err = np.array([errors_V02[2],  errors_V00[2],  errors_V20[2]])        # ps
 #
 ## Multiply by 1000
 #FWHM = FWHM * 1000
