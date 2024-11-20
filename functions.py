@@ -731,15 +731,27 @@ def interpolate_pulses(data, EXTRASAMPLING = 8, time_step = 0.2):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def constant_fraction_discrimination(vector, fraction = 0.9, shift = 30, plot = True):
+def constant_fraction_discrimination(vector, time_step = 0.2, fraction = 0.9, shift = 30, plot = True):
     corrected_signal = np.zeros_like(vector)
+    delayed_signal = np.zeros_like(vector)
+    delayed_signal2 = np.zeros_like(vector)
+    
     for i in range(vector.shape[0]):
-      delayed_signal = np.roll(vector[i,:], shift)
-      delayed_signal[:shift] = 0
-      fraction_signal = fraction*(-vector[i,:])
-      corrected_signal[i,:] = delayed_signal + fraction_signal
-      if plot:
-          plt.plot(corrected_signal[i, :])
+        
+        res = shift % time_step  # Fractional part of the delay
+        for j in range(vector.shape[1] - 1, 0, -1):
+            slope = (vector[i, j] - vector[i, j-1]) / time_step
+            delayed_signal[i, j] = vector[i, j] - slope * res 
+        delayed_signal[i, 0] = vector[i, 0] 
+
+        idel = int(shift / time_step) 
+        delayed_signal2[i,:] = np.roll(delayed_signal[i,:], idel)
+        delayed_signal2[i,:idel] = delayed_signal[i,:idel]
+        
+        fraction_signal = fraction*(-vector[i,:])
+        corrected_signal[i,:] = delayed_signal2[i,:] + fraction_signal
+        if plot:
+            plt.plot(corrected_signal[i, :])
     return corrected_signal
 
 
