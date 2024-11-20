@@ -240,42 +240,52 @@ def simpsons_rule_array(y, h):
 #----------------------------------------------------------------------------------------------
 
 def normalize(data, method = 'standardization'):
-    """
-    Normalizes the data using the specified method and returns the normalized data along with the parameters.
-    
-    Parameters:
-        data (numpy.ndarray): The data to be normalized (shape: N x M x 2).
-        method (str): The normalization method ('min-max', 'max', 'standardization'). Default is 'standardization'.
-        
-    Returns:
-        tuple: The normalized data, normalization parameters (depends on the method).
-    """
+
     if method not in ['min-max', 'max', 'standardization']:
         raise ValueError("Invalid method. Choose from 'min-max', 'max', 'standardization'.")
 
     if method == 'min-max':
-        min_vals = np.min(data[:, :, 0], axis=0)
-        max_vals = np.max(data[:, :, 0], axis=0)
-        normalized_data_dec0 = (data[:, :, 0] - min_vals) / (max_vals - min_vals)
-        normalized_data_dec1 = (data[:, :, 1] - min_vals) / (max_vals - min_vals)
-        params = (min_vals, max_vals)   
+        if len(data.shape) == 3:
+            min_vals = np.min(data[:, :, 0], axis=0)
+            max_vals = np.max(data[:, :, 0], axis=0)
+            normalized_data_dec0 = (data[:, :, 0] - min_vals) / (max_vals - min_vals)
+            normalized_data_dec1 = (data[:, :, 1] - min_vals) / (max_vals - min_vals)
+            normalized_data = np.stack((normalized_data_dec0, normalized_data_dec1), axis=-1) # Concatenate the normalized channels back togethe
+            params = (min_vals, max_vals)   
+        
+        if len(data.shape) == 2:
+            min_vals = np.min(data, axis = 0)
+            normalized_data = (data - min_vals) / (max_vals - min_vals)
+            params = (min_vals, max_vals)   
 
     elif method == 'max':
-        max_vals = np.max(data[:, :, 0], axis=0)
-        params = max_vals
-        normalized_data_dec0 = data[:, :, 0] / max_vals
-        normalized_data_dec1 = data[:, :, 1] / max_vals
+        if len(data.shape) == 3:
+            max_vals = np.max(data[:, :, 0], axis=0)
+            params = max_vals
+            normalized_data_dec0 = data[:, :, 0] / max_vals
+            normalized_data_dec1 = data[:, :, 1] / max_vals
+            normalized_data = np.stack((normalized_data_dec0, normalized_data_dec1), axis=-1)
+        
+        if len(data.shape) == 2:
+            max_vals = np.max(data, axis=0)
+            params = max_vals
+            normalized_data = data / max_vals
     
     elif method == 'standardization':
-        means = np.mean(data[:, :, 0], axis=0)
-        stds = np.std(data[:, :, 0], axis=0)
-        params = (means, stds)
-        normalized_data_dec0 = (data[:, :, 0] - means) / stds
-        normalized_data_dec1 = (data[:, :, 1] - means) / stds
-        params = (means, stds)
+        if len(data.shape) == 3:
+            means = np.mean(data[:, :, 0], axis=0)
+            stds = np.std(data[:, :, 0], axis=0)
+            normalized_data_dec0 = (data[:, :, 0] - means) / stds
+            normalized_data_dec1 = (data[:, :, 1] - means) / stds
+            normalized_data = np.stack((normalized_data_dec0, normalized_data_dec1), axis=-1)
+            params = (means, stds)
+        
+        if len(data.shape) == 2:
+            means = np.mean(data, axis=0)
+            stds = np.std(data, axis=0)
+            normalized_data = (data - means) / stds
+            params = (means, stds)
 
-    # Concatenate the normalized channels back together
-    normalized_data = np.stack((normalized_data_dec0, normalized_data_dec1), axis=-1)
     
     return normalized_data, params
 
