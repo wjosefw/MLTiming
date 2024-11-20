@@ -265,6 +265,76 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
 
+def train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
+    
+    loss_list = []
+    val_loss_list = []
+    test = []
+    val_list = []  
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    
+    # Move model and test_tensor to the device
+    model = model.to(device)
+    test_tensor = test_tensor.to(device)
+
+
+    # Define MSE loss
+    loss_fn = torch.nn.MSELoss()
+
+    for epoch in range(EPOCHS):
+        running_loss = 0.0
+
+        for data in train_loader:
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device) 
+            optimizer.zero_grad()
+            
+            outputs = model(inputs)
+
+            loss = loss_fn(outputs, labels)
+            loss.backward()
+            
+            optimizer.step()
+
+            running_loss += loss.item()
+
+        scheduler.step()
+        loss_list.append(running_loss / len(train_loader))
+
+        print(f'EPOCH {epoch + 1}:')
+        print(f'LOSS train {running_loss / len(train_loader)}')
+
+        with torch.no_grad():
+            test_epoch = model(test_tensor)
+            test.append(np.squeeze(test_epoch.cpu().detach().numpy()))
+
+            val_loss = 0
+            for val_data, val_labels in val_loader:
+                val_data, val_labels = val_data.to(device), val_labels.to(device) 
+                val = model(val_data)
+                val_loss += loss_fn(val, val_labels)
+                val_list.append(val.cpu().detach().numpy())  
+            
+            val_loss_list.append(val_loss.item() / len(val_loader))
+            print(f'LOSS val {val_loss / len(val_loader)}')
+
+    if save:
+        torch.save(model.state_dict(), name)
+
+    return (
+        np.array(loss_list, dtype = 'object'), 
+        np.array(val_loss_list, dtype = 'object'), 
+        np.array(test, dtype = 'object'), 
+        np.array(val_list, dtype = 'object')
+    )
+
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------  
+
 def train_loop_T_Ref(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, checkpoint = 15, name = 'model', save = False):
     loss_list = []
     val_loss_list = []
