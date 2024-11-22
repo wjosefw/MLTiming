@@ -5,16 +5,17 @@ import torch
 from efficient_kan.src.efficient_kan import KAN
 
 from functions import ( calculate_gaussian_center, plot_gaussian, 
-                       get_gaussian_params, set_seed)
+                       get_gaussian_params, set_seed, momentos, normalize_given_params)
 from Models import ConvolutionalModel
+from efficient_kan.src.efficient_kan import KAN
 
 #Load data
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA.npz'))['data']
-data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA.npz'))['data']
-data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
+test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
+test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
+test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 
-test_data  = np.concatenate((data_55[2000:,:,:], data_28[2000:,:,:], data_82[2000:,:,:]), axis = 0)
+test_data  = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 print('Número de casos de test: ', test_data.shape[0])
 
 # -------------------------------------------------------------------------
@@ -24,9 +25,12 @@ print('Número de casos de test: ', test_data.shape[0])
 set_seed(42)                               # Fix seeds
 nbins = 71                                 # Num bins for all histograms
 time_step = 0.2                            # Signal time step in ns
-start = 47 
-stop = 74 
 positions = np.array([0.2, 0.0, -0.2])
+normalization_method = 'standardization'
+start = 47
+stop = 74
+batch_size = 32
+architecture = [5, 5, 1, 1]    # KAN architecture
 
 
 # -------------------------------------------------------------------------
@@ -34,17 +38,12 @@ positions = np.array([0.2, 0.0, -0.2])
 # -------------------------------------------------------------------------
 
 TEST = test_data[:,start:stop,:] 
-print(TEST.shape)
-## Calculate moments 
-#MOMENTS_TEST = momentos_threshold(test_array, test_time_array, order = moments_order)
+
+# Calculate moments 
+#MOMENTS_TEST = momentos(TEST, order = 5)
 #
-#params_dec1 =  (np.array([3.68875700e+00, 4.82522064e-01, 6.32268770e-02, 8.29974908e-03,
-#       1.09150562e-03]), np.array([2.64585153e-01, 3.87722669e-02, 6.11491434e-03, 9.75909816e-04,
-#       1.53876365e-04]))
-#
-#params_dec0 =  (np.array([3.69254424e+00, 4.79422013e-01, 6.23606115e-02, 8.12694738e-03,
-#       1.06116437e-03]), np.array([2.46847211e-01, 3.55539483e-02, 5.61759587e-03, 9.02041860e-04,
-#       1.42868234e-04]))
+#params_dec0 = (np.array([0.45625919, 0.48014345, 0.46551475, 0.44413998, 0.42240204]), np.array([0.4199902 , 0.38190358, 0.34704695, 0.31804562, 0.29395941]))
+#params_dec1 = (np.array([0.34293025, 0.38269777, 0.3791107 , 0.36606818, 0.35089854]), np.array([0.46452994, 0.37975432, 0.3360716 , 0.30489697, 0.28054114]))
 #
 #MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
 #MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
@@ -55,11 +54,20 @@ print(TEST.shape)
 # -------------------------------------------------------------------------
 
 dir = 'predictions/Convolutional/'
+#dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
+
 model_dec0_dir = os.path.join(dir, 'Conv_model_dec0')
 model_dec1_dir = os.path.join(dir, 'Conv_model_dec1')
 
+#model_dec0_dir = os.path.join(dir, 'model_dec0')
+#model_dec1_dir = os.path.join(dir, 'model_dec1')
+
+
 model_dec0 = ConvolutionalModel(int(stop-start))
 model_dec1 = ConvolutionalModel(int(stop-start))
+#architecture = [5, 5, 1, 1]  
+#model_dec0 = KAN(architecture)
+#model_dec1 = KAN(architecture)
 
 model_dec0.load_state_dict(torch.load(model_dec0_dir))
 model_dec1.load_state_dict(torch.load(model_dec1_dir))
@@ -73,12 +81,16 @@ model_dec1.eval()
 test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0]).float()).detach().numpy())
 test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1]).float()).detach().numpy())
 
+
+#test_dec0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST[:,:,0]).float()).detach().numpy())
+#test_dec1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST[:,:,1]).float()).detach().numpy())
+
 # Calculate TOF
 TOF = test_dec0 - test_dec1
 
-TOF_V00 = TOF[:data_55[2000:,:,:].shape[0]] 
-TOF_V02 = TOF[data_55[2000:,:,:].shape[0] : data_55[2000:,:,:].shape[0] + data_28[2000:,:,:].shape[0]] 
-TOF_V20 = TOF[data_55[2000:,:,:].shape[0] + data_28[2000:,:,:].shape[0]:] 
+TOF_V00 = TOF[:test_data_55.shape[0]] 
+TOF_V02 = TOF[test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
+TOF_V20 = TOF[test_data_55.shape[0] + test_data_28.shape[0]:] 
 
 
 # Calulate Test error
@@ -155,6 +167,7 @@ plt.show()
 resolution_list = []
 bias_list = []
 MAE_list = []
+centroid_02_list = []
 for i in range(1000):
     a_00 = np.random.choice(np.arange(0, TOF_V00.shape[0]), size = TOF_V00.shape[0], replace = True)
     a_02 = np.random.choice(np.arange(0, TOF_V02.shape[0]), size = TOF_V02.shape[0], replace = True)
@@ -169,6 +182,7 @@ for i in range(1000):
     resolution = np.mean((params_V20[3], params_V00[3], params_V02[3]))
     resolution_list.append(resolution)
     
+    centroid_02_list.append(params_V02[2])
     centroids = np.array([params_V20[2], params_V00[2], params_V02[2]])
     bias = np.mean(abs(centroids - positions))
     bias_list.append(bias)
@@ -186,7 +200,34 @@ print('Mean bias: ', np.mean(np.array(bias_list))*1000)
 print('Std bias: ', np.std(np.array(bias_list))*1000)
 print('Mean MAE: ', np.mean(np.array(MAE_list))*1000)
 print('Std MAE: ', np.std(np.array(MAE_list))*1000)
+print('02 std: ', np.std(np.array(centroid_02_list))*1000)
 
+# -------------------------------------------------------------------------
+#------------------------------- SHAP -------------------------------------
+# -------------------------------------------------------------------------
+
+import shap
+
+model = model_dec0
+channel = 0
+waveforms = torch.tensor(TEST[:10,None,:,channel]).float()
+# SHAP Explainer
+explainer = shap.DeepExplainer(model, torch.tensor(TEST[-1000:,None,:,channel]).float())
+shap_values = explainer.shap_values(waveforms, check_additivity = False)
+
+shap_values_flat = shap_values[0][0].squeeze()
+waveform_flat = waveforms.squeeze().detach().numpy()
+
+# Plot waveform with SHAP values
+for i in range(waveform_flat.shape[0]):
+    plt.figure(figsize=(10, 6))
+    plt.plot(waveform_flat[i,:], 'b-', label = "Waveform")
+    plt.scatter(range(len(waveform_flat[i,:])), waveform_flat[i,:], c = shap_values_flat, cmap = "coolwarm", label = "SHAP values")
+    plt.colorbar(label="Feature Importance")
+    plt.title("SHAP Explanation for Waveform")
+    plt.legend()
+    plt.show()
+    
 # -------------------------------------------------------------------------
 #-------------------------- INFERENCE TIME --------------------------------
 # -------------------------------------------------------------------------
