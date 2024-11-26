@@ -781,6 +781,80 @@ def Calculate_CFD(array, fraction = 0.7, shift = 80, time_step = 0.025):
     return np.array(timestamps_list)
 
 
+#def extract_signal_window_by_LED(vector, time_step = 0.2, threshold = 0.1, window_low = 10, window_high = 7):
+
+    new_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
+    new_vector2 = np.zeros((vector.shape[0], int(window_high + window_low)))
+
+    timestamps_LED = []
+    for i in range(vector.shape[0]):
+        timestamp = calculate_slope_y_intercept(vector[i,:], time_step, threshold = threshold)
+        timestamps_LED.append(timestamp)
+    
+    
+    for i in range(vector.shape[0]):
+        idel = int((timestamps_LED[i]) / time_step) 
+        
+        # Calculate the low and high indices to truncate around the fraction threshold
+        low_index = idel - window_low
+        high_index = idel + window_high
+        
+        
+        new_vector[i,:] =  vector[i,low_index:high_index]
+        
+        
+        res = (timestamps_LED[i]) % time_step # Calculate residue for interpolation
+        for j in range(new_vector.shape[1] - 1):   # Interpolate to move to LED position
+            slope = (new_vector[i, j + 1] - new_vector[i, j]) / time_step
+            new_vector2[i, j] =  new_vector[i, j] + slope * res 
+        last_slope = (vector[i, high_index + 1] - vector[i, high_index]) / time_step
+        new_vector2[i, -1] = new_vector[i, -1] + last_slope * res 
+
+        
+
+    return new_vector2
+
+def extract_signal_window_by_LED(vector, time_step = 0.2, threshold = 0.1, window_low = 10, window_high = 7):
+    """
+    Extracts a window of signal data around a calculated timestamp for each signal in the input vector array.
+    The timestamp is determined based on the LED threshold. 
+    Interpolates the signal to align with the calculated LED position.
+    """
+
+    # Initialize arrays to store truncated and interpolated signal windows
+    new_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
+    new_vector2 = np.zeros((vector.shape[0], int(window_high + window_low)))
+
+    # Calculate and store LED timestamps for each signal
+    timestamps_LED = []
+
+    for i in range(vector.shape[0]):
+        timestamp = calculate_slope_y_intercept(vector[i, :], time_step, threshold = threshold)
+        timestamps_LED.append(timestamp)
+
+    # Extract signal and perform interpolation
+    for i in range(vector.shape[0]):
+        # Calculate the index corresponding to the detected LED timestamp
+        idel = int(timestamps_LED[i] / time_step)
+        
+        # Define the indices for the low and high parts of the window
+        low_index = idel - window_low
+        high_index = idel + window_high
+        
+        # Extract the signal window
+        new_vector[i, :] = vector[i, low_index:high_index]
+        
+        # Calculate the residue and interpolate the signal
+        res = timestamps_LED[i] % time_step
+        for j in range(new_vector.shape[1] - 1):
+            slope = (new_vector[i, j + 1] - new_vector[i, j]) / time_step
+            new_vector2[i, j] = new_vector[i, j] + slope * res
+        last_slope = (vector[i, high_index + 1] - vector[i, high_index]) / time_step
+        new_vector2[i, -1] = new_vector[i, -1] + last_slope * res
+
+    return new_vector2
+
+
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -980,3 +1054,4 @@ def momentos_threshold(vector, time_vector, order = 4):
                     MOMENT[i,j,k] = np.sum(W*vector[i,:,k])
     
     return MOMENT
+
