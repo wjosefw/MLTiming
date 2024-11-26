@@ -14,7 +14,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     test_tensor = test_tensor.to(device)
-    
+
     loss_list = []
     val_loss_list = []
     test = []
@@ -26,10 +26,11 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     for epoch in range(EPOCHS):
         running_loss = 0.0
         model.train()
+
         for data in train_loader:
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
-
+           
             # Zero gradients
             optimizer.zero_grad()
 
@@ -67,6 +68,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
 
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
+                
                 mask = val_labels != 0 
                 val_0 = model(val_data[:, None, :, 0])
                 val_1 = model(val_data[:, None, :, 1])
@@ -217,7 +219,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
             outputs_0 = model(inputs[:, :, 0])
             outputs_1 = model(inputs[:, :, 1])
 
-            loss = loss_MAE_KAN(outputs_0, outputs_1, labels)
+            loss = custom_loss_with_huber(outputs_0, outputs_1, labels)
             loss.backward()
             optimizer.step()
 
@@ -240,7 +242,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
                 val_data, val_labels = val_data.to(device), val_labels.to(device) 
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += loss_MAE_KAN(val_0, val_1, val_labels)
+                val_loss += custom_loss_with_huber(val_0, val_1, val_labels)
 
                 # Stack val_0 and val_1 along the last dimension
                 val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
