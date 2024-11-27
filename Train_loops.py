@@ -147,7 +147,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
             outputs_1 = model(inputs[:, :, 1])
 
             # Compute the loss and its gradients
-            loss = custom_loss_MAE(outputs_0, outputs_1, labels)
+            loss = custom_loss_with_huber(outputs_0, outputs_1, labels)
             loss.backward()
 
             # Adjust learning weights
@@ -177,7 +177,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += custom_loss_MAE(val_0, val_1, val_labels)
+                val_loss += custom_loss_with_huber(val_0, val_1, val_labels)
             val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
 
