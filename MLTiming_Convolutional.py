@@ -4,20 +4,29 @@ import matplotlib.pyplot as plt
 import torch
 
 # Import functions
-from functions import (create_and_delay_pulse_pair, create_position, 
-                       calculate_gaussian_center, plot_gaussian, 
-                       get_gaussian_params, set_seed, continuous_delay)
-from Models import ConvolutionalModel,  count_parameters
+from functions import (create_and_delay_pulse_pair, calculate_gaussian_center, 
+                       plot_gaussian, get_gaussian_params, set_seed)
+from Models import ConvolutionalModel,  count_parameters, ResNet1D
 from Train_loops import train_loop_convolutional
+
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-#train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
-#val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
-#test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
-data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA.npz'))['data']
-data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA.npz'))['data']
-data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
+
+train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data']
+train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
+train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
+
+
+validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
+validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
+validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
+
+
+test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
+test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
+test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
+
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -28,25 +37,24 @@ time_step = 0.2     # Signal time step in ns
 nbins = 71          # Num bins for all histograms                          
 t_shift = 1         # Time steps to move for the new positions
 start = 47 
-stop = 74 
+stop =  74 
 set_seed(42)        # Fix seeds
 epochs = 500
 lr = 1e-4
 batch_size = 32  
-save = False
+save = True
 
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-#train_data = new_train[:6000,start:stop,:] 
-#validation_data = new_val[:,start:stop,:] 
-#test_data = new_train[6000:,start:stop,:]
+train_data = np.concatenate((train_data_55, train_data_28, train_data_82), axis = 0)
+validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
+test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 
-train_data = np.concatenate((data_55[:2000,start:stop,:], data_28[:2000,start:stop,:], data_82[:2000,start:stop,:]), axis = 0)
-validation_data = np.concatenate((data_55[4000:5000,start:stop,:], data_28[4000:5000,start:stop,:], data_82[4000:5000,start:stop,:]), axis = 0)
-test_data = np.concatenate((data_55[2000:,start:stop,:], data_28[2000:,start:stop,:], data_82[2000:,start:stop,:]), axis = 0)
-
+train_data = train_data[:,start:stop,:]
+validation_data = validation_data[:,start:stop,:] 
+test_data = test_data[:,start:stop,:]
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
@@ -80,87 +88,24 @@ val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class ConvolutionalModelWithTransformer(nn.Module):
-    def __init__(self, N_points, num_outputs=1, num_heads=4, num_transformer_layers=2):
-        super(ConvolutionalModelWithTransformer, self).__init__()
-
-        # Define convolutional blocks with batch normalization and ReLU
-        self.conv1 = self.conv_block(1, 16, 5)
-        self.conv2 = self.conv_block(16, 32, 5)
-        self.conv3 = self.conv_block(32, 64, 3)
-
-        # Transformer configuration
-        self.embedding_dim = 64  # Transformer expects this as the feature dimension
-        self.seq_length = N_points // 8  # Sequence length after convolutional layers
-
-        self.transformer = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(
-                d_model=self.embedding_dim,
-                nhead=num_heads,
-                dim_feedforward=128,
-                activation='relu',
-                dropout=0.1
-            ),
-            num_layers=num_transformer_layers
-        )
-
-        # Fully connected layers
-        self.fc1 = nn.Linear(self.seq_length * self.embedding_dim, 32)
-        self.fc2 = nn.Linear(32, num_outputs)
-        
-        # Dropout for regularization
-        self.dropout = nn.Dropout(p=0.05)
-
-    def conv_block(self, in_channels, out_channels, kernel_size):
-        return nn.Sequential(
-            nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, padding='same', stride=1),
-            nn.MaxPool1d(kernel_size=2),
-        )
-
-    def forward(self, x):
-        # Pass through convolutional blocks
-        x = self.conv1(x)  # (batch_size, 16, N_points/2)
-        x = self.conv2(x)  # (batch_size, 32, N_points/4)
-        x = self.conv3(x)  # (batch_size, 64, N_points/8)
-
-        # Prepare input for the Transformer
-        x = x.permute(0, 2, 1)  # (batch_size, seq_length, embedding_dim)
-        
-        # Pass through Transformer
-        x = self.transformer(x)  # (batch_size, seq_length, embedding_dim)
-
-        # Flatten for fully connected layers
-        x = x.reshape(x.size(0), -1)  # (batch_size, seq_length * embedding_dim)
-        x = self.dropout(x)
-        x = self.fc1(x)
-        x = self.fc2(x)
-        x = F.softplus(x)
-
-        return x
-
 
 #set_seed(42)
 #model_dec0 = ConvolutionalModel(int(stop-start))
 #set_seed(42)
 #model_dec1 = ConvolutionalModel(int(stop-start))
 
-
 set_seed(42)
-model_dec0 = ConvolutionalModelWithTransformer(int(stop-start))
+model_dec0 = ResNet1D(int(stop-start))
 set_seed(42)
-model_dec1 = ConvolutionalModelWithTransformer(int(stop-start))
+model_dec1 = ResNet1D(int(stop-start))
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
 optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr, weight_decay = 1e-5) 
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr, weight_decay = 1e-5) 
 
 #Execute train loop
-loss_dec0, test_dec0, val_loss_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec0',  save = save) 
-loss_dec1, test_dec1, val_loss_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/Conv_model_dec1',  save = save)
+loss_dec0, test_dec0, val_loss_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/ResNet_model_dec0',  save = save) 
+loss_dec1, test_dec1, val_loss_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/ResNet_model_dec1',  save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -169,9 +114,9 @@ loss_dec1, test_dec1, val_loss_dec1, val_dec1 = train_loop_convolutional(model_d
 # Calculate TOF
 TOF = test_dec0 - test_dec1
 
-TOF_V00 = TOF[:,:data_55[2000:,:,:].shape[0]] 
-TOF_V02 = TOF[:, data_55[2000:,:,:].shape[0] : data_55[2000:,:,:].shape[0] + data_28[2000:,:,:].shape[0]] 
-TOF_V20 = TOF[:, data_55[2000:,:,:].shape[0]  + data_28[2000:,:,:].shape[0]:] 
+TOF_V00 = TOF[:,:test_data_55.shape[0]] 
+TOF_V02 = TOF[:, test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
+TOF_V20 = TOF[:, test_data_55.shape[0]  + test_data_28.shape[0]:] 
     
 
 # Calulate Validation error
@@ -180,11 +125,10 @@ centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3)
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + t_shift*time_step))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
 error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - t_shift*time_step))
-#error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 2*t_shift*time_step))
-#error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 2*t_shift*time_step))
+
 
 # Get MAE
-Error = np.concatenate((error_V02, error_V20, error_V00),  axis = 1)  #error_V04, error_V40), axis = 1)   
+Error = np.concatenate((error_V02, error_V20, error_V00),  axis = 1)  
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
 
@@ -217,25 +161,20 @@ plt.show()
 
 
 # Histogram and gaussian fit 
-#plot_gaussian(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
 plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
 plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
 plot_gaussian(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-#plot_gaussian(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
 
 
-#params_V04, errors_V04 = get_gaussian_params(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V02, errors_V02 = get_gaussian_params(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V00, errors_V00 = get_gaussian_params(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V20, errors_V20 = get_gaussian_params(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
-#params_V40, errors_V40 = get_gaussian_params(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 
 
-#print("V40: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
 print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
 print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
 print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-#print("V04: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
+
 
 print('')
 plt.legend()
