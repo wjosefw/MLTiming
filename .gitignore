@@ -36,6 +36,7 @@ Pycaret_cosas/
 pykan/
 predictions/
 efficient_kan/
+figures/
 
 pulsos_Na22_energy_dec0_train.npz
 pulsos_Na22_energy_dec0_test_val.npz
