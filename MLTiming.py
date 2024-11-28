@@ -18,14 +18,20 @@ print(f'Using device: {device}')
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-#train_data = np.load(os.path.join(dir,'Na22_train.npz'))['data']
-#val_data = np.load(os.path.join(dir, 'Na22_val.npz'))['data']
-#test_data = np.load(os.path.join(dir, 'Na22_test_val.npz'))['data']
 
-data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA.npz'))['data']
-data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA.npz'))['data']
-data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
+train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data']
+train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
+train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
 
+
+validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
+validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
+validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
+
+
+test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
+test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
+test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -40,36 +46,28 @@ t_shift = 1                           # Time steps to move for the new positions
 normalization_method = 'standardization'
 start = 47
 stop = 74
-lr = 1e-3
+lr = 1e-4
 epochs = 500
 batch_size = 32
 Num_Neurons = 16
 architecture = [moments_order, int(sys.argv[2]), 1, 1]    # KAN architecture
-save = False
+save = True
 
-# -------------------------------------------------------------------------
-#----------------------- ALIGN PULSES -------------------------------------
-# -------------------------------------------------------------------------
-
-#align_time = 0.5
-#new_train = continuous_delay(train_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-#new_val = continuous_delay(val_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
-#new_test = continuous_delay(test_data, time_step = time_step, delay_time = align_time, channel_to_fix = 0, channel_to_move = 1)
 
 # -------------------------------------------------------------------------
 #----------------------- CROP WAVEFORM ------------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.concatenate((data_55[:2000,start:stop,:], data_28[:2000,start:stop,:], data_82[:2000,start:stop,:]), axis = 0)
-validation_data = np.concatenate((data_55[4000:5000,start:stop,:], data_28[4000:5000,start:stop,:], data_82[4000:5000,start:stop,:]), axis = 0)
-test_data = np.concatenate((data_55[2000:,start:stop,:], data_28[2000:,start:stop,:], data_82[2000:,start:stop,:]), axis = 0)
+train_data = np.concatenate((train_data_55, train_data_28, train_data_82), axis = 0)
+validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
+test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 
-#train_data = new_train[:,start:stop,:]  #189:213
-#validation_data = new_val[:,start:stop,:] 
-#test_data = new_test[:,start:stop,:]
-#
-#print('Número de casos de entrenamiento: ', train_data.shape[0])
-#print('Número de casos de test: ', test_data.shape[0])
+train_data = train_data[:,start:stop,:]
+validation_data = validation_data[:,start:stop,:] 
+test_data = test_data[:,start:stop,:]
+
+print('Número de casos de entrenamiento: ', train_data.shape[0])
+print('Número de casos de test: ', test_data.shape[0])
 
 # -------------------------------------------------------------------------
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
@@ -82,12 +80,6 @@ val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], tim
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
 TEST = test_data
-#TEST_00 = test_data
-#TEST_02 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = t_shift)
-#TEST_20 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = t_shift)
-#TEST_04 = create_position(TEST_00, channel_to_move = 1, channel_to_fix = 0, t_shift = int(2*t_shift))
-#TEST_40 = create_position(TEST_00, channel_to_move = 0, channel_to_fix = 1, t_shift = int(2*t_shift))
-#TEST = np.concatenate((TEST_02, TEST_00, TEST_20, TEST_04, TEST_40), axis = 0)
 
 
 # Calculate moments 
@@ -150,26 +142,21 @@ optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr)
 # Execute train loop
 loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec0', save = save) 
 loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec1', save = save)
-#loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec0', save = save) 
-#loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/model_dec1', save = save)
+#loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(MOMENTS_TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/MLP_model_dec0', save = save) 
+#loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(MOMENTS_TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/MLP_model_dec1', save = save)
 
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
+
 # Calculate TOF
 TOF = test_dec0 - test_dec1
 
-#TOF_V02 = TOF[:,:TEST_00.shape[0]] 
-#TOF_V00 = TOF[:,TEST_00.shape[0] :2*TEST_00.shape[0]] 
-#TOF_V20 = TOF[:,2*TEST_00.shape[0] :3*TEST_00.shape[0]] 
-#TOF_V04 = TOF[:,3*TEST_00.shape[0] :4*TEST_00.shape[0]] 
-#TOF_V40 = TOF[:,4*TEST_00.shape[0]:] 
-
-TOF_V00 = TOF[:,:data_55[2000:,:,:].shape[0]] 
-TOF_V02 = TOF[:, data_55[2000:,:,:].shape[0] : data_55[2000:,:,:].shape[0] + data_28[2000:,:,:].shape[0]] 
-TOF_V20 = TOF[:, data_55[2000:,:,:].shape[0]  + data_28[2000:,:,:].shape[0]:] 
+TOF_V00 = TOF[:,:test_data_55.shape[0]] 
+TOF_V02 = TOF[:, test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
+TOF_V20 = TOF[:, test_data_55.shape[0]  + test_data_28.shape[0]:] 
     
 
 # Calulate Test error
@@ -178,11 +165,10 @@ centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 5)
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + time_step*t_shift))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
 error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - time_step*t_shift))
-#error_V04 = abs((TOF_V04 - centroid_V00[:, np.newaxis] + 2*time_step*t_shift))
-#error_V40 = abs((TOF_V40 - centroid_V00[:, np.newaxis] - 2*time_step*t_shift))
+
 
 #Get MAE
-Error = np.concatenate((error_V02, error_V20, error_V00), axis = 1) # error_V04, error_V40), axis = 1)   
+Error = np.concatenate((error_V02, error_V20, error_V00), axis = 1) 
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
 
@@ -214,25 +200,20 @@ plt.show()
 
 
 # Histogram and gaussian fit 
-#plot_gaussian(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, label = '-0.4 ns offset', nbins = nbins)
 plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
 plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
 plot_gaussian(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-#plot_gaussian(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.4 ns offset', nbins = nbins)
 
 
-#params_V04, errors_V04 = get_gaussian_params(TOF_V04[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V02, errors_V02 = get_gaussian_params(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V00, errors_V00 = get_gaussian_params(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V20, errors_V20 = get_gaussian_params(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
-#params_V40, errors_V40 = get_gaussian_params(TOF_V40[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 
 
-#print("V40: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V40[2], errors_V40[2], params_V40[3], errors_V40[3]))
 print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
 print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
 print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-#print("V04: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V04[2], errors_V04[2], params_V04[3], errors_V04[3]))
+
 
 print('')
 plt.legend()
@@ -243,11 +224,12 @@ plt.show()
 ### Combine the two numbers
 #num = f"{sys.argv[1]}{sys.argv[2]}"
 #
+#
 ## Your existing variables
-#FWHM = np.array([params_V04[3], params_V02[3], params_V00[3], params_V20[3], params_V40[3]])  # ps
-#FWHM_err = np.array([errors_V04[3],  errors_V02[3],  errors_V00[3],  errors_V20[3],  errors_V40[3]])        # ps
-#centroid = np.array([params_V04[2], params_V02[2], params_V00[2], params_V20[2], params_V40[2]])  # ps
-#centroid_err = np.array([errors_V04[2],  errors_V02[2],  errors_V00[2],  errors_V20[2],  errors_V40[2]])        # ps
+#FWHM = np.array([params_V02[3], params_V00[3], params_V20[3]])  # ps
+#FWHM_err = np.array([errors_V02[3],  errors_V00[3],  errors_V20[3]])        # ps
+#centroid = np.array([params_V02[2], params_V00[2], params_V20[2]])  # ps
+#centroid_err = np.array([errors_V02[2],  errors_V00[2],  errors_V20[2]])        # ps
 #
 ## Multiply by 1000
 #FWHM = FWHM * 1000
