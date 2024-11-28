@@ -44,8 +44,8 @@ stop = 74
 lr = 1e-4
 epochs = 500
 batch_size = 32
-Num_Neurons = 16
-save = False
+Num_Neurons = 8
+save = True
 
 
 # -------------------------------------------------------------------------
@@ -104,8 +104,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr)  
 
 # Execute train loop
-loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, save = save) 
-loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, save = save)
+loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/MLPWAVE_model_dec0', save = save) 
+loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/MLPWAVE_model_dec1', save = save)
 
 
 # -------------------------------------------------------------------------
