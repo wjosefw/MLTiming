@@ -23,8 +23,8 @@ class ConvolutionalModel(nn.Module):
         self.flatten_size = 64 * (N_points // 8)  
 
         # Fully connected layer with output
-        self.fc1 = nn.Linear(self.flatten_size, 32)
-        self.fc2 = nn.Linear(32, num_outputs)
+        self.fc1 = nn.Linear(self.flatten_size, 16)
+        self.fc2 = nn.Linear(16, num_outputs)
         
         # Dropout for regularization
         self.dropout = nn.Dropout(p = 0.05)
@@ -152,10 +152,10 @@ class ResNet1D(nn.Module):
         super(ResNet1D, self).__init__()
 
         # Define residual blocks
-        self.block1 = ResidualBlock(1, 16, 5)
+        self.block1 = ResidualBlock(1, 16, 5) 
         self.pool1 = nn.MaxPool1d(kernel_size = 2)
 
-        self.block2 = ResidualBlock(16, 32, 5)
+        self.block2 = ResidualBlock(16, 32, 5) 
         self.pool2 = nn.MaxPool1d(kernel_size = 2)
 
         self.block3 = ResidualBlock(32, 64, 3)
