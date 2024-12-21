@@ -7,6 +7,7 @@ import torch.optim as optim
 
 
 from Losses import custom_loss_MAE, custom_loss_bounded, custom_loss_MSE, custom_loss_Limit, custom_loss_with_huber, loss_MAE_KAN, loss_MSE_KAN
+
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
 
@@ -20,9 +21,12 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     test = []
     val_list = []
 
+    # Define loss function
+    loss_fn = custom_loss_with_huber  
+
     # Cosine Annealing Scheduler
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
-
+    
     for epoch in range(EPOCHS):
         running_loss = 0.0
         model.train()
@@ -39,7 +43,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
             outputs_1 = model(inputs[:, None, :, 1])
             
             # Compute the loss and its gradients
-            loss = custom_loss_with_huber(outputs_0, outputs_1, labels)
+            loss = loss_fn(outputs_0, outputs_1, labels)
             loss.backward()
 
             # Adjust learning weights
@@ -72,7 +76,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
                 mask = val_labels != 0 
                 val_0 = model(val_data[:, None, :, 0])
                 val_1 = model(val_data[:, None, :, 1])
-                val_loss += custom_loss_with_huber(val_0[mask], val_1[mask], val_labels[mask]).item()
+                val_loss += loss_fn(val_0[mask], val_1[mask], val_labels[mask]).item()
         
                 # Stack val_0 and val_1 along the last dimension
                 val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
@@ -100,23 +104,6 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
 #----------------------------------------------------------------------------------------------  
 
 def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
-    """
-    Args:
-    model (torch.nn.Module): The model to be trained.
-    optimizer (torch.optim.Optimizer): The optimizer used to adjust the model's parameters.
-    train_loader (torch.utils.data.DataLoader): DataLoader containing the training data.
-    val_loader (torch.utils.data.DataLoader): DataLoader containing the validation data.
-    test_tensor (torch.Tensor): Tensor used for testing.
-    EPOCHS (int, optional): The number of epochs to train the model. Default is 75.
-    name (str, optional): Base name for the saved model files. Default is 'model'.
-    save (bool, optional): Whether to save the model at specified checkpoints. Default is False.
-
-    Returns:
-    tuple: A tuple containing:
-        - loss_array (numpy.ndarray): Array of average losses per epoch during training.
-        - test (numpy.ndarray): Array of model predictions on the test_tensor after each epoch.
-
-    """
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -126,6 +113,9 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
     loss_list = []
     val_loss_list = []
     test = []
+
+    # Define loss function
+    loss_fn = custom_loss_with_huber  
 
     # Cosine Annealing Scheduler
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS)
@@ -147,7 +137,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
             outputs_1 = model(inputs[:, :, 1])
 
             # Compute the loss and its gradients
-            loss = custom_loss_with_huber(outputs_0, outputs_1, labels)
+            loss = loss_fn(outputs_0, outputs_1, labels)
             loss.backward()
 
             # Adjust learning weights
@@ -177,7 +167,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += custom_loss_with_huber(val_0, val_1, val_labels)
+                val_loss += loss_fn(val_0, val_1, val_labels)
             val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
 
@@ -204,6 +194,9 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     
+    # Define loss function
+    loss_fn = custom_loss_with_huber  
+
     # Move model and test_tensor to the device
     model = model.to(device)
     test_tensor = test_tensor.to(device)
@@ -219,7 +212,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
             outputs_0 = model(inputs[:, :, 0])
             outputs_1 = model(inputs[:, :, 1])
 
-            loss = custom_loss_with_huber(outputs_0, outputs_1, labels)
+            loss = loss_fn(outputs_0, outputs_1, labels)
             loss.backward()
             optimizer.step()
 
@@ -242,7 +235,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
                 val_data, val_labels = val_data.to(device), val_labels.to(device) 
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += custom_loss_with_huber(val_0, val_1, val_labels)
+                val_loss += loss_fn(val_0, val_1, val_labels)
 
                 # Stack val_0 and val_1 along the last dimension
                 val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
@@ -269,22 +262,24 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
 
 def train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
     
-    loss_list = []
-    val_loss_list = []
-    test = []
-    val_list = []  
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
-    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     
     # Move model and test_tensor to the device
     model = model.to(device)
     test_tensor = test_tensor.to(device)
-
-
-    # Define MSE loss
+    
+     # Define MSE loss
     loss_fn = torch.nn.MSELoss()
+
+    # Define scheduler
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
+    
+    loss_list = []
+    val_loss_list = []
+    test = []
+    val_list = []  
+    
 
     for epoch in range(EPOCHS):
         running_loss = 0.0
@@ -342,7 +337,9 @@ def train_loop_T_Ref(model, optimizer, train_loader, val_loader, test_tensor, EP
     val_loss_list = []
     test = []
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
-    mse_loss = nn.MSELoss()
+    
+    # Define loss function
+    loss_fn = nn.MSELoss()
     
     for epoch in range(EPOCHS):
         running_loss = 0.0
@@ -353,7 +350,7 @@ def train_loop_T_Ref(model, optimizer, train_loader, val_loader, test_tensor, EP
             
             outputs = model(inputs)
 
-            loss = mse_loss(outputs, labels)
+            loss = loss_fn(outputs, labels)
             loss.backward()
             optimizer.step()
 
@@ -372,7 +369,7 @@ def train_loop_T_Ref(model, optimizer, train_loader, val_loader, test_tensor, EP
             val_loss = 0
             for val_data, val_labels in val_loader:
                 val_output = model(val_data)
-                val_loss += mse_loss(val_output, val_labels)
+                val_loss += loss_fn(val_output, val_labels)
             val_loss_list.append(val_loss / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
 
@@ -385,6 +382,7 @@ def train_loop_T_Ref(model, optimizer, train_loader, val_loader, test_tensor, EP
 #----------------------------------------------------------------------------------------------  
 
 def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     test_tensor = test_tensor.to(device)
@@ -392,6 +390,9 @@ def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loade
     loss_list = []
     val_loss_list = []
     test = []
+    
+    # Define loss function
+    loss_fn = custom_loss_with_huber  
 
     # Cosine Annealing Scheduler
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
@@ -411,7 +412,7 @@ def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loade
             outputs_1 = model(inputs[:, None, :, :, 1])
             
             # Compute the loss and its gradients
-            loss = custom_loss_with_huber(outputs_0, outputs_1, labels)
+            loss = loss_fn(outputs_0, outputs_1, labels)
             loss.backward()
 
             # Adjust learning weights
@@ -441,7 +442,7 @@ def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loade
                 mask = val_labels != 0 
                 val_0 = model(val_data[:, None, :, :, 0])
                 val_1 = model(val_data[:, None, :, :, 1])
-                val_loss += custom_loss_with_huber(val_0[mask], val_1[mask], val_labels[mask]).item()
+                val_loss += loss_fn(val_0[mask], val_1[mask], val_labels[mask]).item()
         val_loss_list.append(val_loss / len(val_loader))
         print(f'LOSS val {val_loss / len(val_loader)}')
 
