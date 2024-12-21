@@ -6,7 +6,7 @@ import torch
 # Import functions
 from functions import (create_and_delay_pulse_pair, calculate_gaussian_center, 
                        plot_gaussian, get_gaussian_params, set_seed)
-from Models import ConvolutionalModel,  count_parameters, ResNet1D
+from Models import ConvolutionalModel,  count_parameters
 from Train_loops import train_loop_convolutional
 
 
@@ -17,11 +17,9 @@ train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data'
 train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
 train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
 
-
 validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
 validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
 validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
-
 
 test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
 test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
@@ -32,10 +30,10 @@ test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1     # Max delay to training pulses in ns
+delay_time = 1      # Max delay to training pulses in ns
 time_step = 0.2     # Signal time step in ns
 nbins = 71          # Num bins for all histograms                          
-t_shift = 1         # Time steps to move for the new positions
+positions = [-0.2, 0.0, 0.2] # Expected time difference of each position
 start = 47 
 stop =  74 
 set_seed(42)        # Fix seeds
@@ -89,27 +87,26 @@ val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-#set_seed(42)
-#model_dec0 = ConvolutionalModel(int(stop-start))
-#set_seed(42)
-#model_dec1 = ConvolutionalModel(int(stop-start))
+set_seed(42)
+model_dec0 = ConvolutionalModel(int(stop-start))
+set_seed(42)
+model_dec1 = ConvolutionalModel(int(stop-start))
 
-set_seed(42)
-model_dec0 = ResNet1D(int(stop-start))
-set_seed(42)
-model_dec1 = ResNet1D(int(stop-start))
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
 optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr, weight_decay = 1e-5) 
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr, weight_decay = 1e-5) 
 
 #Execute train loop
-loss_dec0, test_dec0, val_loss_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/ResNet_model_dec0',  save = save) 
-loss_dec1, test_dec1, val_loss_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/ResNet_model_dec1',  save = save)
+loss_dec0, test_dec0, val_loss_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/model_dec0',  save = save) 
+loss_dec1, test_dec1, val_loss_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/model_dec1',  save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
+
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec0_CNN.npz', data = test_dec0)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/test_dec1_CNN.npz', data = test_dec1)
 
 # Calculate TOF
 TOF = test_dec0 - test_dec1
@@ -117,20 +114,37 @@ TOF = test_dec0 - test_dec1
 TOF_V00 = TOF[:,:test_data_55.shape[0]] 
 TOF_V02 = TOF[:, test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
 TOF_V20 = TOF[:, test_data_55.shape[0]  + test_data_28.shape[0]:] 
-    
-
+   
 # Calulate Validation error
 centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
     
-error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + t_shift*time_step))
-error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
-error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - t_shift*time_step))
+error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[0]))
+error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
+error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - positions[2]))
 
 
 # Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00),  axis = 1)  
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
+
+#centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
+#centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3) 
+#centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3)
+#
+#error_V20_centroid = abs(centroid_V20 - 0.2)
+#error_V02_centroid = abs(centroid_V02 + 0.2)
+#
+#avg_bias = np.mean(np.stack((error_V20_centroid , error_V02_centroid), axis = -1), axis = 1)
+#Plot MAE_singles vs MAE_coincidences
+#err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
+#err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
+#mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
+#mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec0_Na22.npz', data = mean_err_val_dec0)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec1_Na22.npz', data = mean_err_val_dec1)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/MAE_Na22.npz', data = MAE)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/avg_bias.npz', data = avg_bias)
 
 # Plot
 plt.figure(figsize = (20,5))
@@ -182,6 +196,15 @@ plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
+
+#CTR = []
+#for i in range(epochs):
+#    params_V02, errors_V02 = get_gaussian_params(TOF_V02[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    params_V00, errors_V00 = get_gaussian_params(TOF_V00[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    params_V20, errors_V20 = get_gaussian_params(TOF_V20[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    CTR.append(np.mean([params_V20[3],params_V00[3],params_V02[3]]))
+#
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/ctr.npz', data = np.array(CTR))
 
 ### Combine the two numbers
 #num = f"{sys.argv[1]}{sys.argv[2]}"
