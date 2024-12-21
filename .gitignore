@@ -37,8 +37,6 @@ pykan/
 predictions/
 efficient_kan/
 figures/
-
-pulsos_Na22_energy_dec0_train.npz
-pulsos_Na22_energy_dec0_test_val.npz
-pulsos_Na22_energy_dec1_train.npz
-pulsos_Na22_energy_dec1_test_val.npz
+FS.sh
+results_FS.txt
+Results.py
