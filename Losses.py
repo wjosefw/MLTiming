@@ -69,7 +69,7 @@ def custom_loss_with_huber(outputs_0, outputs_1, labels):
     penalty = torch.mean(torch.relu(deviation) ** 2)
 
     # Total loss
-    loss = regression_loss + penalty_weight * penalty #+ 0.001*torch.mean(outputs_0)
+    loss = regression_loss #+ penalty_weight * penalty 
     return loss
 
 #----------------------------------------------------------------------------------------------

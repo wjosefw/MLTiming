@@ -17,20 +17,29 @@ print(f'Using device: {device}')
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA.npz'))['data']
-data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA.npz'))['data']
-data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA.npz'))['data']
+train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data']
+train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
+train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
+
+
+validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
+validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
+validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
+
+
+test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
+test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
+test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 
 
 # -------------------------------------------------------------------------
 # ----------------------- IMPORTANT DEFINITIONS ---------------------------
 # -------------------------------------------------------------------------
 
-channel = 1                                # Channel to train
+channel = 0                                # Channel to train
 delay_time = 1                             # Max delay to training pulses in ns
 set_seed(42)                               # Fix seeds
 nbins = 71                                 # Num bins for all histograms
-t_shift = 1                                # Time steps to move for the new positions
 start = 47 
 stop = 74 
 time_step = 0.2                            # Signal time step in ns
@@ -44,12 +53,16 @@ save_name = 'predictions/Convolutional/Conv_model_dec' + str(channel)
 #----------------------- CROP WAVEFORM ------------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.concatenate((data_55[:6000,start:stop,:], data_28[:6000,start:stop,:], data_82[:6000,start:stop,:]), axis = 0) 
-val_data = np.concatenate((data_55[6000:7000,start:stop,:], data_28[6000:7000,start:stop,:], data_82[6000:7000,start:stop,:]), axis = 0)
-test_data = np.concatenate((data_55[6000:,start:stop,:], data_28[6000:,start:stop,:], data_82[6000:,start:stop,:]), axis = 0)
+train_data = np.concatenate((train_data_55, train_data_28, train_data_82), axis = 0)
+validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
+test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
+
+train_data = train_data[:,start:stop,:]
+validation_data = validation_data[:,start:stop,:] 
+test_data = test_data[:,start:stop,:]
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
-print('Número de casos de validacion: ', val_data.shape[0])
+print('Número de casos de validacion: ', validation_data.shape[0])
 
 # -------------------------------------------------------------------------
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
@@ -57,7 +70,7 @@ print('Número de casos de validacion: ', val_data.shape[0])
 
 # Create virtual coincidences
 train, REF_train = create_and_delay_pulse_pair(train_data[:,:,channel], time_step, delay_time = delay_time)
-val, REF_val = create_and_delay_pulse_pair(val_data[:,:,channel], time_step, delay_time = delay_time)
+val, REF_val = create_and_delay_pulse_pair(validation_data[:,:,channel], time_step, delay_time = delay_time)
 
 TEST = test_data
 
@@ -82,6 +95,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr = lr, weight_decay = 1e-5)
 #Execute train loop
 loss, test, val_loss, val_inf = train_loop_convolutional(model, optimizer, train_loader, val_loader, torch.tensor(TEST[:,:,channel]).float(), EPOCHS = epochs, name = save_name,  save = save) 
 
+
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
@@ -102,9 +116,9 @@ plt.legend()
 plt.show()
 
 # Decompress test positions
-test_55 = test[-1,:data_55[6000:,:,:].shape[0]]
-test_28 = test[-1, data_55[6000:,:,:].shape[0]:data_55[6000:,:,:].shape[0]+ data_28[6000:,:,:].shape[0]]
-test_82 = test[-1, data_55[6000:,:,:].shape[0]+ data_28[6000:,:,:].shape[0]:]
+test_55 = test[-1,:test_data_55.shape[0]]
+test_28 = test[-1, test_data_55.shape[0]: test_data_55.shape[0]+ test_data_28.shape[0]]
+test_82 = test[-1, test_data_55.shape[0]+ test_data_28.shape[0]:]
 
 
 # Plot histograms of predictions for the different positions
@@ -117,12 +131,13 @@ plt.show()
 
 
 #plot validation delays hists
-plt.hist(val_inf[-1,:,0] - val_inf[-1,:,1], bins = nbins, alpha = 0.5)
-plt.hist(REF_val, bins = nbins, alpha = 0.5)
+plt.hist(val_inf[-1,:,0] - val_inf[-1,:,1], bins = nbins, alpha = 0.5, label = 'Predicted delays validation')
+plt.hist(REF_val, bins = nbins, alpha = 0.5, label = 'Target delays validation')
+plt.legend()
 plt.show()
 
 # Get validation error
-err_val = val_inf[-1,:,0] - val_inf[-1,:,1] - REF_val
+err_val = (val_inf[-1,:,0] - val_inf[-1,:,1]) - REF_val
 print('MAE validation: ', np.mean(abs(err_val)))
 
 #Plot validation delay vs error

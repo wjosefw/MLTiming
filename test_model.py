@@ -29,7 +29,6 @@ set_seed(42)                               # Fix seeds
 nbins = 71                                # Num bins for all histograms
 normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
-total_time = time_step*test_data.shape[1] - time_step 
 architecture = [moments_order, 3, 1, 1]   
 fraction = 0.1                             # Fraction to trigger the pulse cropping   
 window_low = 14                            # Number of steps to take before trigger
@@ -41,8 +40,8 @@ positions = np.array([-0.2, 0.0, 0.2])
 # ------------------------ PREPROCESS DATA --------------------------------
 # -------------------------------------------------------------------------
 
-test_array_dec0, test_time_array_dec0 = extract_signal_along_time_singles(test_data[:,:100,0], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
-test_array_dec1, test_time_array_dec1 = extract_signal_along_time_singles(test_data[:,:100,1], time_step, total_time, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array_dec0, test_time_array_dec0 = extract_signal_along_time_singles(test_data[:,:100,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array_dec1, test_time_array_dec1 = extract_signal_along_time_singles(test_data[:,:100,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
 
 test_array = np.stack((test_array_dec0, test_array_dec1), axis = -1)
 test_time_array = np.stack((test_time_array_dec0, test_time_array_dec1), axis = -1)
@@ -50,17 +49,29 @@ test_time_array = np.stack((test_time_array_dec0, test_time_array_dec1), axis = 
 ## Calculate moments 
 MOMENTS_TEST = momentos_threshold(test_array, test_time_array, order = moments_order)
 
-params_dec0 = (np.array([3.09991389e+00, 3.86548463e-01, 4.82566935e-02, 6.03213656e-03,
-       7.55067753e-04, 9.46516774e-05, 1.18826636e-05]), np.array([2.16221785e-01, 2.89560821e-02, 4.13109444e-03, 6.04213492e-04,
-       8.85184723e-05, 1.28667074e-05, 1.85084856e-06]))
+params_dec0 = (np.array([3.09991389e+00, 4.63085059e+01, 6.92581996e+02, 1.03715011e+04,
+       1.55529650e+05, 2.33567496e+06, 3.51281042e+07]), np.array([2.16221785e-01, 3.46893863e+00, 5.92896327e+01, 1.03886921e+03,
+       1.82331281e+04, 3.17505692e+05, 5.47156791e+06]))
 
-params_dec1 = (np.array([3.09495111e+00, 3.89054263e-01, 4.89555545e-02, 6.16734394e-03,
-       7.77941603e-04, 9.82609367e-05, 1.24285457e-05]), np.array([2.31959436e-01, 3.16876207e-02, 4.54678171e-03, 6.63819916e-04,
-       9.69038574e-05, 1.40442818e-05, 2.01685628e-06]))
+params_dec1 = (np.array([3.09495111e+00, 4.66087007e+01, 7.02612076e+02, 1.06039732e+04,
+       1.60241230e+05, 2.42473896e+06, 3.67418671e+07]), np.array([2.31959436e-01, 3.79617696e+00, 6.52555929e+01, 1.14135496e+03,
+       1.99603585e+04, 3.46564142e+05, 5.96232795e+06]))
+
+
+#params_dec0 = (np.array([3.09991389e+00, 4.78469918e+01, 7.39581118e+02, 1.14497881e+04,
+#       1.77552354e+05, 2.75801415e+06, 4.29162120e+07]), np.array([2.16221785e-01, 3.69746793e+00, 6.90685627e+01, 1.31202896e+03,
+#       2.46152404e+04, 4.53307052e+05, 8.20399776e+06]))
+#
+#params_dec1 = (np.array([3.09495111e+00, 4.81439897e+01, 7.49878490e+02, 1.16966769e+04,
+#       1.82726048e+05, 2.85913142e+06, 4.48107168e+07]), np.array([2.31959436e-01, 4.01132857e+00, 7.45707916e+01, 1.40613108e+03,
+#       2.62500902e+04, 4.82339986e+05, 8.72817437e+06]))
+
 
 MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
 MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
 MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
+
+
 
 # -------------------------------------------------------------------------
 #--------------------------- LOAD MODELS ----------------------------------

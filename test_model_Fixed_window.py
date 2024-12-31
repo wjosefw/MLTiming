@@ -11,12 +11,13 @@ from Models import ConvolutionalModel, MLP_Torch
 
 #Load data
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
-test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
-test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
+test_data_82 = np.load(os.path.join(dir, 'pulsos_Na22_82_sin_normalizar_test.npz'))['data']
+test_data_55 = np.load(os.path.join(dir, 'pulsos_Na22_55_sin_normalizar_test.npz'))['data']
+test_data_28 = np.load(os.path.join(dir, 'pulsos_Na22_28_sin_normalizar_test.npz'))['data']
 
 test_data  = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 print('Número de casos de test: ', test_data.shape[0])
+
 
 # -------------------------------------------------------------------------
 # ---------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -72,7 +73,6 @@ model_dec1_dir = os.path.join(dir, 'model_dec1')
 #model_dec0_dir = os.path.join(dir, 'MLPWAVE_model_dec0')
 #model_dec1_dir = os.path.join(dir, 'MLPWAVE_model_dec1')
 
-
 model_dec0 = ConvolutionalModel(int(stop-start))
 model_dec1 = ConvolutionalModel(int(stop-start))
 
@@ -93,7 +93,6 @@ model_dec1.eval()
 
 test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0]).float()).detach().numpy())
 test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1]).float()).detach().numpy())
-
 
 #test_dec0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST[:,:,0]).float()).detach().numpy())
 #test_dec1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST[:,:,1]).float()).detach().numpy())
@@ -251,7 +250,7 @@ time_array_moments = np.array(time_list_moments)
 
 
 # Start timer inference
-for i in range(100):
+for i in range(10):
     start_time_inference= time.time()
     with torch.no_grad():
         assert not torch.is_grad_enabled()
