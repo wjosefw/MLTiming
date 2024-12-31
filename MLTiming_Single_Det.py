@@ -36,7 +36,7 @@ test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 # ----------------------- IMPORTANT DEFINITIONS ---------------------------
 # -------------------------------------------------------------------------
 
-channel = 1                                # Channel to train
+channel = 0                                # Channel to train
 delay_time = 1                             # Max delay to training pulses in ns
 moments_order = 7                          # Order of moments used
 set_seed(42)                               # Fix seeds
@@ -161,8 +161,6 @@ M_Train = momentos_threshold(train, time_train, order = moments_order)
 M_Val = momentos_threshold(val, val_time, order = moments_order) 
 
 # Normalize virtual coincidence moments 
-#M_Train, params =  normalize(M_Train, method = normalization_method)
-
 M_Train_channel0 =  normalize_given_params(M_Train, n_params, channel = 0, method = normalization_method)
 M_Train_channel1 =  normalize_given_params(M_Train, n_params, channel = 1, method = normalization_method)
 M_Train = np.stack((M_Train_channel0, M_Train_channel1), axis = -1)
@@ -171,7 +169,6 @@ M_Val_channel0 =  normalize_given_params(M_Val, n_params, channel = 0, method = 
 M_Val_channel1 =  normalize_given_params(M_Val, n_params, channel = 1, method = normalization_method)
 M_Val = np.stack((M_Val_channel0, M_Val_channel1), axis = -1)
 
-#print("Normalization parameters second loop:", params)
 
 # Create virtual coinicidences Datasets/Dataloaders
 train_dataset = torch.utils.data.TensorDataset(torch.from_numpy(M_Train).float(), torch.from_numpy(np.expand_dims(REF_train, axis = -1)).float())
