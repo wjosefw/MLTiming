@@ -913,11 +913,11 @@ def extract_signal_window_by_fraction(vector, fraction = 0.2, window_low = 140, 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def extract_signal_along_time(vector, time_step, total_time, fraction = 0.2, window_low = 140, window_high = 10):
+def extract_signal_along_time(vector, time_step, fraction = 0.2, window_low = 140, window_high = 10):
 
     new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
     time_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
-    t = np.arange(0, time_step*vector.shape[1], time_step) / total_time
+    t = np.arange(0, time_step*vector.shape[1], time_step)
     #t = np.linspace(0, 1, vector.shape[1])
     #t = np.arange(0, time_step*vector.shape[1], time_step)
     
@@ -950,11 +950,11 @@ def extract_signal_along_time(vector, time_step, total_time, fraction = 0.2, win
 
     return new_vector, time_vector, a, b    
 
-def extract_signal_along_time_singles(vector, time_step, total_time, fraction = 0.2, window_low = 140, window_high = 10):
+def extract_signal_along_time_singles(vector, time_step, fraction = 0.2, window_low = 140, window_high = 10):
 
     new_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
     time_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
-    t = np.arange(0, time_step*vector.shape[1], time_step) / total_time
+    t = np.arange(0, time_step*vector.shape[1], time_step)
  
     for i in range(vector.shape[0]):
         
@@ -975,7 +975,7 @@ def extract_signal_along_time_singles(vector, time_step, total_time, fraction = 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, total_time, delay_time = 1):
+def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, delay_time = 1):
     
 
     INPUT = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
@@ -992,9 +992,9 @@ def create_and_delay_pulse_pair_along_time(pulse_set, time_vector, time_step, to
         
         REF[i] = NRD0[i] - NRD1[i]
         
-        Time_delayed[i,:,0] = time_vector[i,:] + (NRD0[i]/total_time)
-        Time_delayed[i,:,1] = time_vector[i,:] + (NRD1[i]/total_time)
-
+        Time_delayed[i,:,0] = time_vector[i,:] + NRD0[i] 
+        Time_delayed[i,:,1] = time_vector[i,:] + NRD1[i] 
+ 
     return INPUT, REF, Time_delayed
 
 #----------------------------------------------------------------------------------------------
