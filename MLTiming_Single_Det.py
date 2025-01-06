@@ -7,10 +7,9 @@ from efficient_kan.src.efficient_kan import KAN
 
 from functions import (extract_signal_along_time_singles, momentos_threshold, set_seed, 
                        normalize, normalize_given_params, calculate_slope_y_intercept,
-                       plot_gaussian, get_gaussian_params, create_and_delay_pulse_pair_along_time)
+                       create_and_delay_pulse_pair_along_time, create_dataloaders)
 from Models import  count_parameters
 from Train_loops import train_loop_KAN, train_loop_KAN_with_target
-
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -31,7 +30,6 @@ test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
 test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
 test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 
-
 # -------------------------------------------------------------------------
 # ----------------------- IMPORTANT DEFINITIONS ---------------------------
 # -------------------------------------------------------------------------
@@ -43,8 +41,8 @@ set_seed(42)                               # Fix seeds
 nbins = 71                                 # Num bins for all histograms
 normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
-epochs = 500                               # Number of epochs for training (first loop)
-epochs2 = 50                                # Number of epochs for training (second loop)
+epochs = 500                                # Number of epochs for training (first loop)
+epochs2 = 150                              # Number of epochs for training (second loop)
 lr = 1e-3                                  # Model learning rate
 batch_size = 32                            # batch size used for training 
 save = True                                # Save models or not
@@ -102,22 +100,19 @@ test_array, test_time_array = extract_signal_along_time_singles(test_data[:,:100
 # Calculate moments
 M_Train = momentos_threshold(train_array, train_time_array, order = moments_order) 
 M_Val = momentos_threshold(val_array, val_time_array, order = moments_order) 
-MOMENTS_TEST = momentos_threshold(test_array, test_time_array, order = moments_order)
+M_Test = momentos_threshold(test_array, test_time_array, order = moments_order)
 
 
 # Normalize moments 
 M_Train, n_params =  normalize(M_Train, method = normalization_method)
 M_Val =  normalize_given_params(M_Val[:,:,None], n_params, channel = 0, method = normalization_method)
-MOMENTS_TEST = normalize_given_params(MOMENTS_TEST[:,:,None], n_params, channel = 0, method = normalization_method)
+M_Test = normalize_given_params(M_Test[:,:,None], n_params, channel = 0, method = normalization_method)
 
 print("Normalization parameters:", n_params)
 
-# Create Datasets/Dataloaders
-train_dataset = torch.utils.data.TensorDataset(torch.from_numpy(M_Train).float(), torch.from_numpy(np.expand_dims(timestamps_train, axis = -1)).float())
-val_dataset = torch.utils.data.TensorDataset(torch.from_numpy(M_Val).float(), torch.from_numpy(np.expand_dims(timestamps_val, axis = -1)).float())
-
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size = len(val_dataset), shuffle = False)
+# Create Dataloaders
+train_loader = create_dataloaders(M_Train, timestamps_train, batch_size = batch_size, shuffle = True)
+val_loader = create_dataloaders(M_Val, timestamps_val, batch_size = batch_size, shuffle = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
@@ -128,31 +123,26 @@ print(f"Total number of parameters: {count_parameters(model)}")
 
 optimizer = torch.optim.AdamW(model.parameters(), lr = lr) 
 
-
 # -------------------------------------------------------------------------
 # -------------------- FIRST TRAINING LOOP -------------------------------
 # -------------------------------------------------------------------------
 
 # Execute first loop
-loss_target, val_loss_target, test_target, val_target = train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, torch.tensor(MOMENTS_TEST).float(), EPOCHS = epochs, name = save_name, save = save) 
+loss_target, val_loss_target = train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = save_name, save = save) 
 
-# Calculate target prediction error
-err_target = test_target[-1,:] - timestamps_test
-plot_gaussian(err_target, 0.0, range = 0.5, label = 'Target errors', nbins = nbins)
-params, errors = get_gaussian_params(err_target, 0.0, range = 0.5, nbins = nbins)
-print("CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params[2], errors[2], params[3], errors[3]))
-
+# Plot training and validation losses
+plt.plot(np.log10(loss_target.astype('float32')), label = 'Train loss Detector 0')
+plt.plot(np.log10(val_loss_target.astype('float32')), label = 'Val loss Detector 0')
+plt.ylabel('Loss value (log)')
+plt.xlabel('Epochs')
 plt.legend()
-plt.xlabel('$\epsilon$ (ns)', fontsize = 14)
-plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
-
 # -------------------------------------------------------------------------
-# -------------------- SECOND TRAINING LOOP -------------------------------
+# ------------------ CREATE VIRTUAL COINCIDENCES --------------------------
 # -------------------------------------------------------------------------
 
-## Create virtual coincidences
+# virtual coincidences
 train, REF_train, time_train = create_and_delay_pulse_pair_along_time(train_array, train_time_array, delay_time = delay_time)
 val, REF_val, val_time = create_and_delay_pulse_pair_along_time(val_array, val_time_array, delay_time = delay_time)
 
@@ -169,19 +159,43 @@ M_Val_channel0 =  normalize_given_params(M_Val, n_params, channel = 0, method = 
 M_Val_channel1 =  normalize_given_params(M_Val, n_params, channel = 1, method = normalization_method)
 M_Val = np.stack((M_Val_channel0, M_Val_channel1), axis = -1)
 
-
-# Create virtual coinicidences Datasets/Dataloaders
-train_dataset = torch.utils.data.TensorDataset(torch.from_numpy(M_Train).float(), torch.from_numpy(np.expand_dims(REF_train, axis = -1)).float())
-val_dataset = torch.utils.data.TensorDataset(torch.from_numpy(M_Val).float(), torch.from_numpy(np.expand_dims(REF_val, axis = -1)).float())
-
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size = len(val_dataset), shuffle = False)
-
-# Execute second train loop
-loss, val_loss, test, val = train_loop_KAN(model, optimizer, train_loader, val_loader, torch.tensor(MOMENTS_TEST).float(), EPOCHS = epochs2, name = save_name, save = save) 
+# Create virtual coincidences Dataloaders
+train_loader = create_dataloaders(M_Train, REF_train, batch_size = batch_size, shuffle = True)
+val_loader = create_dataloaders(M_Val, REF_val, batch_size = batch_size, shuffle = False)
 
 # -------------------------------------------------------------------------
-# ------------------------------ RESULTS ----------------------------------
+# ------- USE VIRTUAL COINCIDENCES TO CHECK RESULTS OF FIRST LOOP ---------
+# -------------------------------------------------------------------------
+
+test0 = np.squeeze(model(torch.tensor(M_Val[:,:,0]).to(device).float()).cpu().detach().numpy())
+test1 = np.squeeze(model(torch.tensor(M_Val[:,:,1]).to(device).float()).cpu().detach().numpy())
+
+#plot validation delays hists
+plt.hist(test0 - test1, bins = nbins, range = [-2, 2], alpha = 0.5, label = 'Prediction')
+plt.hist(REF_val, bins = nbins, range = [-2, 2], alpha = 0.5, label = 'Reference')
+plt.legend()
+plt.show()
+
+# Get validation error
+err_val = test0 - test1 - REF_val
+print('MAE validation: ', np.mean(abs(err_val)))
+
+#Plot validation delay vs error
+plt.plot(REF_val, err_val, 'b.', markersize = 1.5)
+plt.xlabel('Validation target delay')
+plt.ylabel('Validation prediction error')
+plt.show()
+
+# -------------------------------------------------------------------------
+# -------------------- SECOND TRAINING LOOP -------------------------------
+# -------------------------------------------------------------------------
+
+# Execute second train loop using the previously created virtual coincidences
+loss, val_loss, test, val = train_loop_KAN(model, optimizer, train_loader, val_loader, torch.tensor(M_Test).float(), EPOCHS = epochs2, name = save_name, save = save) 
+
+
+# -------------------------------------------------------------------------
+# ------------------- SECOND TRAINING LOOP RESULTS ------------------------
 # -------------------------------------------------------------------------
 
 # Plot
@@ -199,60 +213,18 @@ plt.ylabel('Counts')
 plt.legend()
 plt.show()
 
-# Decompress test positions
-test_55 = test[-1,:test_data_55.shape[0]]
-test_28 = test[-1, test_data_55.shape[0]: test_data_55.shape[0] + test_data_28.shape[0]]
-test_82 = test[-1, test_data_55.shape[0]+ test_data_28.shape[0]:]
-
-MOMENTS_TEST_55 = MOMENTS_TEST[: test_data_55.shape[0], 1]
-MOMENTS_TEST_28 = MOMENTS_TEST[test_data_55.shape[0]: test_data_55.shape[0] + test_data_28.shape[0], 1]
-MOMENTS_TEST_82 = MOMENTS_TEST[test_data_55.shape[0] + test_data_28.shape[0]:, 1]
-
-# Plot histograms of predictions for the different positions
-plt.hist(test_55, bins = nbins, alpha = 0.5, label = '55')
-plt.hist(test_28, bins = nbins, alpha = 0.5, label = '28')
-plt.hist(test_82, bins = nbins, alpha = 0.5, label = '82')
-plt.title('Prediction times histograms')
-plt.legend()
-plt.show()
-
-
-#plot validation delays hists
-plt.hist(val[-1,:,0] - val[-1,:,1], bins = nbins, alpha = 0.5)
-plt.hist(REF_val, bins = nbins, alpha = 0.5)
-plt.show()
-
 # Get validation error
 err_val = val[-1,:,0] - val[-1,:,1] - REF_val
 print('MAE validation: ', np.mean(abs(err_val)))
 
+#plot validation delays hists
+plt.hist(val[-1,:,0] - val[-1,:,1], range = [-2,2], bins = nbins, alpha = 0.5)
+plt.hist(REF_val, bins = nbins, range = [-2,2], alpha = 0.5)
+plt.show()
+
 #Plot validation delay vs error
-plt.plot(val[-1,:,0] - val[-1,:,1], err_val, 'b.', markersize = 1.5)
+plt.plot(REF_val, err_val, 'b.', markersize = 1.5)
 plt.ylabel('Validation Error')
-plt.xlabel('Validation target delay')
+plt.xlabel('Validation Target Delay')
 plt.show()
 
-# Plot moment one vs validation values
-plt.plot(MOMENTS_TEST_55, test_55, 'b.', label = '55')
-plt.plot(MOMENTS_TEST_28, test_28, 'r.', label = '28')
-plt.plot(MOMENTS_TEST_82, test_82, 'g.', label = '82')
-plt.xlabel('Moment one')
-plt.ylabel('Time (ns)')
-plt.legend()
-plt.show()
-
-# Plot representation of moments diff vs ref delay
-plt.plot(M_Val[:,1,0] - M_Val[:,1,1], REF_val, 'b.')
-plt.title('Diff moment vs ref delay')
-plt.show()
-
-
-# Plot Histogram and gaussian fit 
-plot_gaussian(err_val, 0.0, range = 0.5, label = 'Validation errors', nbins = nbins)
-params, errors = get_gaussian_params(err_val, 0.0, range = 0.5, nbins = nbins)
-print("CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params[2], errors[2], params[3], errors[3]))
-
-plt.legend()
-plt.xlabel('$\epsilon$ (ns)', fontsize = 14)
-plt.ylabel('Counts', fontsize = 14)
-plt.show()

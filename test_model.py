@@ -58,19 +58,9 @@ params_dec1 = (np.array([3.09495111e+00, 4.66087007e+01, 7.02612076e+02, 1.06039
        1.99603585e+04, 3.46564142e+05, 5.96232795e+06]))
 
 
-#params_dec0 = (np.array([3.09991389e+00, 4.78469918e+01, 7.39581118e+02, 1.14497881e+04,
-#       1.77552354e+05, 2.75801415e+06, 4.29162120e+07]), np.array([2.16221785e-01, 3.69746793e+00, 6.90685627e+01, 1.31202896e+03,
-#       2.46152404e+04, 4.53307052e+05, 8.20399776e+06]))
-#
-#params_dec1 = (np.array([3.09495111e+00, 4.81439897e+01, 7.49878490e+02, 1.16966769e+04,
-#       1.82726048e+05, 2.85913142e+06, 4.48107168e+07]), np.array([2.31959436e-01, 4.01132857e+00, 7.45707916e+01, 1.40613108e+03,
-#       2.62500902e+04, 4.82339986e+05, 8.72817437e+06]))
-
-
 MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
 MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
 MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
-
 
 
 # -------------------------------------------------------------------------

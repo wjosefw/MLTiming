@@ -260,16 +260,12 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
 
-def train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
+def train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, EPOCHS = 75, name = 'model', save = False):
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     
-    # Move model and test_tensor to the device
-    model = model.to(device)
-    test_tensor = test_tensor.to(device)
-    
-     # Define MSE loss
+     # Define loss
     loss_fn = torch.nn.MSELoss()
 
     # Define scheduler
@@ -277,8 +273,6 @@ def train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, test_
     
     loss_list = []
     val_loss_list = []
-    test = []
-    val_list = []  
     
 
     for epoch in range(EPOCHS):
@@ -305,16 +299,13 @@ def train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, test_
         print(f'LOSS train {running_loss / len(train_loader)}')
 
         with torch.no_grad():
-            test_epoch = model(test_tensor)
-            test.append(np.squeeze(test_epoch.cpu().detach().numpy()))
-
+        
             val_loss = 0
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device) 
                 val = model(val_data)
                 val_loss += loss_fn(val, val_labels)
-                val_list.append(val.cpu().detach().numpy())  
-            
+                
             val_loss_list.append(val_loss.item() / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
 
@@ -323,11 +314,8 @@ def train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, test_
 
     return (
         np.array(loss_list, dtype = 'object'), 
-        np.array(val_loss_list, dtype = 'object'), 
-        np.array(test, dtype = 'object'), 
-        np.array(val_list, dtype = 'object')
+        np.array(val_loss_list, dtype = 'object')
     )
-
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
