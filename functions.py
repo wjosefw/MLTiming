@@ -1022,3 +1022,11 @@ def momentos_threshold(vector, time_vector, order = 4):
     
     return MOMENT
 
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+
+def create_dataloaders(input, target, batch_size = 32, shuffle = True):
+  dataset = torch.utils.data.TensorDataset(torch.from_numpy(input).float(), torch.from_numpy(np.expand_dims(target, axis = -1)).float())
+  dataloader = torch.utils.data.DataLoader(dataset, batch_size = batch_size, shuffle = shuffle)
+  return dataloader
