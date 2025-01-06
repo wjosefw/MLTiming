@@ -42,7 +42,7 @@ nbins = 71                                 # Num bins for all histograms
 normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
 epochs = 500                                # Number of epochs for training (first loop)
-epochs2 = 150                              # Number of epochs for training (second loop)
+epochs2 = 1                              # Number of epochs for training (second loop)
 lr = 1e-3                                  # Model learning rate
 batch_size = 32                            # batch size used for training 
 save = True                                # Save models or not
@@ -65,7 +65,7 @@ print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
 
 # -------------------------------------------------------------------------
-# ---------------- TRAINING TO REPRODUCE LED ------------------------------
+# ---------------------- GET LED TIMESTAMPS -------------------------------
 # -------------------------------------------------------------------------
 
 # Get time stamps
@@ -90,6 +90,9 @@ timestamps_train = np.array(timestamps_train_list)
 timestamps_val = np.array(timestamps_val_list)
 timestamps_test = np.array(timestamps_test_list)
 
+# -------------------------------------------------------------------------
+# ----------------- PREPARE DATA FOR FIRST LOOP ---------------------------
+# -------------------------------------------------------------------------
 
 # Extract pulses
 train_array, train_time_array = extract_signal_along_time_singles(train_data[:, :100, channel], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
@@ -124,7 +127,7 @@ print(f"Total number of parameters: {count_parameters(model)}")
 optimizer = torch.optim.AdamW(model.parameters(), lr = lr) 
 
 # -------------------------------------------------------------------------
-# -------------------- FIRST TRAINING LOOP -------------------------------
+# -------------------- FIRST TRAINING LOOP --------------------------------
 # -------------------------------------------------------------------------
 
 # Execute first loop
@@ -167,6 +170,7 @@ val_loader = create_dataloaders(M_Val, REF_val, batch_size = batch_size, shuffle
 # ------- USE VIRTUAL COINCIDENCES TO CHECK RESULTS OF FIRST LOOP ---------
 # -------------------------------------------------------------------------
 
+# Make a prediction of virtual coincidences
 test0 = np.squeeze(model(torch.tensor(M_Val[:,:,0]).to(device).float()).cpu().detach().numpy())
 test1 = np.squeeze(model(torch.tensor(M_Val[:,:,1]).to(device).float()).cpu().detach().numpy())
 
