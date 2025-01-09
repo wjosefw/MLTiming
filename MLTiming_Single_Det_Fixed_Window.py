@@ -5,10 +5,10 @@ import torch
 from efficient_kan.src.efficient_kan import KAN
 
 
-from functions import (set_seed, plot_gaussian, 
-                       get_gaussian_params, create_and_delay_pulse_pair)
+from functions import (set_seed, create_and_delay_pulse_pair,
+                       Calculate_CFD, create_dataloaders)
 from Models import  count_parameters, ConvolutionalModel
-from Train_loops import train_loop_convolutional
+from Train_loops import train_loop_convolutional, train_loop_convolutional_with_target
 
 
 # Device setup
@@ -36,99 +36,148 @@ test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 # ----------------------- IMPORTANT DEFINITIONS ---------------------------
 # -------------------------------------------------------------------------
 
-channel = 0                                # Channel to train
+channel = 1                                # Channel to train
 delay_time = 1                             # Max delay to training pulses in ns
 set_seed(42)                               # Fix seeds
 nbins = 71                                 # Num bins for all histograms
 start = 47 
 stop = 74 
 time_step = 0.2                            # Signal time step in ns
-epochs = 500                               # Number of epochs for training
-lr = 1e-4                                  # Model learning rate
+epochs = 500                               # Number of epochs for training (first loop)
+epochs2 = 500                              # Number of epochs for training (second loop) 
+lr = 1e-3                                  # Model learning rate
 batch_size = 32                            # batch size used for training
-save = False                               # Save models or not
+save = True                                # Save models or not
 save_name = 'predictions/Convolutional/Conv_model_dec' + str(channel)
-
-# -------------------------------------------------------------------------
-#----------------------- CROP WAVEFORM ------------------------------------
-# -------------------------------------------------------------------------
+fraction_cfd = 0.064                       # Fraction for CFD 
+shift = 6.8                                # Shift for CFD 
 
 train_data = np.concatenate((train_data_55, train_data_28, train_data_82), axis = 0)
 validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
 test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 
-train_data = train_data[:,start:stop,:]
-validation_data = validation_data[:,start:stop,:] 
-test_data = test_data[:,start:stop,:]
+# -------------------------------------------------------------------------
+# ---------------------- GET CFD TIMESTAMPS -------------------------------
+# -------------------------------------------------------------------------
+
+# Get CFD timestamps
+timestamps_train = Calculate_CFD(train_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
+timestamps_val = Calculate_CFD(validation_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
+timestamps_test = Calculate_CFD(test_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
+
+# -------------------------------------------------------------------------
+#----------------------- CROP WAVEFORM ------------------------------------
+# -------------------------------------------------------------------------
+
+train_data = train_data[:,start:stop,channel]
+validation_data = validation_data[:,start:stop,channel] 
+test_data = test_data[:,start:stop,channel]
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de validacion: ', validation_data.shape[0])
 
 # -------------------------------------------------------------------------
-# -------------------- TRAIN/VALIDATION/TEST SET --------------------------
+# ----------------- PREPARE DATA FOR FIRST LOOP ---------------------------
 # -------------------------------------------------------------------------
 
-# Create virtual coincidences
-train, REF_train = create_and_delay_pulse_pair(train_data[:,:,channel], time_step, delay_time = delay_time)
-val, REF_val = create_and_delay_pulse_pair(validation_data[:,:,channel], time_step, delay_time = delay_time)
-
-TEST = test_data
-
-# Create Datasets/Dataloaders
-train_dataset = torch.utils.data.TensorDataset(torch.from_numpy(train).float(), torch.from_numpy(np.expand_dims(REF_train, axis = -1)).float())
-val_dataset = torch.utils.data.TensorDataset(torch.from_numpy(val).float(), torch.from_numpy(np.expand_dims(REF_val, axis = -1)).float())
-
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size = len(val_dataset), shuffle = False)
+# Create Dataloaders
+train_loader = create_dataloaders(train_data, timestamps_train, batch_size = batch_size, shuffle = True)
+val_loader = create_dataloaders(validation_data, timestamps_val, batch_size = batch_size, shuffle = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-set_seed(42)
 model = ConvolutionalModel(int(stop-start))
-
 print(f"Total number of parameters: {count_parameters(model)}")
 
-optimizer = torch.optim.AdamW(model.parameters(), lr = lr, weight_decay = 1e-5) 
-
-#Execute train loop
-loss, test, val_loss, val_inf = train_loop_convolutional(model, optimizer, train_loader, val_loader, torch.tensor(TEST[:,:,channel]).float(), EPOCHS = epochs, name = save_name,  save = save) 
-
+optimizer = torch.optim.AdamW(model.parameters(), lr = lr) 
 
 # -------------------------------------------------------------------------
-# ------------------------------ RESULTS ----------------------------------
+# -------------------- FIRST TRAINING LOOP --------------------------------
 # -------------------------------------------------------------------------
 
-# Plot
-plt.plot(np.log10(loss.astype('float32')), label = 'Train loss Detector 0')
-plt.plot(np.log10(val_loss.astype('float32')), label = 'Val loss Detector 0')
+# Execute first loop
+loss_target, val_loss_target = train_loop_convolutional_with_target(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = save_name, save = save) 
+
+# Plot training and validation losses
+plt.plot(np.log10(loss_target.astype('float32')), label = 'Train loss Detector 0')
+plt.plot(np.log10(val_loss_target.astype('float32')), label = 'Val loss Detector 0')
 plt.ylabel('Loss value (log)')
 plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
-plt.hist(test[-1,:], bins = nbins, alpha = 0.5, range = [0, 6], label = 'Detector 0');
+val = np.squeeze(model(torch.tensor(validation_data[:,None,:]).to(device).float()).cpu().detach().numpy())
+plt.plot(timestamps_val, val - timestamps_val, 'b.')
+plt.show()
+
+plt.hist(timestamps_val, bins = 71, alpha = 0.5,  label = 'True timestamps')
+plt.hist(val, bins = 71, alpha = 0.5, label = 'Predicted timestamps')
+plt.legend()
+plt.show()
+
+# -------------------------------------------------------------------------
+# ------------------ CREATE VIRTUAL COINCIDENCES --------------------------
+# -------------------------------------------------------------------------
+
+# Create virtual coincidences
+train, REF_train = create_and_delay_pulse_pair(train_data, time_step, delay_time = delay_time)
+val, REF_val = create_and_delay_pulse_pair(validation_data, time_step, delay_time = delay_time)
+
+# Create Dataloaders
+train_loader = create_dataloaders(train, REF_train, batch_size = batch_size, shuffle = True)
+val_loader = create_dataloaders(val, REF_val, batch_size = batch_size, shuffle = False)
+
+# -------------------------------------------------------------------------
+# ------- USE VIRTUAL COINCIDENCES TO CHECK RESULTS OF FIRST LOOP ---------
+# -------------------------------------------------------------------------
+
+# Make a prediction of virtual coincidences
+test0 = np.squeeze(model(torch.tensor(val[:,None,:,0]).to(device).float()).cpu().detach().numpy())
+test1 = np.squeeze(model(torch.tensor(val[:,None,:,1]).to(device).float()).cpu().detach().numpy())
+
+#plot validation delays hists
+plt.hist(test0 - test1, bins = nbins, range = [-2, 2], alpha = 0.5, label = 'Prediction')
+plt.hist(REF_val, bins = nbins, range = [-2, 2], alpha = 0.5, label = 'Reference')
+plt.legend()
+plt.show()
+
+# Get validation error
+err_val = test0 - test1 - REF_val
+print('MAE validation: ', np.mean(abs(err_val)))
+
+#Plot validation delay vs error
+plt.plot(REF_val, err_val, 'b.', markersize = 1.5)
+plt.xlabel('Validation target delay')
+plt.ylabel('Validation prediction error')
+plt.show()
+
+# -------------------------------------------------------------------------
+# -------------------- SECOND TRAINING LOOP -------------------------------
+# -------------------------------------------------------------------------
+
+# Execute train loop
+loss, test, val_loss, val_inf = train_loop_convolutional(model, optimizer, train_loader, val_loader, torch.tensor(test_data).float(), EPOCHS = epochs2, name = save_name,  save = save) 
+
+# -------------------------------------------------------------------------
+# ------------------- SECOND TRAINING LOOP RESULTS ------------------------
+# -------------------------------------------------------------------------
+
+# Plot
+plt.plot(np.log10(loss.astype('float32')), label = 'Train loss Detector ' + str(channel))
+plt.plot(np.log10(val_loss.astype('float32')), label = 'Val loss Detector ' + str(channel))
+plt.ylabel('Loss value (log)')
+plt.xlabel('Epochs')
+plt.legend()
+plt.show()
+
+plt.hist(test[-1,:], bins = nbins, alpha = 0.5, label = 'Detector ' + str(channel));
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')
 plt.legend()
 plt.show()
-
-# Decompress test positions
-test_55 = test[-1,:test_data_55.shape[0]]
-test_28 = test[-1, test_data_55.shape[0]: test_data_55.shape[0]+ test_data_28.shape[0]]
-test_82 = test[-1, test_data_55.shape[0]+ test_data_28.shape[0]:]
-
-
-# Plot histograms of predictions for the different positions
-plt.hist(test_55, bins = nbins, alpha = 0.5, label = '55')
-plt.hist(test_28, bins = nbins, alpha = 0.5, label = '28')
-plt.hist(test_82, bins = nbins, alpha = 0.5, label = '82')
-plt.title('Prediction times histograms')
-plt.legend()
-plt.show()
-
 
 #plot validation delays hists
 plt.hist(val_inf[-1,:,0] - val_inf[-1,:,1], bins = nbins, alpha = 0.5, label = 'Predicted delays validation')
@@ -140,22 +189,12 @@ plt.show()
 err_val = (val_inf[-1,:,0] - val_inf[-1,:,1]) - REF_val
 print('MAE validation: ', np.mean(abs(err_val)))
 
-#Plot validation delay vs error
-plt.plot(val_inf[-1,:,0] - val_inf[-1,:,1], err_val, 'b.', markersize = 1.5)
-plt.ylabel('Validation Error')
+#Plot target validation delay vs error
+plt.plot(REF_val, err_val, 'b.', markersize = 1.5)
 plt.xlabel('Validation target delay')
+plt.ylabel('Validation prediction error')
 plt.show()
 
-
-# Plot Histogram and gaussian fit 
-plot_gaussian(err_val, 0.0, range = 0.1, label = 'Validation errors', nbins = nbins)
-params, errors = get_gaussian_params(err_val, 0.0, range = 0.1, nbins = nbins)
-print("CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params[2], errors[2], params[3], errors[3]))
-
-plt.legend()
-plt.xlabel('$\epsilon$ (ns)', fontsize = 14)
-plt.ylabel('Counts', fontsize = 14)
-plt.show()
 
 
 
