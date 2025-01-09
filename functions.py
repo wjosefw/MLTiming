@@ -254,6 +254,7 @@ def normalize(data, method = 'standardization'):
             params = (min_vals, max_vals)   
         
         if len(data.shape) == 2:
+            max_vals = np.max(data, axis = 0)
             min_vals = np.min(data, axis = 0)
             normalized_data = (data - min_vals) / (max_vals - min_vals)
             params = (min_vals, max_vals)   
@@ -959,7 +960,7 @@ def extract_signal_along_time_singles(vector, time_step, fraction = 0.2, window_
     for i in range(vector.shape[0]):
         
         # Find indices where the signal in each channel exceeds the fraction threshold
-        index = np.where(vector[i,:] <= fraction)[0][-1]
+        index = np.where(vector[i,:] > fraction)[0][0]
         
         # Calculate the low and high indices to extraction
         index_low = index - window_low
