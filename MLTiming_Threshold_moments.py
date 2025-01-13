@@ -10,7 +10,8 @@ print(device)
 
 from functions import (momentos_threshold, set_seed, calculate_gaussian_center, 
                        normalize, normalize_given_params, plot_gaussian, get_gaussian_params, 
-                       extract_signal_along_time_singles, create_and_delay_pulse_pair_along_time)
+                       extract_signal_along_time_singles, create_and_delay_pulse_pair_along_time,
+                       create_dataloaders)
 from Train_loops import train_loop_KAN
 
 
@@ -42,7 +43,7 @@ normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
 epochs = 500                               # Number of epochs for training
 lr = 1e-3                                  # Model learning rate
-batch_size = 16                            # batch size used for training
+batch_size = 32                            # batch size used for training
 save = False                               # Save models or not
 architecture = [moments_order, 3, 1, 1]   
 fraction = 0.1                             # Fraction to trigger the pulse cropping   
@@ -67,14 +68,14 @@ print('Número de casos de test: ', test_data.shape[0])
 
 
 # Extract pulses
-train_array_dec0, train_time_array_dec0 = extract_signal_along_time_singles(train_data[:,:100,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
-train_array_dec1, train_time_array_dec1 = extract_signal_along_time_singles(train_data[:,:100,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+train_array_dec0, train_time_array_dec0 = extract_signal_along_time_singles(train_data[:,:,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+train_array_dec1, train_time_array_dec1 = extract_signal_along_time_singles(train_data[:,:,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
 
-val_array_dec0, val_time_array_dec0 = extract_signal_along_time_singles(validation_data[:,:100,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
-val_array_dec1, val_time_array_dec1 = extract_signal_along_time_singles(validation_data[:,:100,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+val_array_dec0, val_time_array_dec0 = extract_signal_along_time_singles(validation_data[:,:,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+val_array_dec1, val_time_array_dec1 = extract_signal_along_time_singles(validation_data[:,:,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
 
-test_array_dec0, test_time_array_dec0  = extract_signal_along_time_singles(test_data[:,:100,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
-test_array_dec1, test_time_array_dec1  = extract_signal_along_time_singles(test_data[:,:100,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array_dec0, test_time_array_dec0  = extract_signal_along_time_singles(test_data[:,:,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array_dec1, test_time_array_dec1  = extract_signal_along_time_singles(test_data[:,:,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
 
 # Stack both detectors
 train_array = np.stack((train_array_dec0, train_array_dec1), axis = -1)
@@ -95,7 +96,6 @@ val_dec0, REF_val_dec0, val_time_dec0 = create_and_delay_pulse_pair_along_time(v
 val_dec1, REF_val_dec1, val_time_dec1 = create_and_delay_pulse_pair_along_time(val_array[:,:,1], val_time_array[:,:,1], delay_time = delay_time)
 
 TEST = test_array 
-
 
 # Calculate moments
 M_Train_dec0 = momentos_threshold(train_dec0, time_train_dec0, order = moments_order) 
@@ -126,20 +126,12 @@ M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
 print("Normalization parameters detector 0:", params_dec0)
 print("Normalization parameters detector 1:", params_dec1)
 
-# Create Dataset
-train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
-train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
-
-val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
-val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
-
 # Create DataLoaders
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = batch_size, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = batch_size, shuffle = True)
+train_loader_dec0 = create_dataloaders(M_Train_dec0, REF_train_dec0, batch_size = batch_size, shuffle = True)
+train_loader_dec1 = create_dataloaders(M_Train_dec1, REF_train_dec1, batch_size = batch_size, shuffle = True)
 
-val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
-val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
-
+val_loader_dec0 = create_dataloaders(M_Val_dec0, REF_val_dec0, batch_size = batch_size, shuffle = False)
+val_loader_dec1 = create_dataloaders(M_Val_dec1, REF_val_dec1, batch_size = batch_size, shuffle = False)
 
 
 # -------------------------------------------------------------------------
