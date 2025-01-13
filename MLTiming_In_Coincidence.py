@@ -4,10 +4,11 @@ import matplotlib.pyplot as plt
 import torch
 
 # Import functions
-from functions import (calculate_gaussian_center, plot_gaussian, get_gaussian_params, set_seed)
+from functions import (calculate_gaussian_center, plot_gaussian, get_gaussian_params, 
+                       set_seed, create_dataloaders)
 from Models import ConvolutionalModel, count_parameters
-from Train_loops import train_loop_convolutional
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load data 
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
@@ -16,11 +17,9 @@ train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data'
 train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
 train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
 
-
 validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
 validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
 validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
-
 
 test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
 test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
@@ -79,17 +78,14 @@ class ConvolutionalModel(nn.Module):
 
         return x
 
-def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
+def train_loop_convolutional(model, optimizer, train_loader, val_loader, EPOCHS = 75, name = 'model', save = False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    test_tensor = test_tensor.to(device)
 
     loss_fn = torch.nn.L1Loss()  # Define MAE loss
 
     loss_list = []
     val_loss_list = []
-    test = []
-    val_list = []
 
     # Cosine Annealing Scheduler
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-6)
@@ -130,25 +126,13 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
         # Calculate predictions on test_tensor
         model.eval()
         with torch.no_grad():
-            test_epoch = model(test_tensor[:,None,:,:])
-            test.append(np.squeeze(test_epoch.cpu().numpy()))
-
             val_loss = 0.0
-            val_stack = []  # List to hold val_0 and val_1 pairs
-
+            
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
 
-                mask = val_labels != 0
                 val = model(val_data[:,None,:,:])
-                val_loss += loss_fn(val[mask], val_labels[mask]).item()
-
-                # Stack val predictions along the last dimension
-                val_stack.append(np.stack((np.squeeze(val.cpu().detach().numpy()))))
-
-            # Combine all batches into a single array for this epoch
-            epoch_val = np.concatenate(val_stack, axis=0)
-            val_list.append(epoch_val)
+                val_loss += loss_fn(val, val_labels).item()
 
             val_loss_list.append(val_loss / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
@@ -158,11 +142,9 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
 
     # Convert lists to numpy arrays
     loss_array = np.array(loss_list, dtype='object')
-    test = np.array(test, dtype='object')
     val_loss = np.array(val_loss_list, dtype='object')
-    val = np.array(val_list, dtype='object')
 
-    return loss_array, test, val_loss, val
+    return loss_array, val_loss
 
 
 # -------------------------------------------------------------------------
@@ -170,13 +152,14 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
 # -------------------------------------------------------------------------
 
 time_step = 0.2     # Signal time step in ns
-nbins = 71          # Num bins for all histograms                          
+nbins = 151          # Num bins for all histograms                          
 start = 47 
 stop =  74 
 set_seed(42)        # Fix seeds
 epochs = 500
 lr = 1e-4
 batch_size = 32  
+name = 'predictions/Convolutional/model_dec0'
 save = False
 
 # -------------------------------------------------------------------------
@@ -214,13 +197,9 @@ test_data = np.transpose(test_data, axes=(0, 2, 1))
 
 print(train_data.shape)
 
-# Create Dataset / DataLoaders
-train_dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_data).float(), torch.from_numpy(np.expand_dims(REF_train, axis = -1)).float())
-val_dataset = torch.utils.data.TensorDataset(torch.from_numpy(validation_data).float(), torch.from_numpy(np.expand_dims(REF_val, axis = -1)).float())
-
-
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size = len(val_dataset), shuffle = False)
+# Create Dataloaders
+train_loader = create_dataloaders(train_data, REF_train, batch_size = batch_size, shuffle = True)
+val_loader = create_dataloaders(validation_data, REF_val, batch_size = batch_size, shuffle = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
@@ -232,45 +211,34 @@ print(f"Total number of parameters: {count_parameters(model)}")
 
 optimizer = torch.optim.AdamW(model.parameters(), lr = lr, weight_decay = 1e-5) 
 
-
-#Execute train loop
-loss, test, val_loss, val = train_loop_convolutional(model, optimizer, train_loader, val_loader, torch.tensor(test_data).float(), EPOCHS = epochs, name = 'predictions/Convolutional/model_dec0',  save = save) 
+# Execute train loop
+loss, val_loss = train_loop_convolutional(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = name,  save = save) 
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
 # Calculate TOF
+test =  np.squeeze(model(torch.tensor(test_data[:,None,:,:]).to(device).float()).cpu().detach().numpy())
 
-TOF_V00 = test[:,:test_data_55.shape[0]] 
-TOF_V02 = test[:, test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
-TOF_V20 = test[:, test_data_55.shape[0]  + test_data_28.shape[0]:] 
+TOF_V00 = test[:test_data_55.shape[0]] 
+TOF_V02 = test[ test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
+TOF_V20 = test[ test_data_55.shape[0]  + test_data_28.shape[0]:] 
     
-
 # Calulate Validation error
-centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
+centroid_V00 = calculate_gaussian_center(TOF_V00[None,:], nbins = nbins, limits = 3) 
     
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + 0.2))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
 error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - 0.2))
-
 
 # Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00),  axis = 1)  
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
 
-
 # Plot
-plt.figure(figsize = (20,5))
-plt.subplot(121)
-plt.plot(np.log10(MAE.astype('float64')), label = 'MAE')
-plt.title('Results in coincidence')
-plt.xlabel('Epochs')
-plt.ylabel('Log10')
-plt.legend()
-
-plt.subplot(122)
+plt.figure(figsize = (6,4))
 plt.plot(np.log10(loss.astype('float32')), label = 'Log Training loss')
 plt.plot(np.log10(val_loss.astype('float32')), label = 'Log Validation loss')
 plt.ylabel('Logarithmic losses')
@@ -278,27 +246,21 @@ plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
-
 # Histogram and gaussian fit 
-plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.25, label = '-0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.25, label = ' 0.0 ns offset', nbins = nbins)
-plot_gaussian(TOF_V20[-1,:], centroid_V00[-1], range = 0.25, label = ' 0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_V02, centroid_V00, range = 0.25, label = '-0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_V00, centroid_V00, range = 0.25, label = ' 0.0 ns offset', nbins = nbins)
+plot_gaussian(TOF_V20, centroid_V00, range = 0.25, label = ' 0.2 ns offset', nbins = nbins)
 
-
-params_V02, errors_V02 = get_gaussian_params(TOF_V02[-1,:], centroid_V00[-1], range = 0.25, nbins = nbins)
-params_V00, errors_V00 = get_gaussian_params(TOF_V00[-1,:], centroid_V00[-1], range = 0.25, nbins = nbins)
-params_V20, errors_V20 = get_gaussian_params(TOF_V20[-1,:], centroid_V00[-1], range = 0.25, nbins = nbins)
-
+params_V02, errors_V02 = get_gaussian_params(TOF_V02, centroid_V00, range = 0.25, nbins = nbins)
+params_V00, errors_V00 = get_gaussian_params(TOF_V00, centroid_V00, range = 0.25, nbins = nbins)
+params_V20, errors_V20 = get_gaussian_params(TOF_V20, centroid_V00, range = 0.25, nbins = nbins)
 
 print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
 print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
 print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-
 
 print('')
 plt.legend()
 plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
-
-
