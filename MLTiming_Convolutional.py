@@ -34,10 +34,10 @@ delay_time = 1      # Max delay to training pulses in ns
 time_step = 0.2     # Signal time step in ns
 nbins = 71          # Num bins for all histograms                          
 positions = [-0.2, 0.0, 0.2] # Expected time difference of each position
-start = 47 
+start = 50 
 stop =  74 
 set_seed(42)        # Fix seeds
-epochs = 500
+epochs = 100
 lr = 1e-4
 batch_size = 32  
 save = True
@@ -128,14 +128,16 @@ Error = np.concatenate((error_V02, error_V20, error_V00),  axis = 1)
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
 
-#centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
-#centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3) 
-#centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3)
-#
-#error_V20_centroid = abs(centroid_V20 - 0.2)
-#error_V02_centroid = abs(centroid_V02 + 0.2)
-#
-#avg_bias = np.mean(np.stack((error_V20_centroid , error_V02_centroid), axis = -1), axis = 1)
+centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
+centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3) 
+centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3)
+
+error_V20_centroid = abs(centroid_V20 - 0.2)
+error_V02_centroid = abs(centroid_V02 + 0.2)
+
+avg_bias = np.mean(np.stack((error_V20_centroid , error_V02_centroid), axis = -1), axis = 1)
+
+
 #Plot MAE_singles vs MAE_coincidences
 #err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
 #err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
@@ -147,9 +149,36 @@ print(MAE[-1])
 #np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/avg_bias.npz', data = avg_bias)
 
 # Plot
+#plt.figure(figsize = (20,5))
+#plt.subplot(131)
+#plt.plot(np.log10(MAE.astype('float64')), label = 'MAE')
+#plt.title('Results in coincidence')
+#plt.xlabel('Epochs')
+#plt.ylabel('Log10')
+#plt.legend()
+#
+#plt.subplot(132)
+#plt.hist(test_dec0[-1,:], bins = nbins, range = [-2, 5], alpha = 0.5, label = 'Detector 0');
+#plt.hist(test_dec1[-1,:], bins = nbins, range = [-2, 5], alpha = 0.5, label = 'Detector 1');
+#plt.title('Single detector prediction histograms')
+#plt.xlabel('time (ns)')
+#plt.ylabel('Counts')
+#plt.legend()
+#
+#plt.subplot(133)
+#plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Log Training loss Detector 0')
+#plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Log Training loss Detector 1')
+#plt.plot(np.log10(val_loss_dec0.astype('float32')), label = 'Log Validation loss Detector 0')
+#plt.plot(np.log10(val_loss_dec1.astype('float32')), label = 'Log Validation loss Detector 1')
+#plt.ylabel('Logarithmic losses')
+#plt.xlabel('Epochs')
+#plt.legend()
+#plt.show()
+
+# Plot
 plt.figure(figsize = (20,5))
 plt.subplot(131)
-plt.plot(np.log10(MAE.astype('float64')), label = 'MAE')
+plt.plot(MAE, label = 'MAE')
 plt.title('Results in coincidence')
 plt.xlabel('Epochs')
 plt.ylabel('Log10')
@@ -164,15 +193,17 @@ plt.ylabel('Counts')
 plt.legend()
 
 plt.subplot(133)
-plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Log Training loss Detector 0')
-plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Log Training loss Detector 1')
-plt.plot(np.log10(val_loss_dec0.astype('float32')), label = 'Log Validation loss Detector 0')
-plt.plot(np.log10(val_loss_dec1.astype('float32')), label = 'Log Validation loss Detector 1')
+plt.plot(loss_dec0, label = 'Log Training loss Detector 0')
+plt.plot(loss_dec1, label = 'Log Training loss Detector 1')
+plt.plot(val_loss_dec0, label = 'Log Validation loss Detector 0')
+plt.plot(val_loss_dec1, label = 'Log Validation loss Detector 1')
 plt.ylabel('Logarithmic losses')
 plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
+plt.plot(abs(val_loss_dec0 - val_loss_dec1), MAE, 'b.')
+plt.show()
 
 # Histogram and gaussian fit 
 plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
@@ -196,6 +227,28 @@ plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
+a = np.where(MAE == np.min(MAE))[0][0]
+# Histogram and gaussian fit 
+plot_gaussian(TOF_V02[a,:], centroid_V00[a], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_V00[a,:], centroid_V00[a], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
+plot_gaussian(TOF_V20[a,:], centroid_V00[a], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
+
+
+params_V02, errors_V02 = get_gaussian_params(TOF_V02[a,:], centroid_V00[a], range = 0.8, nbins = nbins)
+params_V00, errors_V00 = get_gaussian_params(TOF_V00[a,:], centroid_V00[a], range = 0.8, nbins = nbins)
+params_V20, errors_V20 = get_gaussian_params(TOF_V20[a,:], centroid_V00[a], range = 0.8, nbins = nbins)
+
+
+print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
+print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
+print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
+
+
+print('')
+plt.legend()
+plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
+plt.ylabel('Counts', fontsize = 14)
+plt.show()
 
 #CTR = []
 #for i in range(epochs):
@@ -203,7 +256,8 @@ plt.show()
 #    params_V00, errors_V00 = get_gaussian_params(TOF_V00[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
 #    params_V20, errors_V20 = get_gaussian_params(TOF_V20[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
 #    CTR.append(np.mean([params_V20[3],params_V00[3],params_V02[3]]))
-#
+
+
 #np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/ctr.npz', data = np.array(CTR))
 
 ### Combine the two numbers
