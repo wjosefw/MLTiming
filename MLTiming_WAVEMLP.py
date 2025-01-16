@@ -7,7 +7,7 @@ print(device)
 
 # Import functions
 from functions import (create_and_delay_pulse_pair, set_seed, plot_gaussian, 
-                       get_gaussian_params, calculate_gaussian_center)
+                       get_gaussian_params, calculate_gaussian_center, create_dataloaders)
 from Models import MLP_Torch, count_parameters
 from Train_loops import train_loop_MLP
 
@@ -37,14 +37,14 @@ delay_time = 1                        # Max delay to training pulses in ns
 time_step = 0.2                       # Signal time step in ns
 set_seed(42)                          # Fix seeds
 nbins = 71                            # Num bins for all histograms                   
-t_shift = 1                           # Time steps to move for the new positions
+positions = [-0.2, 0.0, 0.2]          # Expected time difference of each position
 normalization_method = 'standardization'
-start = 47
+start = 50
 stop = 74
 lr = 1e-4
-epochs = 500
+epochs = 100
 batch_size = 32
-Num_Neurons = 8
+Num_Neurons = 16
 save = True
 
 
@@ -68,7 +68,6 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-
 train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(train_data[:,:,0], time_step, delay_time = delay_time)
 train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time_step, delay_time = delay_time)
 
@@ -78,19 +77,12 @@ val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], tim
 # Test set
 TEST = test_data 
 
-# Create Datasets/Dataloaders
-train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
-train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
+# Create Dataloaders
+train_loader_dec0 = create_dataloaders(train_dec0, REF_train_dec0, batch_size = batch_size, shuffle = True)
+train_loader_dec1 = create_dataloaders(train_dec1, REF_train_dec1, batch_size = batch_size, shuffle = True)
 
-val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
-val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
-
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = batch_size, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = batch_size, shuffle = True)
-
-val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
-val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
-
+val_loader_dec0 = create_dataloaders(val_dec0, REF_val_dec0, batch_size = batch_size, shuffle = False)
+val_loader_dec1 = create_dataloaders(val_dec1, REF_val_dec1, batch_size = batch_size, shuffle = False)
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
@@ -119,14 +111,12 @@ TOF_V00 = TOF[:,:test_data_55.shape[0]]
 TOF_V02 = TOF[:, test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
 TOF_V20 = TOF[:, test_data_55.shape[0]  + test_data_28.shape[0]:] 
     
-
 # Calulate Test error
 centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 5) 
 
-error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] + time_step*t_shift))
-error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis]))
-error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - time_step*t_shift))
-
+error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[0]))
+error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
+error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - positions[2]))
 
 #Get MAE
 Error = np.concatenate((error_V02, error_V20, error_V00), axis = 1)  
@@ -158,22 +148,19 @@ plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
-  
+
 # Histogram and gaussian fit 
 plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
 plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
 plot_gaussian(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
 
-
 params_V02, errors_V02 = get_gaussian_params(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V00, errors_V00 = get_gaussian_params(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 params_V20, errors_V20 = get_gaussian_params(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 
-
 print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
 print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
 print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-
 
 print('')
 plt.legend()
