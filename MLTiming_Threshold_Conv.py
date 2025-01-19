@@ -220,22 +220,3 @@ plt.legend()
 plt.xlabel('$\Delta t$ (ns)')
 plt.ylabel('Counts')
 plt.show()
-
-#import time
-#
-#time_test = np.tile(train_dec0[0,:,:], (1000000, 1,1))
-#
-#time_list_inference = []
-## Start timer inference
-#for i in range(10):
-#    start_time_inference= time.time()
-#    with torch.no_grad():
-#        assert not torch.is_grad_enabled()
-#        output_time_test = model_dec0(torch.tensor(M_time_test[:,:,0]).float().to(device))
-#    end_time_inference = time.time()
-#    elapsed_time_inference = end_time_inference - start_time_inference
-#    time_list_inference.append(elapsed_time_inference)
-#time_array_inference = np.array(time_list_inference)
-#
-#print('Elapsed time momentos:', np.mean(time_array_moments), np.std(time_array_moments))
-#print('Elapsed time inference:', np.mean(time_array_inference), np.std(time_array_inference))
