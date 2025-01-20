@@ -1031,3 +1031,32 @@ def create_dataloaders(input, target, batch_size = 32, shuffle = True):
   dataset = torch.utils.data.TensorDataset(torch.from_numpy(input).float(), torch.from_numpy(np.expand_dims(target, axis = -1)).float())
   dataloader = torch.utils.data.DataLoader(dataset, batch_size = batch_size, shuffle = shuffle)
   return dataloader
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+
+def get_mean_pulse_from_set(pulse_set, channel = 0):
+    """
+    Calculate the mean pulse from a set of pulses using Fourier transforms.
+
+    Parameters:
+    pulse_set (array-like): The input set of pulses. Expected shape is (num_pulses, pulse_length, num_channels).
+    channel (int, optional): The channel of the pulses to use for calculation. Default is 0.
+
+    Returns:
+    array-like: The mean pulse calculated from the set of pulses.
+    """
+    transforms = []
+    
+    for i in range(pulse_set.shape[0]):
+        fourier_transform = np.fft.fft(pulse_set[i, :, channel])
+        transforms.append(fourier_transform)
+    
+    transforms = np.array(transforms, dtype='object')
+    sum_of_transf = np.sum(transforms, axis = 0)
+    reconstructed_signal = np.fft.ifft(sum_of_transf)
+    normalized_reconstructed_signal = reconstructed_signal / np.max(reconstructed_signal)
+    mean_pulse = np.real(normalized_reconstructed_signal)
+  
+    return mean_pulse
