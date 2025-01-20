@@ -8,8 +8,6 @@ from functions import (momentos_threshold, normalize_given_params,
                        calculate_gaussian_center, plot_gaussian, get_gaussian_params,
                        extract_signal_along_time_singles, set_seed)
 
-
-
 #Load data
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
 test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
@@ -24,10 +22,10 @@ print('Número de casos de test: ', test_data.shape[0])
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-moments_order = 7                         # Order of moments used
+moments_order = 3                         # Order of moments used
 set_seed(42)                               # Fix seeds
 nbins = 71                                # Num bins for all histograms
-normalization_method = 'standardization'
+normalization_method = 'min-max'
 time_step = 0.2                            # Signal time step in ns
 architecture = [moments_order, 3, 1, 1]   
 fraction = 0.1                             # Fraction to trigger the pulse cropping   
@@ -40,27 +38,30 @@ positions = np.array([-0.2, 0.0, 0.2])
 # ------------------------ PREPROCESS DATA --------------------------------
 # -------------------------------------------------------------------------
 
-test_array_dec0, test_time_array_dec0 = extract_signal_along_time_singles(test_data[:,:100,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
-test_array_dec1, test_time_array_dec1 = extract_signal_along_time_singles(test_data[:,:100,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array_dec0, test_time_array_dec0 = extract_signal_along_time_singles(test_data[:,:,0], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
+test_array_dec1, test_time_array_dec1 = extract_signal_along_time_singles(test_data[:,:,1], time_step, fraction = fraction, window_low = window_low, window_high = window_high)
 
 test_array = np.stack((test_array_dec0, test_array_dec1), axis = -1)
 test_time_array = np.stack((test_time_array_dec0, test_time_array_dec1), axis = -1)
 
-## Calculate moments 
-MOMENTS_TEST = momentos_threshold(test_array, test_time_array, order = moments_order)
+# Calculate moments 
+M_Test = momentos_threshold(test_array, test_time_array, order = moments_order)
 
-params_dec0 = (np.array([3.09991389e+00, 4.63085059e+01, 6.92581996e+02, 1.03715011e+04,
-       1.55529650e+05, 2.33567496e+06, 3.51281042e+07]), np.array([2.16221785e-01, 3.46893863e+00, 5.92896327e+01, 1.03886921e+03,
-       1.82331281e+04, 3.17505692e+05, 5.47156791e+06]))
+#params_dec0 = (np.array([2.49006424e+00, 3.69086747e+01, 5.47651140e+02, 7.35277735e+03,
+#       9.38157278e+04, 1.19932386e+06, 1.53605323e+07]), np.array([4.54540675e+00, 7.19073970e+01, 1.15883398e+03, 1.86954970e+04,
+#       3.01945943e+05, 4.88202499e+06, 7.90218242e+07]))
+#
+#
+#params_dec1 = (np.array([2.60473954e+00, 3.55232148e+01, 3.30786391e+02, 3.09120845e+03,
+#       2.89878868e+04, 2.72743634e+05, 2.57438541e+06]), np.array([4.76085984e+00, 7.35929604e+01, 1.20196527e+03, 1.96502931e+04,
+#       3.21572618e+05, 5.26777479e+06, 8.63801267e+07]))
 
-params_dec1 = (np.array([3.09495111e+00, 4.66087007e+01, 7.02612076e+02, 1.06039732e+04,
-       1.60241230e+05, 2.42473896e+06, 3.67418671e+07]), np.array([2.31959436e-01, 3.79617696e+00, 6.52555929e+01, 1.14135496e+03,
-       1.99603585e+04, 3.46564142e+05, 5.96232795e+06]))
+params_dec0 = (np.array([   93815.72779932,  1199323.85888984, 15360532.26677727]), np.array([  301945.94267104,  4882024.9896586 , 79021824.17482163]))
+params_dec1 = (np.array([  28987.88680182,  272743.63431606, 2574385.40817853]), np.array([  321572.61849044,  5267774.79285711, 86380126.65519048]))
 
-
-MOMENTS_TEST_norm_dec0 = normalize_given_params(MOMENTS_TEST, params_dec0, channel = 0, method = normalization_method)
-MOMENTS_TEST_norm_dec1 = normalize_given_params(MOMENTS_TEST, params_dec1, channel = 1, method = normalization_method)
-MOMENTS_TEST = np.stack((MOMENTS_TEST_norm_dec0, MOMENTS_TEST_norm_dec1), axis = -1)
+M_Test_norm_dec0 = normalize_given_params(M_Test, params_dec0, channel = 0, method = normalization_method)
+M_Test_norm_dec1 = normalize_given_params(M_Test, params_dec1, channel = 1, method = normalization_method)
+M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
 
 
 # -------------------------------------------------------------------------
@@ -83,8 +84,8 @@ model_dec1.load_state_dict(torch.load(model_dec1_dir))
 #--------------------------- GET RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-test_dec0 = np.squeeze(model_dec0(torch.tensor(MOMENTS_TEST[:,:,0]).float()).detach().numpy())
-test_dec1 = np.squeeze(model_dec1(torch.tensor(MOMENTS_TEST[:,:,1]).float()).detach().numpy())
+test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
+test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
 
 # Calculate TOF
 TOF = test_dec0 - test_dec1

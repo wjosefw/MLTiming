@@ -11,7 +11,7 @@ print(device)
 # Import functions 
 from functions import (move_to_reference, create_and_delay_pulse_pair, 
                        set_seed, create_dataloaders, calculate_gaussian_center, 
-                       plot_gaussian, get_gaussian_params)
+                       plot_gaussian, get_gaussian_params, get_mean_pulse_from_set)
 from Models import ConvolutionalModel,  count_parameters
 from Train_loops import train_loop_convolutional
 
@@ -34,17 +34,17 @@ test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 0.75           # Max delay to training pulses in ns
-time_step = 0.2          # Signal time step in ns
-set_seed(42)             # Fix seeds
-nbins = 71               # Num bins for all histograms
+delay_time = 1            # Max delay to training pulses in ns
+time_step = 0.2              # Signal time step in ns
+set_seed(42)                 # Fix seeds
+nbins = 71                   # Num bins for all histograms
 positions = [-0.2, 0.0, 0.2] # Expected time difference of each position
 normalization_method = 'standardization'
 start = 60
 stop = 74
-lr = 5e-5
-epochs = 1000
-batch_size = 128 
+lr = 1e-5
+epochs = 500
+batch_size = 32 
 save = False
 
 # -------------------------------------------------------------------------
@@ -62,8 +62,8 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-mean_pulse_dec0 = train_data[0,:,0]
-mean_pulse_dec1 = train_data[0,:,1]
+mean_pulse_dec0 = get_mean_pulse_from_set(train_data, channel = 0)
+mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
 
 # Train/Validation/Test set
 delays_dec0, moved_pulses_dec0 = move_to_reference(mean_pulse_dec0, train_data, start = start, stop = stop, max_delay = int(stop-start), channel = 0)
@@ -177,3 +177,32 @@ plt.legend()
 plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
+
+centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
+centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3) 
+centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3)
+
+error_V20_centroid = abs(centroid_V20 - 0.2)
+error_V02_centroid = abs(centroid_V02 + 0.2)
+
+avg_bias = np.mean(np.stack((error_V20_centroid , error_V02_centroid), axis = -1), axis = 1)
+
+
+#Plot MAE_singles vs MAE_coincidences
+err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
+err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
+mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
+mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec0_Na22.npz', data = mean_err_val_dec0)
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec1_Na22.npz', data = mean_err_val_dec1)
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/MAE_Na22.npz', data = MAE)
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/avg_bias.npz', data = avg_bias)
+
+CTR = []
+for i in range(epochs):
+    params_V02, errors_V02 = get_gaussian_params(TOF_V02[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+    params_V00, errors_V00 = get_gaussian_params(TOF_V00[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+    params_V20, errors_V20 = get_gaussian_params(TOF_V20[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+    CTR.append(np.mean([params_V20[3],params_V00[3],params_V02[3]]))
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/ctr.npz', data = np.array(CTR))
+

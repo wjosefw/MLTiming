@@ -21,22 +21,19 @@ train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data'
 train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
 train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
 
-
 validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
 validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
 validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
-
 
 test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
 test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
 test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 
-
 # -------------------------------------------------------------------------
 # ----------------------- IMPORTANT DEFINITIONS ---------------------------
 # -------------------------------------------------------------------------
 
-channel = 1                                # Channel to train
+channel = 0                                # Channel to train
 delay_time = 1                             # Max delay to training pulses in ns
 set_seed(42)                               # Fix seeds
 nbins = 71                                 # Num bins for all histograms
@@ -47,7 +44,7 @@ epochs = 500                               # Number of epochs for training (firs
 epochs2 = 500                              # Number of epochs for training (second loop) 
 lr = 1e-3                                  # Model learning rate
 batch_size = 32                            # batch size used for training
-save = True                                # Save models or not
+save = False                               # Save models or not
 save_name = 'predictions/Convolutional/Conv_model_dec' + str(channel)
 fraction_cfd = 0.064                       # Fraction for CFD 
 shift = 6.8                                # Shift for CFD 

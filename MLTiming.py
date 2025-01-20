@@ -7,7 +7,8 @@ from efficient_kan.src.efficient_kan import KAN
 
 from functions import (momentos, create_and_delay_pulse_pair,
                        set_seed, calculate_gaussian_center, normalize, 
-                       normalize_given_params, plot_gaussian, get_gaussian_params)
+                       normalize_given_params, plot_gaussian, get_gaussian_params,
+                       create_dataloaders)
 from Models import MLP_Torch,  count_parameters
 from Train_loops import train_loop_MLP, train_loop_KAN
 
@@ -22,11 +23,9 @@ train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data'
 train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
 train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
 
-
 validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
 validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
 validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
-
 
 test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
 test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
@@ -41,16 +40,16 @@ time_step = 0.2                       # Signal time step in ns
 moments_order = int(sys.argv[1])      # Max order of moments used
 set_seed(42)                          # Fix seeds
 nbins = 71                            # Num bins for all histograms                   
-positions = [-0.2, 0.0, 0.2] # Expected time difference of each position
+positions = [-0.2, 0.0, 0.2]          # Expected time difference of each position
 normalization_method = 'standardization'
-start = 50
+start = 60
 stop = 74
-lr = 1e-4
+lr = 1e-3
 epochs = 100
 batch_size = 32
 Num_Neurons = 16
 architecture = [moments_order, int(sys.argv[2]), 1, 1]    # KAN architecture
-save = True
+save = False
 
 
 # -------------------------------------------------------------------------
@@ -78,9 +77,6 @@ train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(train_data[:,:,1], time
 val_dec0, REF_val_dec0 = create_and_delay_pulse_pair(validation_data[:,:,0], time_step, delay_time = delay_time)
 val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(validation_data[:,:,1], time_step, delay_time = delay_time)
 
-TEST = test_data
-
-
 # Calculate moments 
 M_Train_dec0 = momentos(train_dec0, order = moments_order) 
 M_Train_dec1 = momentos(train_dec1, order = moments_order) 
@@ -88,7 +84,7 @@ M_Train_dec1 = momentos(train_dec1, order = moments_order)
 M_Val_dec0 = momentos(val_dec0, order = moments_order) 
 M_Val_dec1 = momentos(val_dec1, order = moments_order) 
 
-M_Test = momentos(TEST, order = moments_order)
+M_Test = momentos(test_data, order = moments_order)
 
 # Normalize moments
 M_Train_dec0, params_dec0 =  normalize(M_Train_dec0, method = normalization_method)
@@ -106,19 +102,12 @@ M_Test_norm_dec0 = normalize_given_params(M_Test, params_dec0, channel = 0, meth
 M_Test_norm_dec1 = normalize_given_params(M_Test, params_dec1, channel = 1, method = normalization_method)
 M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
 
+# Create Dataloaders
+train_loader_dec0 = create_dataloaders(M_Train_dec0, REF_train_dec0, batch_size = batch_size, shuffle = True)
+train_loader_dec1 = create_dataloaders(M_Train_dec1, REF_train_dec1, batch_size = batch_size, shuffle = True)
 
-# Create Datasets/Dataloaders
-train_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec0).float(), torch.from_numpy(np.expand_dims(REF_train_dec0, axis = -1)).float())
-train_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Train_dec1).float(), torch.from_numpy(np.expand_dims(REF_train_dec1, axis = -1)).float())
-
-val_dataset_dec0 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec0).float(), torch.from_numpy(np.expand_dims(REF_val_dec0, axis = -1)).float())
-val_dataset_dec1 = torch.utils.data.TensorDataset(torch.from_numpy(M_Val_dec1).float(), torch.from_numpy(np.expand_dims(REF_val_dec1, axis = -1)).float())
-
-train_loader_dec0 = torch.utils.data.DataLoader(train_dataset_dec0, batch_size = batch_size, shuffle = True)
-train_loader_dec1 = torch.utils.data.DataLoader(train_dataset_dec1, batch_size = batch_size, shuffle = True)
-
-val_loader_dec0 = torch.utils.data.DataLoader(val_dataset_dec0, batch_size = len(val_dataset_dec0), shuffle = False)
-val_loader_dec1 = torch.utils.data.DataLoader(val_dataset_dec1, batch_size = len(val_dataset_dec1), shuffle = False)
+val_loader_dec0  = create_dataloaders(M_Val_dec0, REF_val_dec0, batch_size = batch_size, shuffle = False)
+val_loader_dec1  = create_dataloaders(M_Val_dec1, REF_val_dec1, batch_size = batch_size, shuffle = False)
 
 # Print information 
 print("Normalization parameters detector 0:", params_dec0)
@@ -194,9 +183,7 @@ plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Train loss Detector 1')
 plt.title('Training loss')
 plt.xlabel('Epochs')
 plt.legend()
-plt.show()
-
-
+#plt.show()
 
 # Histogram and gaussian fit 
 plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
@@ -218,7 +205,36 @@ print('')
 plt.legend()
 plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
-plt.show()
+#plt.show()
+
+#centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
+#centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3) 
+#centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3)
+#
+#error_V20_centroid = abs(centroid_V20 - 0.2)
+#error_V02_centroid = abs(centroid_V02 + 0.2)
+#
+#avg_bias = np.mean(np.stack((error_V20_centroid , error_V02_centroid), axis = -1), axis = 1)
+#
+#
+##Plot MAE_singles vs MAE_coincidences
+#
+#err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
+#err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
+#mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
+#mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec0_Na22.npz', data = mean_err_val_dec0)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec1_Na22.npz', data = mean_err_val_dec1)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/MAE_Na22.npz', data = MAE)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/avg_bias.npz', data = avg_bias)
+#CTR = []
+#for i in range(epochs):
+#    params_V02, errors_V02 = get_gaussian_params(TOF_V02[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    params_V00, errors_V00 = get_gaussian_params(TOF_V00[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    params_V20, errors_V20 = get_gaussian_params(TOF_V20[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    CTR.append(np.mean([params_V20[3],params_V00[3],params_V02[3]]))
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/ctr.npz', data = np.array(CTR))
+
 
 ### Combine the two numbers
 #num = f"{sys.argv[1]}{sys.argv[2]}"
@@ -245,3 +261,4 @@ plt.show()
 #    file.write(f"centroid_err_{num} = np.array([{', '.join(f'{v:.1f}' for v in centroid_err)}])  # ps\n")
 #    file.write(f"MAE_{num} = {MAE[-1]:.7f}  # ps\n")  # Write MAE with one decima
 #    file.write("\n")  # Add a new line for better separation
+

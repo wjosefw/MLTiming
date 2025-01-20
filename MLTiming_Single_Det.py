@@ -34,23 +34,23 @@ test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 # ----------------------- IMPORTANT DEFINITIONS ---------------------------
 # -------------------------------------------------------------------------
 
-channel = 0                                # Channel to train
+channel = 1                                # Channel to train
 delay_time = 1                             # Max delay to training pulses in ns
-moments_order = 7                          # Order of moments used
+moments_order = 15                          # Order of moments used
 set_seed(42)                               # Fix seeds
 nbins = 71                                 # Num bins for all histograms
-normalization_method = 'standardization'
+normalization_method = 'min-max'
 time_step = 0.2                            # Signal time step in ns
-epochs = 500                               # Number of epochs for training (first loop)
+epochs = 50                               # Number of epochs for training (first loop)
 epochs2 = 0                                # Number of epochs for training (second loop)
 lr = 1e-3                                  # Model learning rate
 batch_size = 32                            # batch size used for training 
 save = True                                # Save models or not
 save_name = 'KAN_models/model_dec' + str(channel)
 architecture = [moments_order, 3, 1, 1]   
-fraction_pc = 0.1                          # Fraction to trigger the pulse cropping 
 fraction_cfd = 0.064                       # Fraction for CFD 
 shift = 6.8                                # Shift for CFD 
+fraction_pc = 0.1                          # Fraction to trigger the pulse cropping 
 window_low = 14                            # Number of steps to take before trigger
 window_high = 10                           # Number of steps to take after trigger
 
@@ -74,6 +74,7 @@ print('Número de casos de test: ', test_data.shape[0])
 timestamps_train = Calculate_CFD(train_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
 timestamps_val = Calculate_CFD(validation_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
 timestamps_test = Calculate_CFD(test_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
+
 
 # -------------------------------------------------------------------------
 # ----------------- PREPARE DATA FOR FIRST LOOP ---------------------------
@@ -126,6 +127,12 @@ plt.show()
 
 val = np.squeeze(model(torch.tensor(M_Val).to(device).float()).cpu().detach().numpy())
 plt.plot(timestamps_val, val - timestamps_val, 'b.')
+plt.show()
+
+
+plt.hist(timestamps_val, bins = 71, alpha = 0.5,  label = 'True timestamps')
+plt.hist(val, bins = 71, alpha = 0.5, label = 'Predicted timestamps')
+plt.legend()
 plt.show()
 
 # -------------------------------------------------------------------------
@@ -182,8 +189,7 @@ plt.show()
 # -------------------------------------------------------------------------
 
 # Execute second train loop using the previously created virtual coincidences
-#loss, val_loss, test, val = train_loop_KAN(model, optimizer, train_loader, val_loader, torch.tensor(M_Test).float(), EPOCHS = epochs2, name = save_name, save = save) 
-
+loss, val_loss, test, val = train_loop_KAN(model, optimizer, train_loader, val_loader, torch.tensor(M_Test).float(), EPOCHS = epochs2, name = save_name, save = save) 
 
 # -------------------------------------------------------------------------
 # ------------------- SECOND TRAINING LOOP RESULTS ------------------------
