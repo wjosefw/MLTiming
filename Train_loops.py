@@ -21,11 +21,11 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     test = []
     val_list = []
 
-    # Define loss function
-    loss_fn = custom_loss_with_huber  
+    # Define loss function 
+    loss_fn = custom_loss_MSE  
 
     # Cosine Annealing Scheduler
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
+    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
     
     for epoch in range(EPOCHS):
         running_loss = 0.0
@@ -53,7 +53,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
             running_loss += loss.item()
 
         # Step the scheduler
-        scheduler.step()
+        #scheduler.step()
 
         # Calculate average loss per epoch
         avg_loss_epoch = running_loss / len(train_loader)  
@@ -72,11 +72,10 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
 
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
-                
-                mask = val_labels != 0 
+                 
                 val_0 = model(val_data[:, None, :, 0])
                 val_1 = model(val_data[:, None, :, 1])
-                val_loss += loss_fn(val_0[mask], val_1[mask], val_labels[mask]).item()
+                val_loss += loss_fn(val_0, val_1, val_labels).item()
         
                 # Stack val_0 and val_1 along the last dimension
                 val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
@@ -158,9 +157,8 @@ def train_loop_convolutional_with_target(model, optimizer, train_loader, val_loa
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
                 
-                mask = val_labels != 0 
                 val = model(val_data[:, None, :])
-                val_loss += loss_fn(val[mask], val_labels[mask]).item()
+                val_loss += loss_fn(val, val_labels).item()
     
         
             val_loss_list.append(val_loss / len(val_loader))
@@ -192,10 +190,10 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
     test = []
 
     # Define loss function
-    loss_fn = custom_loss_with_huber  
+    loss_fn = custom_loss_MSE
 
     # Cosine Annealing Scheduler
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS)
+    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS)
 
     for epoch in range(EPOCHS):
         running_loss = 0.0
@@ -224,7 +222,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
             running_loss += loss.item()
 
         # Step the scheduler
-        scheduler.step()
+        #scheduler.step()
 
         # Calculate average loss per epoch
         avg_loss_epoch = running_loss / int(i)  # loss per batch
@@ -266,13 +264,13 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
     val_loss_list = []
     test = []
     val = []  
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
+    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     
     # Define loss function
-    loss_fn = custom_loss_with_huber  
+    loss_fn = custom_loss_MSE 
 
     # Move model and test_tensor to the device
     model = model.to(device)
@@ -295,7 +293,7 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
 
             running_loss += loss.item()
 
-        scheduler.step()
+        #scheduler.step()
         loss_list.append(running_loss / len(train_loader))
 
         print(f'EPOCH {epoch + 1}:')
@@ -460,7 +458,7 @@ def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loade
     loss_fn = custom_loss_with_huber  
 
     # Cosine Annealing Scheduler
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
+    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
 
     for epoch in range(EPOCHS):
         running_loss = 0.0
@@ -487,7 +485,7 @@ def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loade
             running_loss += loss.item()
 
         # Step the scheduler
-        scheduler.step()
+        #scheduler.step()
 
         # Calculate average loss per epoch
         avg_loss_epoch = running_loss / len(train_loader)  
@@ -504,10 +502,10 @@ def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loade
             val_loss = 0.0
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
-                mask = val_labels != 0 
+                 
                 val_0 = model(val_data[:, None, :, :, 0])
                 val_1 = model(val_data[:, None, :, :, 1])
-                val_loss += loss_fn(val_0[mask], val_1[mask], val_labels[mask]).item()
+                val_loss += loss_fn(val_0, val_1, val_labels).item()
         val_loss_list.append(val_loss / len(val_loader))
         print(f'LOSS val {val_loss / len(val_loader)}')
 
