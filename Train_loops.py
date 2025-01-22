@@ -188,6 +188,7 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
     loss_list = []
     val_loss_list = []
     test = []
+    val = []  
 
     # Define loss function
     loss_fn = custom_loss_MSE
@@ -238,11 +239,21 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
             test.append(np.squeeze(test_epoch.cpu().numpy()))
 
             val_loss = 0
+            val_stack = []  # List to hold val_0 and val_1 pairs
+
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
                 val_loss += loss_fn(val_0, val_1, val_labels)
+                
+                # Stack val_0 and val_1 along the last dimension
+                val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
+            
+            # Combine all batches into a single array for this epoch
+            epoch_val = np.concatenate(val_stack, axis = 0)  
+            val.append(epoch_val)  
+
             val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
             print(f'LOSS val {val_loss / len(val_loader)}')
 
@@ -252,8 +263,12 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
        torch.save(model.state_dict(), name)
 
     
-
-    return np.array(loss_list, dtype = 'object'), np.array(val_loss_list, dtype = 'object'), np.array(test, dtype = 'object')
+    return (
+        np.array(loss_list, dtype = 'object'), 
+        np.array(val_loss_list, dtype = 'object'), 
+        np.array(test, dtype = 'object'), 
+        np.array(val, dtype = 'object')
+    )
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
