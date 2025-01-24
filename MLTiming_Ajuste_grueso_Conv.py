@@ -30,29 +30,29 @@ test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
 test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
 test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 
+
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1            # Max delay to training pulses in ns
-time_step = 0.2              # Signal time step in ns
-set_seed(42)                 # Fix seeds
-nbins = 71                   # Num bins for all histograms
-positions = [-0.2, 0.0, 0.2] # Expected time difference of each position
-normalization_method = 'standardization'
+delay_time = 0.75                # Max delay to training pulses in ns
+time_step = 0.2               # Signal time step in ns
+set_seed(42)                  # Fix seeds
+nbins = 71                    # Num bins for all histograms
+positions = [-0.2, 0.0, 0.2]  # Expected time difference of each position
 start = 60
 stop = 74
 lr = 1e-5
-epochs = 500
-batch_size = 32 
-save = False
+epochs = 1000
+batch_size = 32
+save = True
 
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.concatenate((train_data_55, train_data_28, train_data_82), axis = 0)
-validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
+train_data = train_data_55
+validation_data = np.concatenate((train_data_55, validation_data_28, validation_data_82), axis = 0)
 test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
@@ -64,6 +64,9 @@ print('Número de casos de test: ', test_data.shape[0])
 
 mean_pulse_dec0 = get_mean_pulse_from_set(train_data, channel = 0)
 mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
+
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/reference_pulse_dec0.npz', data = mean_pulse_dec0)
+np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/reference_pulse_dec1.npz', data = mean_pulse_dec1)
 
 # Train/Validation/Test set
 delays_dec0, moved_pulses_dec0 = move_to_reference(mean_pulse_dec0, train_data, start = start, stop = stop, max_delay = int(stop-start), channel = 0)
@@ -131,7 +134,7 @@ Error = np.concatenate((error_V02, error_V20, error_V00), axis = 1)
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
 
-# Plot
+#Plot
 plt.figure(figsize = (20,5))
 plt.subplot(131)
 plt.plot(MAE, label = 'MAE')
@@ -158,7 +161,7 @@ plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
-  
+
 # Histogram and gaussian fit 
 plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
 plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
@@ -177,6 +180,37 @@ plt.legend()
 plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
+
+### Combine the two numbers
+#num = f"{sys.argv[1]}{sys.argv[2]}"
+
+
+# Your existing variables
+#FWHM = np.array([params_V02[3], params_V00[3], params_V20[3]])  # ps
+#FWHM_err = np.array([errors_V02[3],  errors_V00[3],  errors_V20[3]])        # ps
+#centroid = np.array([params_V02[2], params_V00[2], params_V20[2]])  # ps
+#centroid_err = np.array([errors_V02[2],  errors_V00[2],  errors_V20[2]])        # ps
+#
+## Multiply by 1000
+#FWHM = FWHM * 1000
+#FWHM_err = FWHM_err * 1000
+#centroid = centroid * 1000
+#centroid_err = centroid_err * 1000
+#
+#with open('results_FS.txt', 'a') as file:
+#    file.write(f"FWHM_{num} = np.array([{', '.join(f'{v:.1f}' for v in FWHM)}])  # ps\n")
+#    file.write(f"FWHM_err_{num} = np.array([{', '.join(f'{v:.1f}' for v in FWHM_err)}])  # ps\n")
+#    file.write(f"centroid_{num} = np.array([{', '.join(f'{v:.1f}' for v in centroid)}])  # ps\n")
+#    file.write(f"centroid_err_{num} = np.array([{', '.join(f'{v:.1f}' for v in centroid_err)}])  # ps\n")
+#    file.write(f"MAE_{num} = {MAE[-1]:.7f}  # ps\n")  # Write MAE with one decima
+#    file.write(f"mean_FWHM_{num} = np.mean(FWHM_{num})\n")
+#    file.write(f"mean_FWHM_err_{num} = np.mean(FWHM_err_{num})\n")
+#    file.write(f"mean_bias_{num} = np.mean(abs(centroid_{num} - positions))\n")
+#    file.write("\n")  # Add a new line for better separation
+#
+#TOF_V00 = TOF_V00[10:]
+#TOF_V02 = TOF_V02[10:]
+#TOF_V20 = TOF_V20[10:]
 
 centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
 centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3) 
@@ -199,7 +233,7 @@ np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/MAE_Na22
 np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/avg_bias.npz', data = avg_bias)
 
 CTR = []
-for i in range(epochs):
+for i in range(TOF_V00.shape[0]):
     params_V02, errors_V02 = get_gaussian_params(TOF_V02[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
     params_V00, errors_V00 = get_gaussian_params(TOF_V00[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
     params_V20, errors_V20 = get_gaussian_params(TOF_V20[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
