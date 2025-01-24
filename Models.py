@@ -69,10 +69,11 @@ class MLP_Torch(nn.Module):
   
     def forward(self, input):
         def forward_single(x):
-            x = F.relu(self.dense1(x))
-            x = F.relu(self.dense2(x))
-            x = F.relu(self.dense3(x))
-            x = self.output(x)
+            x = F.leaky_relu(self.dense1(x))
+            x = F.leaky_relu(self.dense2(x))
+            x = F.leaky_relu(self.dense3(x))
+            x = F.softplus(self.output(x))
+            
             return x
         
         out = forward_single(input)
