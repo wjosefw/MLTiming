@@ -22,7 +22,7 @@ def gauss_fit(x, y):
 
 def calculate_gaussian_center(vector, nbins = 51):
     """
-    Calculate the Gaussian fit centroid for each row of the input vector.
+    Calculate Gaussian fit centroid for each row of the input vector.
 
     Parameters:
     vector (numpy.ndarray): A 2D array where each row represents a set of data points to be analyzed.
