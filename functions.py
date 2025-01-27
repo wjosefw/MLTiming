@@ -30,7 +30,7 @@ def calculate_gaussian_center(vector, nbins = 51):
     limits (float, optional): Range of the histogram. 
 
     Returns:
-    numpy.ndarray: Array of centroid values (x0) for each row of the input vector. 
+    numpy.ndarray: Array of centoid values (x0) for each row of the input vector. 
     """
     
     centroid = [] 
