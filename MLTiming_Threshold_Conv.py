@@ -39,13 +39,13 @@ set_seed(42)                               # Fix seeds
 nbins = 71                                 # Num bins for all histograms
 normalization_method = 'standardization'
 time_step = 0.2                            # Signal time step in ns
-epochs = 50                               # Number of epochs for training
-lr = 1e-4                                  # Model learning rate
+epochs = 1                               # Number of epochs for training
+lr = 5e-4                                  # Model learning rate
 save = False                               # Save models or not 
 fraction = 0.1                             # Fraction to trigger the pulse cropping   
 window_low = 14                            # Number of steps to take before trigger
 window_high = 10                           # Number of steps to take after trigger
-batch_size = 16
+batch_size = 128
 positions = [-0.2, 0.0, 0.2]               # Expected time difference of each position
 
 

@@ -25,8 +25,9 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     loss_fn = custom_loss_MSE  
 
     # Cosine Annealing Scheduler
-    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
+    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-5)
     
+
     for epoch in range(EPOCHS):
         running_loss = 0.0
         model.train()

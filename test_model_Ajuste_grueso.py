@@ -12,9 +12,9 @@ from Models import ConvolutionalModel, MLP_Torch
 
 #Load data
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
-test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
-test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
+test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val_FS.npz'))['data']
+test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val_FS.npz'))['data']
+test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val_FS.npz'))['data']
 
 test_data  = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 print('Número de casos de test: ', test_data.shape[0])
@@ -25,16 +25,16 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------------------------------------------------------------
 
 set_seed(42)                               # Fix seeds
-nbins = 71                                 # Num bins for all histograms
+nbins = 41                                 # Num bins for all histograms
 time_step = 0.2                            # Signal time step in ns
 positions = np.array([0.2, 0.0, -0.2])
 normalization_method = 'standardization'
-moments_order = 7
-start = 61
-stop = 73
+moments_order = 6
+start = 60
+stop = 74
 batch_size = 32
 architecture = [moments_order, 3, 1, 1]    # KAN architecture
-Num_Neurons = 16
+Num_Neurons = 32
 
 
 # -------------------------------------------------------------------------
@@ -54,49 +54,55 @@ TEST = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 # ------------------------ PREPROCESS DATA --------------------------------
 # -------------------------------------------------------------------------
 
- ## Calculate moments 
-M_Test = momentos(test_data, order = moments_order)
+# Calculate moments 
+M_Test = momentos(TEST, order = moments_order)
 
-params_dec0 = (np.array([0.46294019, 0.48189313, 0.46084979, 0.43525004, 0.4108511 ,
-       0.3888638 , 0.36936704]), np.array([0.42321711, 0.37704465, 0.33838475, 0.30744539, 0.28236585,
-       0.26169133, 0.24438544]))
-params_dec1 = (np.array([0.34837473, 0.38529399, 0.37614394, 0.35929   , 0.34166016,
-       0.32509272, 0.31004378]), np.array([0.4272395 , 0.35716153, 0.31630676, 0.286154  , 0.26244718,
-       0.24318128, 0.22717464]))
+#params_dec0 = (np.array([0.38743577, 0.35521059, 0.32091923, 0.29320879, 0.27105946,
+#       0.25315543, 0.23847421, 0.22627119]), np.array([0.18359224, 0.15205655, 0.13110244, 0.11621708, 0.10512331,
+#       0.09655463, 0.08975309, 0.08423733]))
+#params_dec1 = (np.array([0.28284467, 0.27656352, 0.25491724, 0.23544002, 0.21921152,
+#       0.20579795, 0.19464108, 0.18527334]), np.array([0.15871774, 0.1323155 , 0.11494621, 0.10255006, 0.09325127,
+#       0.08601955, 0.08024191, 0.07552924]))
+#
+params_dec0 = (np.array([0.37360714, 0.34350668, 0.310697  , 0.2840613 , 0.26272417,
+       0.24545365]), np.array([0.19064454, 0.15812544, 0.13650124, 0.12110903, 0.10962155,
+       0.10073992]))
 
+params_dec1 = (np.array([0.2666009 , 0.26276701, 0.24283218, 0.22459564, 0.20930532,
+       0.19662505]), np.array([0.16339829, 0.13645537, 0.11867063, 0.10595505, 0.09640735,
+       0.08897757]))
 
 M_Test_norm_dec0 = normalize_given_params(M_Test, params_dec0, channel = 0, method = normalization_method)
 M_Test_norm_dec1 = normalize_given_params(M_Test, params_dec1, channel = 1, method = normalization_method)
 M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
 
-
 # -------------------------------------------------------------------------
 #--------------------------- LOAD MODELS ----------------------------------
 # -------------------------------------------------------------------------
 
-dir = 'predictions/Convolutional/'
-#dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
+#dir = 'predictions/Convolutional/'
+dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
 
-model_dec0_dir = os.path.join(dir, 'AG_model_dec0')
-model_dec1_dir = os.path.join(dir, 'AG_model_dec1')
+#model_dec0_dir = os.path.join(dir, 'AG_model_dec0')
+#model_dec1_dir = os.path.join(dir, 'AG_model_dec1')
 
 #model_dec0_dir = os.path.join(dir, 'Conv_model_dec0')
 #model_dec1_dir = os.path.join(dir, 'Conv_model_dec1')
 
-#model_dec0_dir = os.path.join(dir, 'MLP_model_dec0')
-#model_dec1_dir = os.path.join(dir, 'MLP_model_dec1')
+model_dec0_dir = os.path.join(dir, 'MLP_AG_model_dec0')
+model_dec1_dir = os.path.join(dir, 'MLP_AG_model_dec1')
 
 #model_dec0_dir = os.path.join(dir, 'MLPWAVE_model_dec0')
 #model_dec1_dir = os.path.join(dir, 'MLPWAVE_model_dec1')
 
-model_dec0 = ConvolutionalModel(int(stop-start))
-model_dec1 = ConvolutionalModel(int(stop-start))
+#model_dec0 = ConvolutionalModel(int(stop-start))
+#model_dec1 = ConvolutionalModel(int(stop-start))
 
 #model_dec0 = KAN(architecture)
 #model_dec1 = KAN(architecture)
 
-#model_dec0 = MLP_Torch(NM = int(stop-start), NN = Num_Neurons, STD_INIT = 0.5)
-#model_dec1 = MLP_Torch(NM = int(stop-start), NN = Num_Neurons, STD_INIT = 0.5)
+model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
          
 model_dec0.load_state_dict(torch.load(model_dec0_dir))
 model_dec1.load_state_dict(torch.load(model_dec1_dir))
@@ -107,11 +113,11 @@ model_dec1.eval()
 #--------------------------- GET RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0])).detach().numpy())
-test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy())
+#test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0])).detach().numpy())
+#test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy())
 
-#test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
-#test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
+test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
+test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
 
 # Calculate TOF
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
@@ -122,7 +128,7 @@ TOF_V20 = TOF[test_data_55.shape[0] + test_data_28.shape[0]:]
 
 
 # Calulate Test error
-centroid_V00 = calculate_gaussian_center(TOF_V00[np.newaxis,:], nbins = nbins, limits = 3) 
+centroid_V00 = calculate_gaussian_center(TOF_V00[np.newaxis,:], nbins = nbins, limits = 1) 
 
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[2]))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
@@ -136,8 +142,8 @@ print(MAE[-1])
 
 
 # Plot
-plt.hist(test_dec0, bins = nbins, alpha = 0.5, label = 'Detector 0');
-plt.hist(test_dec1, bins = nbins, alpha = 0.5, label = 'Detector 1');
+plt.hist(test_dec0, bins = nbins, alpha = 0.5, range = [0.2,0.8], label = 'Detector 0');
+plt.hist(test_dec1, bins = nbins, alpha = 0.5, range = [0.2,0.8], label = 'Detector 1');
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')
@@ -180,7 +186,7 @@ size_V02 = int(TOF_V02.shape[0]/10)
 size_V20 = int(TOF_V20.shape[0]/10)
 
 for i in range(10):
-    centroid_V00 = calculate_gaussian_center(TOF_V00[None, i*size_V00 : (i+1)*size_V00], nbins = nbins, limits = 3) 
+    centroid_V00 = calculate_gaussian_center(TOF_V00[None, i*size_V00 : (i+1)*size_V00], nbins = nbins, limits = 1) 
     params_V02, errors_V02 = get_gaussian_params(TOF_V02[i*size_V02 : (i+1)*size_V02], centroid_V00, range = 0.8, nbins = nbins)
     params_V00, errors_V00 = get_gaussian_params(TOF_V00[i*size_V00 : (i+1)*size_V00], centroid_V00, range = 0.8, nbins = nbins)
     params_V20, errors_V20 = get_gaussian_params(TOF_V20[i*size_V20 : (i+1)*size_V20], centroid_V00, range = 0.8, nbins = nbins)
