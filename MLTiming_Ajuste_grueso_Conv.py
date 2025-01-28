@@ -43,7 +43,7 @@ positions = [-0.2, 0.0, 0.2]  # Expected time difference of each position
 start = 60
 stop = 74
 lr = 1e-5
-epochs = 300
+epochs = 750
 batch_size = 32
 save = True
 
@@ -51,7 +51,8 @@ save = True
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.concatenate((train_data_55, train_data_55, train_data_55),axis = 0)
+#train_data = np.concatenate((train_data_55, train_data_55, train_data_55),axis = 0)
+train_data = train_data_55
 validation_data = np.concatenate((validation_data_28, validation_data_82), axis = 0)
 test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 
