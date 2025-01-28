@@ -43,7 +43,7 @@ positions = [-0.2, 0.0, 0.2]  # Expected time difference of each position
 start = 60
 stop = 74
 lr = 1e-5
-epochs = 750
+epochs = 375
 batch_size = 32
 save = True
 
@@ -51,7 +51,7 @@ save = True
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.concatenate((train_data_55, validation_data_55),axis = 0)
+train_data = np.concatenate((train_data_55, validation_data_55, train_data_55),axis = 0)
 validation_data = np.concatenate((validation_data_28, validation_data_82), axis = 0)
 test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 
@@ -123,7 +123,7 @@ TOF_V02 = TOF[:, test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.sh
 TOF_V20 = TOF[:, test_data_55.shape[0]  + test_data_28.shape[0]:] 
 
 # Calulate Validation error
-centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 5) 
+centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins) 
 
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[0]))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
@@ -212,9 +212,9 @@ plt.show()
 #TOF_V02 = TOF_V02[10:]
 #TOF_V20 = TOF_V20[10:]
 
-centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
-centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3) 
-centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3)
+centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins) 
+centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins) 
+centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins)
 
 error_V20_centroid = abs(centroid_V20 - 0.2)
 error_V02_centroid = abs(centroid_V02 + 0.2)
