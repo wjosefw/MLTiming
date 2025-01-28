@@ -51,9 +51,8 @@ save = True
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-#train_data = np.concatenate((train_data_55, train_data_55, train_data_55),axis = 0)
 train_data = train_data_55
-validation_data = np.concatenate((validation_data_28, validation_data_82), axis = 0)
+validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
 test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
@@ -65,6 +64,46 @@ print('Número de casos de test: ', test_data.shape[0])
 
 mean_pulse_dec0 = get_mean_pulse_from_set(train_data, channel = 0)
 mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
+
+def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, channel=0):
+
+    if (stop - start) < max_delay:
+        raise ValueError("Window size (stop-start) cannot be smaller than max_delay")
+
+    # Extract the reference window
+    reference_pulse = reference[start:stop]
+    delays = []
+    aligned_pulses = []
+
+    for i in range(pulse_set.shape[0]):
+        mse = []
+        segments = []
+
+        # Extract the current pulse channel and sliding window
+        pulse = pulse_set[i, :, channel]
+        for i in range(0, pulse_set.shape[1] - int(stop - start)):
+            start_idx = i
+            stop_idx = i + int(stop - start)
+
+            # Ensure valid indices within bounds of the pulse array
+            if start_idx < 0 or stop_idx > len(pulse):
+                continue
+
+            # Extract the sliding window segment
+            segment = pulse[start_idx:stop_idx]
+            mse.append(np.mean((reference_pulse - segment) ** 2))
+            segments.append(segment)
+
+        # Find the shift with the minimal MSE
+        mse = np.array(mse)
+        min_mse_index = np.argmin(mse)
+        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
+        optimal_shift = start - optimal_start  
+        
+        delays.append(optimal_shift)
+        aligned_pulses.append(segments[min_mse_index])
+
+    return np.array(delays), np.array(aligned_pulses)
 
 np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/reference_pulse_dec0.npz', data = mean_pulse_dec0)
 np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/reference_pulse_dec1.npz', data = mean_pulse_dec1)
