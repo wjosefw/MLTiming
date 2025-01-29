@@ -70,6 +70,47 @@ mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
 np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/reference_pulse_dec0.npz', data = mean_pulse_dec0)
 np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/reference_pulse_dec1.npz', data = mean_pulse_dec1)
 
+def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, channel=0):
+
+    if (stop - start) < max_delay:
+        raise ValueError("Window size (stop-start) cannot be smaller than max_delay")
+
+    # Extract the reference window
+    reference_pulse = reference[start:stop]
+    delays = []
+    aligned_pulses = []
+
+    for i in range(pulse_set.shape[0]):
+        mse = []
+        segments = []
+        
+        # Extract the current pulse channel and sliding window
+        pulse = pulse_set[i, :, channel]
+        for i in range(0, pulse_set.shape[1] - int(stop - start)):
+            start_idx = i
+            stop_idx = i + int(stop - start)
+
+            # Ensure valid indices within bounds of the pulse array
+            if start_idx < 0 or stop_idx > len(pulse):
+                continue
+
+            # Extract the sliding window segment
+            segment = pulse[start_idx:stop_idx]
+            mse.append(np.mean((reference_pulse - segment) ** 2))
+            segments.append(segment)
+
+        # Find the shift with the minimal MSE
+        mse = np.array(mse)
+        min_mse_index = np.argmin(mse)
+        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
+        optimal_shift = start - optimal_start  
+        
+        delays.append(optimal_shift)
+        aligned_pulses.append(segments[min_mse_index])
+        
+
+    return np.array(delays), np.array(aligned_pulses)
+
 # Train/Validation/Test set
 delays_dec0, moved_pulses_dec0 = move_to_reference(mean_pulse_dec0, train_data, start = start_dec0, stop = stop_dec0, max_delay = int(stop_dec0-start_dec0), channel = 0)
 delays_dec1, moved_pulses_dec1 = move_to_reference(mean_pulse_dec1, train_data, start = start_dec1, stop = stop_dec1, max_delay = int(stop_dec1-start_dec1), channel = 1)
@@ -210,35 +251,36 @@ plt.show()
 #    file.write(f"mean_bias_{num} = np.mean(abs(centroid_{num} - positions))\n")
 #    file.write("\n")  # Add a new line for better separation
 #
-TOF_V00 = TOF_V00[50:]
-TOF_V02 = TOF_V02[50:]
-TOF_V20 = TOF_V20[50:]
 
-centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins) 
-centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins) 
-centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins)
-
-error_V20_centroid = abs(centroid_V20 - 0.2)
-error_V02_centroid = abs(centroid_V02 + 0.2)
-
-avg_bias = np.mean(np.stack((error_V20_centroid , error_V02_centroid), axis = -1), axis = 1)
-
-
-#Plot MAE_singles vs MAE_coincidences
-err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
-err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
-mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
-mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
-np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec0_Na22.npz', data = mean_err_val_dec0)
-np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec1_Na22.npz', data = mean_err_val_dec1)
-np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/MAE_Na22.npz', data = MAE)
-np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/avg_bias.npz', data = avg_bias)
-
-CTR = []
-for i in range(TOF_V00.shape[0]):
-    params_V02, errors_V02 = get_gaussian_params(TOF_V02[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
-    params_V00, errors_V00 = get_gaussian_params(TOF_V00[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
-    params_V20, errors_V20 = get_gaussian_params(TOF_V20[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
-    CTR.append(np.mean([params_V20[3],params_V00[3],params_V02[3]]))
-np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/ctr.npz', data = np.array(CTR))
+#TOF_V00 = TOF_V00[50:]
+#TOF_V02 = TOF_V02[50:]
+#TOF_V20 = TOF_V20[50:]
+#
+#centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins) 
+#centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins) 
+#centroid_V20 = calculate_gaussian_center(TOF_V20 - centroid_V00[:, np.newaxis], nbins = nbins)
+#
+#error_V20_centroid = abs(centroid_V20 - 0.2)
+#error_V02_centroid = abs(centroid_V02 + 0.2)
+#
+#avg_bias = np.mean(np.stack((error_V20_centroid , error_V02_centroid), axis = -1), axis = 1)
+#
+#
+##Plot MAE_singles vs MAE_coincidences
+#err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
+#err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
+#mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
+#mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec0_Na22.npz', data = mean_err_val_dec0)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/mean_err_val_dec1_Na22.npz', data = mean_err_val_dec1)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/MAE_Na22.npz', data = MAE)
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/avg_bias.npz', data = avg_bias)
+#
+#CTR = []
+#for i in range(TOF_V00.shape[0]):
+#    params_V02, errors_V02 = get_gaussian_params(TOF_V02[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    params_V00, errors_V00 = get_gaussian_params(TOF_V00[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    params_V20, errors_V20 = get_gaussian_params(TOF_V20[i,:], centroid_V00[i], range = 0.8, nbins = nbins)
+#    CTR.append(np.mean([params_V20[3],params_V00[3],params_V02[3]]))
+#np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/ctr.npz', data = np.array(CTR))
 

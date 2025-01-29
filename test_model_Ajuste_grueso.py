@@ -12,9 +12,9 @@ from Models import ConvolutionalModel, MLP_Torch
 
 #Load data
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val_FS.npz'))['data']
-test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val_FS.npz'))['data']
-test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val_FS.npz'))['data']
+test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
+test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
+test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 
 test_data  = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 print('Número de casos de test: ', test_data.shape[0])
@@ -25,17 +25,59 @@ print('Número de casos de test: ', test_data.shape[0])
 # -------------------------------------------------------------------------
 
 set_seed(42)                               # Fix seeds
-nbins = 41                                 # Num bins for all histograms
+nbins = 71                                 # Num bins for all histograms
 time_step = 0.2                            # Signal time step in ns
 positions = np.array([0.2, 0.0, -0.2])
 normalization_method = 'standardization'
 moments_order = 6
-start = 60
-stop = 74
+start_dec0 = 60
+stop_dec0 = 74
+start_dec1 = 61
+stop_dec1 = 75
 batch_size = 32
 architecture = [moments_order, 3, 1, 1]    # KAN architecture
 Num_Neurons = 32
 
+def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, channel=0):
+
+    if (stop - start) < max_delay:
+        raise ValueError("Window size (stop-start) cannot be smaller than max_delay")
+
+    # Extract the reference window
+    reference_pulse = reference[start:stop]
+    delays = []
+    aligned_pulses = []
+
+    for i in range(pulse_set.shape[0]):
+        mse = []
+        segments = []
+        
+        # Extract the current pulse channel and sliding window
+        pulse = pulse_set[i, :, channel]
+        for i in range(0, pulse_set.shape[1] - int(stop - start)):
+            start_idx = i
+            stop_idx = i + int(stop - start)
+
+            # Ensure valid indices within bounds of the pulse array
+            if start_idx < 0 or stop_idx > len(pulse):
+                continue
+
+            # Extract the sliding window segment
+            segment = pulse[start_idx:stop_idx]
+            mse.append(np.mean((reference_pulse - segment) ** 2))
+            segments.append(segment)
+
+        # Find the shift with the minimal MSE
+        mse = np.array(mse)
+        min_mse_index = np.argmin(mse)
+        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
+        optimal_shift = start - optimal_start  
+        
+        delays.append(optimal_shift)
+        aligned_pulses.append(segments[min_mse_index])
+        
+
+    return np.array(delays), np.array(aligned_pulses)
 
 # -------------------------------------------------------------------------
 # ----------------------- MOVE TO REFERENCE -------------------------------
@@ -45,9 +87,10 @@ mean_pulses_dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/'
 mean_pulse_dec0 = np.load(os.path.join(mean_pulses_dir, 'reference_pulse_dec0.npz'))['data']
 mean_pulse_dec1 = np.load(os.path.join(mean_pulses_dir, 'reference_pulse_dec1.npz'))['data']
 
-delays_test_dec0, moved_pulses_test_dec0 = move_to_reference(mean_pulse_dec0, test_data, start = start, stop = stop, max_delay = int(stop-start), channel = 0)
-delays_test_dec1, moved_pulses_test_dec1 = move_to_reference(mean_pulse_dec1, test_data, start = start, stop = stop, max_delay = int(stop-start), channel = 1)
+delays_test_dec0, moved_pulses_test_dec0 = move_to_reference(mean_pulse_dec0, test_data, start = start_dec0, stop = stop_dec0, max_delay = int(stop_dec0-start_dec0), channel = 0)
+delays_test_dec1, moved_pulses_test_dec1 = move_to_reference(mean_pulse_dec1, test_data, start = start_dec1, stop = stop_dec1, max_delay = int(stop_dec1-start_dec1), channel = 1)
 
+print(type(moved_pulses_test_dec0))
 TEST = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 
 # -------------------------------------------------------------------------
@@ -80,29 +123,29 @@ M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
 #--------------------------- LOAD MODELS ----------------------------------
 # -------------------------------------------------------------------------
 
-#dir = 'predictions/Convolutional/'
-dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
+dir = 'predictions/Convolutional/'
+#dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/KAN_models'
 
-#model_dec0_dir = os.path.join(dir, 'AG_model_dec0')
-#model_dec1_dir = os.path.join(dir, 'AG_model_dec1')
+model_dec0_dir = os.path.join(dir, 'AG_model_dec0')
+model_dec1_dir = os.path.join(dir, 'AG_model_dec1')
 
 #model_dec0_dir = os.path.join(dir, 'Conv_model_dec0')
 #model_dec1_dir = os.path.join(dir, 'Conv_model_dec1')
 
-model_dec0_dir = os.path.join(dir, 'MLP_AG_model_dec0')
-model_dec1_dir = os.path.join(dir, 'MLP_AG_model_dec1')
+#model_dec0_dir = os.path.join(dir, 'MLP_AG_model_dec0')
+#model_dec1_dir = os.path.join(dir, 'MLP_AG_model_dec1')
 
 #model_dec0_dir = os.path.join(dir, 'MLPWAVE_model_dec0')
 #model_dec1_dir = os.path.join(dir, 'MLPWAVE_model_dec1')
 
-#model_dec0 = ConvolutionalModel(int(stop-start))
-#model_dec1 = ConvolutionalModel(int(stop-start))
+model_dec0 = ConvolutionalModel(int(stop_dec0-start_dec0))
+model_dec1 = ConvolutionalModel(int(stop_dec1-start_dec1))
 
 #model_dec0 = KAN(architecture)
 #model_dec1 = KAN(architecture)
 
-model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
-model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+#model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+#model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
          
 model_dec0.load_state_dict(torch.load(model_dec0_dir))
 model_dec1.load_state_dict(torch.load(model_dec1_dir))
@@ -113,11 +156,11 @@ model_dec1.eval()
 #--------------------------- GET RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-#test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0])).detach().numpy())
-#test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy())
+test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0])).detach().numpy())
+test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy())
 
-test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
-test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
+#test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
+#test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
 
 # Calculate TOF
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
@@ -128,7 +171,7 @@ TOF_V20 = TOF[test_data_55.shape[0] + test_data_28.shape[0]:]
 
 
 # Calulate Test error
-centroid_V00 = calculate_gaussian_center(TOF_V00[np.newaxis,:], nbins = nbins, limits = 1) 
+centroid_V00 = calculate_gaussian_center(TOF_V00[np.newaxis,:], nbins = nbins) 
 
 error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[2]))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
@@ -186,7 +229,7 @@ size_V02 = int(TOF_V02.shape[0]/10)
 size_V20 = int(TOF_V20.shape[0]/10)
 
 for i in range(10):
-    centroid_V00 = calculate_gaussian_center(TOF_V00[None, i*size_V00 : (i+1)*size_V00], nbins = nbins, limits = 1) 
+    centroid_V00 = calculate_gaussian_center(TOF_V00[None, i*size_V00 : (i+1)*size_V00], nbins = nbins) 
     params_V02, errors_V02 = get_gaussian_params(TOF_V02[i*size_V02 : (i+1)*size_V02], centroid_V00, range = 0.8, nbins = nbins)
     params_V00, errors_V00 = get_gaussian_params(TOF_V00[i*size_V00 : (i+1)*size_V00], centroid_V00, range = 0.8, nbins = nbins)
     params_V20, errors_V20 = get_gaussian_params(TOF_V20[i*size_V20 : (i+1)*size_V20], centroid_V00, range = 0.8, nbins = nbins)
