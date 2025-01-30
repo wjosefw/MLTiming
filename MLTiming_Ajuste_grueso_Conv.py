@@ -44,7 +44,7 @@ start_dec0 = 60
 stop_dec0 = 74
 start_dec1 = 61
 stop_dec1 = 75
-lr = 1e-5
+lr = 1e-4
 epochs = 1000
 batch_size = 32
 save = True
@@ -70,56 +70,15 @@ mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
 np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/reference_pulse_dec0.npz', data = mean_pulse_dec0)
 np.savez_compressed('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/reference_pulse_dec1.npz', data = mean_pulse_dec1)
 
-def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, channel=0):
-
-    if (stop - start) < max_delay:
-        raise ValueError("Window size (stop-start) cannot be smaller than max_delay")
-
-    # Extract the reference window
-    reference_pulse = reference[start:stop]
-    delays = []
-    aligned_pulses = []
-
-    for i in range(pulse_set.shape[0]):
-        mse = []
-        segments = []
-        
-        # Extract the current pulse channel and sliding window
-        pulse = pulse_set[i, :, channel]
-        for i in range(0, pulse_set.shape[1] - int(stop - start)):
-            start_idx = i
-            stop_idx = i + int(stop - start)
-
-            # Ensure valid indices within bounds of the pulse array
-            if start_idx < 0 or stop_idx > len(pulse):
-                continue
-
-            # Extract the sliding window segment
-            segment = pulse[start_idx:stop_idx]
-            mse.append(np.mean((reference_pulse - segment) ** 2))
-            segments.append(segment)
-
-        # Find the shift with the minimal MSE
-        mse = np.array(mse)
-        min_mse_index = np.argmin(mse)
-        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
-        optimal_shift = start - optimal_start  
-        
-        delays.append(optimal_shift)
-        aligned_pulses.append(segments[min_mse_index])
-        
-
-    return np.array(delays), np.array(aligned_pulses)
-
 # Train/Validation/Test set
-delays_dec0, moved_pulses_dec0 = move_to_reference(mean_pulse_dec0, train_data, start = start_dec0, stop = stop_dec0, max_delay = int(stop_dec0-start_dec0), channel = 0)
-delays_dec1, moved_pulses_dec1 = move_to_reference(mean_pulse_dec1, train_data, start = start_dec1, stop = stop_dec1, max_delay = int(stop_dec1-start_dec1), channel = 1)
+delays_dec0, moved_pulses_dec0 = move_to_reference(mean_pulse_dec0, train_data, start = start_dec0, stop = stop_dec0, channel = 0)
+delays_dec1, moved_pulses_dec1 = move_to_reference(mean_pulse_dec1, train_data, start = start_dec1, stop = stop_dec1, channel = 1)
 
-delays_val_dec0, moved_pulses_val_dec0 = move_to_reference(mean_pulse_dec0, validation_data, start = start_dec0, stop = stop_dec0, max_delay = int(stop_dec0-start_dec0), channel = 0)
-delays_val_dec1, moved_pulses_val_dec1 = move_to_reference(mean_pulse_dec1, validation_data, start = start_dec1, stop = stop_dec1, max_delay = int(stop_dec1-start_dec1), channel = 1)
+delays_val_dec0, moved_pulses_val_dec0 = move_to_reference(mean_pulse_dec0, validation_data, start = start_dec0, stop = stop_dec0, channel = 0)
+delays_val_dec1, moved_pulses_val_dec1 = move_to_reference(mean_pulse_dec1, validation_data, start = start_dec1, stop = stop_dec1, channel = 1)
 
-delays_test_dec0, moved_pulses_test_dec0 = move_to_reference(mean_pulse_dec0, test_data, start = start_dec0, stop = stop_dec0, max_delay = int(stop_dec0-start_dec0), channel = 0)
-delays_test_dec1, moved_pulses_test_dec1 = move_to_reference(mean_pulse_dec1, test_data, start = start_dec1, stop = stop_dec1, max_delay = int(stop_dec1-start_dec1), channel = 1)
+delays_test_dec0, moved_pulses_test_dec0 = move_to_reference(mean_pulse_dec0, test_data, start = start_dec0, stop = stop_dec0, channel = 0)
+delays_test_dec1, moved_pulses_test_dec1 = move_to_reference(mean_pulse_dec1, test_data, start = start_dec1, stop = stop_dec1, channel = 1)
 
 train_dec0, REF_train_dec0 = create_and_delay_pulse_pair(moved_pulses_dec0, time_step, delay_time = delay_time)
 train_dec1, REF_train_dec1 = create_and_delay_pulse_pair(moved_pulses_dec1, time_step, delay_time = delay_time)

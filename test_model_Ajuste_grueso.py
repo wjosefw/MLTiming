@@ -19,6 +19,38 @@ test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 test_data  = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 print('Número de casos de test: ', test_data.shape[0])
 
+def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
+    
+    window_size = int(stop - start)
+    reference_pulse = reference[start:stop] # Extract the reference pulse
+    delays = np.zeros(pulse_set.shape[0])
+    aligned_pulses = np.zeros((pulse_set.shape[0], int(stop - start)), dtype = np.float32) # This data type is the input to the NN
+
+    for i in range(pulse_set.shape[0]):
+        mse = np.zeros((pulse_set.shape[1] - int(stop - start)))
+        segments = np.zeros((pulse_set.shape[1] - int(stop - start), int(stop - start)), dtype = np.float32)
+
+        # Extract the current pulse channel and sliding window
+        pulse = pulse_set[i, :, channel]
+        for j in range(0, pulse_set.shape[1] - int(stop - start)):
+            start_idx = j
+            stop_idx = j + int(stop - start)
+
+            # Extract the sliding window segment
+            segment = pulse[start_idx:stop_idx]
+            mse[j] = np.mean((reference_pulse - segment) ** 2)
+            segments[j,:] = segment
+
+        # Find the shift with the minimal MSE
+        min_mse_index = np.argmin(mse)
+        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
+        optimal_shift = start - optimal_start  
+        
+        delays[i] = optimal_shift
+        aligned_pulses[i,:] = segments[min_mse_index,:]
+
+    return delays, aligned_pulses
+
 
 # -------------------------------------------------------------------------
 # ---------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -38,47 +70,6 @@ batch_size = 32
 architecture = [moments_order, 3, 1, 1]    # KAN architecture
 Num_Neurons = 32
 
-def move_to_reference(reference, pulse_set, start=50, stop=80, max_delay=10, channel=0):
-
-    if (stop - start) < max_delay:
-        raise ValueError("Window size (stop-start) cannot be smaller than max_delay")
-
-    # Extract the reference window
-    reference_pulse = reference[start:stop]
-    delays = []
-    aligned_pulses = []
-
-    for i in range(pulse_set.shape[0]):
-        mse = []
-        segments = []
-        
-        # Extract the current pulse channel and sliding window
-        pulse = pulse_set[i, :, channel]
-        for i in range(0, pulse_set.shape[1] - int(stop - start)):
-            start_idx = i
-            stop_idx = i + int(stop - start)
-
-            # Ensure valid indices within bounds of the pulse array
-            if start_idx < 0 or stop_idx > len(pulse):
-                continue
-
-            # Extract the sliding window segment
-            segment = pulse[start_idx:stop_idx]
-            mse.append(np.mean((reference_pulse - segment) ** 2))
-            segments.append(segment)
-
-        # Find the shift with the minimal MSE
-        mse = np.array(mse)
-        min_mse_index = np.argmin(mse)
-        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
-        optimal_shift = start - optimal_start  
-        
-        delays.append(optimal_shift)
-        aligned_pulses.append(segments[min_mse_index])
-        
-
-    return np.array(delays), np.array(aligned_pulses)
-
 # -------------------------------------------------------------------------
 # ----------------------- MOVE TO REFERENCE -------------------------------
 # -------------------------------------------------------------------------
@@ -87,10 +78,9 @@ mean_pulses_dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/predictions/'
 mean_pulse_dec0 = np.load(os.path.join(mean_pulses_dir, 'reference_pulse_dec0.npz'))['data']
 mean_pulse_dec1 = np.load(os.path.join(mean_pulses_dir, 'reference_pulse_dec1.npz'))['data']
 
-delays_test_dec0, moved_pulses_test_dec0 = move_to_reference(mean_pulse_dec0, test_data, start = start_dec0, stop = stop_dec0, max_delay = int(stop_dec0-start_dec0), channel = 0)
-delays_test_dec1, moved_pulses_test_dec1 = move_to_reference(mean_pulse_dec1, test_data, start = start_dec1, stop = stop_dec1, max_delay = int(stop_dec1-start_dec1), channel = 1)
+delays_test_dec0, moved_pulses_test_dec0 = move_to_reference(mean_pulse_dec0, test_data, start = start_dec0, stop = stop_dec0, channel = 0)
+delays_test_dec1, moved_pulses_test_dec1 = move_to_reference(mean_pulse_dec1, test_data, start = start_dec1, stop = stop_dec1, channel = 1)
 
-print(type(moved_pulses_test_dec0))
 TEST = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 
 # -------------------------------------------------------------------------
@@ -100,13 +90,6 @@ TEST = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 # Calculate moments 
 M_Test = momentos(TEST, order = moments_order)
 
-#params_dec0 = (np.array([0.38743577, 0.35521059, 0.32091923, 0.29320879, 0.27105946,
-#       0.25315543, 0.23847421, 0.22627119]), np.array([0.18359224, 0.15205655, 0.13110244, 0.11621708, 0.10512331,
-#       0.09655463, 0.08975309, 0.08423733]))
-#params_dec1 = (np.array([0.28284467, 0.27656352, 0.25491724, 0.23544002, 0.21921152,
-#       0.20579795, 0.19464108, 0.18527334]), np.array([0.15871774, 0.1323155 , 0.11494621, 0.10255006, 0.09325127,
-#       0.08601955, 0.08024191, 0.07552924]))
-#
 params_dec0 = (np.array([0.37360714, 0.34350668, 0.310697  , 0.2840613 , 0.26272417,
        0.24545365]), np.array([0.19064454, 0.15812544, 0.13650124, 0.12110903, 0.10962155,
        0.10073992]))
