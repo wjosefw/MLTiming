@@ -612,35 +612,29 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
+
 def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
+    
+    window_size = int(stop - start)
+    reference_pulse = reference[start:stop] # Extract the reference pulse
+    num_pulses = pulse_set.shape[0]
+    
+    # Initialize results
+    delays = np.zeros(num_pulses)
+    aligned_pulses = np.zeros((num_pulses, window_size), dtype = np.float32) # This data type is the input to the NN
 
-    # Extract the reference window
-    reference_pulse = reference[start:stop]
-    delays = np.zeros(pulse_set.shape[0])
-    aligned_pulses = np.zeros((pulse_set.shape[0], int(stop - start)), dtype = np.float32) # This data type is the input to the NN
-
-    for i in range(pulse_set.shape[0]):
-        mse = np.zeros((pulse_set.shape[1] - int(stop - start)))
-        segments = np.zeros((pulse_set.shape[1] - int(stop - start), int(stop - start)), dtype = np.float32)
-
-        # Extract the current pulse channel and sliding window
-        pulse = pulse_set[i, :, channel]
-        for j in range(0, pulse_set.shape[1] - int(stop - start)):
-            start_idx = j
-            stop_idx = j + int(stop - start)
-
-            # Extract the sliding window segment
-            segment = pulse[start_idx:stop_idx]
-            mse[j] = np.mean((reference_pulse - segment) ** 2)
-            segments[j,:] = segment
-
-        # Find the shift with the minimal MSE
-        min_mse_index = np.argmin(mse)
-        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
-        optimal_shift = start - optimal_start  
+    # Iterate over all pulses
+    for i in range(num_pulses):
+        pulse = pulse_set[i, :, channel]  # Extract the pulse
+        segments = np.lib.stride_tricks.sliding_window_view(pulse, window_size)  # Fast sliding window
+        mse = np.mean((segments - reference_pulse) ** 2, axis = 1)  # Vectorized MSE computation
         
+        # Find optimal shift
+        min_mse_index = np.argmin(mse)
+        optimal_shift = start - min_mse_index # min_mse_index is the start that minimizes the MSE  
+
         delays[i] = optimal_shift
-        aligned_pulses[i,:] = segments[min_mse_index,:]
+        aligned_pulses[i, :] = segments[min_mse_index, :]
 
     return delays, aligned_pulses
 
