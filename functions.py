@@ -612,52 +612,37 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def move_to_reference(reference, pulse_set, start = 50, stop = 80, max_delay = 10, channel = 0):
-    """
-    Aligns each pulse in a set with a reference pulse by shifting it to minimize MSE.
-    
-    Parameters:
-        reference (np.array): The reference pulse.
-        pulse_set (np.array): The set of pulses to align.
-        start (int): Start index for slicing the pulses.
-        stop (int): Stop index for slicing the pulses.
-        max_delay (int): Maximum delay allowed for shifting.
-        channel (int): Channel index to use from pulse_set.
-    
-    Returns:
-        np.array: Array of delay steps for each pulse to achieve minimum MSE.
-        np.array: Array of moved pulses corresponding to the minimal MSE alignment.
-    """
+def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
 
-    if int(stop-start) < max_delay:
-       print('Window (stop-start) cannot be smaller than max_delay')
+    # Extract the reference window
+    reference_pulse = reference[start:stop]
+    delays = np.zeros(pulse_set.shape[0])
+    aligned_pulses = np.zeros((pulse_set.shape[0], int(stop - start)), dtype = np.float32) # This data type is the input to the NN
 
-    y1 = reference[start:stop]
-    delays = []
-    moved_pulses = []
     for i in range(pulse_set.shape[0]):
-        mse = []
-        y2_list = []
-        y2 = pulse_set[i, start:stop, channel]
-        for j in range(-max_delay, max_delay + 1):  # j goes from -max_delay to max_delay
-            y2_rolled = np.roll(y2, j)
-            # Correct edges based on shift direction
-            if j < 0:
-                y2_rolled[j:] = pulse_set[i, stop:stop + abs(j), channel]
-            if j >= 0:
-                y2_rolled[:j] = pulse_set[i, :j, channel]
-            mse.append(np.mean((y1 - y2_rolled)**2))
-            y2_list.append(y2_rolled)
-        
-        mse = np.array(mse)
-        min_mse_index = np.argmin(mse)
-        delay_steps = min_mse_index - max_delay  # adjust index to reflect actual shift
-        delays.append(delay_steps)
-        
-        y2_array = np.array(y2_list)
-        moved_pulses.append(y2_array[min_mse_index])  # Reuse min_mse_index to avoid recomputation
+        mse = np.zeros((pulse_set.shape[1] - int(stop - start)))
+        segments = np.zeros((pulse_set.shape[1] - int(stop - start), int(stop - start)), dtype = np.float32)
 
-    return np.array(delays), np.array(moved_pulses)
+        # Extract the current pulse channel and sliding window
+        pulse = pulse_set[i, :, channel]
+        for j in range(0, pulse_set.shape[1] - int(stop - start)):
+            start_idx = j
+            stop_idx = j + int(stop - start)
+
+            # Extract the sliding window segment
+            segment = pulse[start_idx:stop_idx]
+            mse[j] = np.mean((reference_pulse - segment) ** 2)
+            segments[j,:] = segment
+
+        # Find the shift with the minimal MSE
+        min_mse_index = np.argmin(mse)
+        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
+        optimal_shift = start - optimal_start  
+        
+        delays[i] = optimal_shift
+        aligned_pulses[i,:] = segments[min_mse_index,:]
+
+    return delays, aligned_pulses
 
    
 #----------------------------------------------------------------------------------------------
