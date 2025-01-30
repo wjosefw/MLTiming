@@ -615,26 +615,27 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
 
 def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
     
-    window_size = int(stop - start)
-    reference_pulse = reference[start:stop] # Extract the reference pulse
+    window_size = stop - start
+    reference_pulse = reference[start:stop]  # Extract reference pulse
     num_pulses = pulse_set.shape[0]
     
     # Initialize results
-    delays = np.zeros(num_pulses)
-    aligned_pulses = np.zeros((num_pulses, window_size), dtype = np.float32) # This data type is the input to the NN
+    delays = np.zeros(num_pulses, dtype=np.int32)
+    aligned_pulses = np.zeros((num_pulses, window_size), dtype=np.float32)
 
-    # Iterate over all pulses
-    for i in range(num_pulses):
-        pulse = pulse_set[i, :, channel]  # Extract the pulse
-        segments = np.lib.stride_tricks.sliding_window_view(pulse, window_size)  # Fast sliding window
-        mse = np.mean((segments - reference_pulse) ** 2, axis = 1)  # Vectorized MSE computation
-        
-        # Find optimal shift
-        min_mse_index = np.argmin(mse)
-        optimal_shift = start - min_mse_index # min_mse_index is the start that minimizes the MSE  
+    # Extract sliding windows for all pulses
+    segments = np.lib.stride_tricks.sliding_window_view(pulse_set[:, :, channel], window_size, axis = 1)
 
-        delays[i] = optimal_shift
-        aligned_pulses[i, :] = segments[min_mse_index, :]
+    # Compute Mean Squared Error (MSE) in vectorized form
+    mse = np.mean((segments - reference_pulse) ** 2, axis = 2)
+
+    # Find optimal shifts
+    min_mse_indices = np.argmin(mse, axis = 1)  # Vectorized across all pulses
+    optimal_shifts = start - min_mse_indices  # Convert to delays
+
+    # Assign results
+    delays[:] = optimal_shifts
+    aligned_pulses[:] = segments[np.arange(num_pulses), min_mse_indices, :]
 
     return delays, aligned_pulses
 
