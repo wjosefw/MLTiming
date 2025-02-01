@@ -217,24 +217,27 @@ def normalize_by_max(array_pulsos, fit_polynomial=True):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
+
 def simpsons_rule_array(y, h):
     """"Calculate integral using Simpsons' rule"""
-    array = np.zeros(y.shape[0])
     n = y.shape[1]
 
-    for i in range(y.shape[0]):
-      integral = y[i,0] + y[i,-1]
+    # Handle the even and odd index multiplications
+    even_indices = np.arange(2, n - 1, 2)  # Indices for 2y_i terms (even indices)
+    odd_indices = np.arange(1, n, 2)       # Indices for 4y_i terms (odd indices)
 
-      for j in range(1, n, 2):
-          integral += 4 * y[i,j]
+    # Apply Simpson's rule across all rows at once
+    # Add y[0] + y[-1]
+    integral = y[:, 0] + y[:, -1]
 
-      for j in range(2, n - 1, 2):
-          integral += 2 * y[i,j]
+    # Add 4 * y[odd_indices]
+    integral += 4 * np.sum(y[:, odd_indices], axis=1)
 
-      integral *= h / 3
-      array[i] = integral
+    # Add 2 * y[even_indices]
+    integral += 2 * np.sum(y[:, even_indices], axis=1)
 
-    return array
+    # Multiply by h/3 and return the result
+    return integral * h / 3
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
