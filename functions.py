@@ -60,20 +60,36 @@ def calculate_gaussian_center(vector, nbins = 51, limit = 1):
 
     return centroid
 
-def plot_gaussian(array, shift, range = 0.8, nbins = 51, label = ' '):
-    """Plot histogram as points and overlay the Gaussian fit."""
+def plot_gaussian(array, shift, nbins = 51, label = ' ', range = 0.8, limit = 1):
+    """
+    Plot histogram centered around its peak and overlay Gaussian fit.
+    """
 
-    # Calculate the histogram data
-    histog, bins, patches = plt.hist(array - shift, bins = nbins, range = [-range, range], alpha = 0.5, label = label)
+    # Compute the initial histogram to find the peak
+    histog, bins = np.histogram(array - shift, bins = nbins, range = [-limit,limit])
     cbins = 0.5 * (bins[1:] + bins[:-1])
+
+    # Find peak position
+    peak_index = np.argmax(histog)
+    peak_value = cbins[peak_index]
     
-    # Fit the Gaussian to the histogram data
+    # Define a histogram range centered at the peak
+    new_min, new_max = peak_value - range, peak_value + range
+
+    # Compute the histogram with the new centered range
+    histog, bins, patches = plt.hist(array - shift, bins=nbins, range=(new_min, new_max), alpha=0.5, label=label)
+    cbins = 0.5 * (bins[1:] + bins[:-1])
+
+    # Fit a Gaussian to the histogram data
     popt = gauss_fit(cbins, histog)
     hist_color = patches[0].get_facecolor()
-    x_fit = np.linspace(-range, range, 500)
+    
+    # Generate Gaussian fit curve
+    x_fit = np.linspace(new_min, new_max, 500)
     y_fit = gauss(x_fit, *popt)
-    plt.plot(x_fit, y_fit, color = hist_color)
-
+    
+    plt.plot(x_fit, y_fit, color=hist_color)
+    plt.legend()
 
 def get_gaussian_params(array, shift, range = 0.8, nbins = 51):
     histog, bins = np.histogram(array - shift, bins = nbins, range = [-range, range])

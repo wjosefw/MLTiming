@@ -19,38 +19,6 @@ test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
 test_data  = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
 print('Número de casos de test: ', test_data.shape[0])
 
-def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
-    
-    window_size = int(stop - start)
-    reference_pulse = reference[start:stop] # Extract the reference pulse
-    delays = np.zeros(pulse_set.shape[0])
-    aligned_pulses = np.zeros((pulse_set.shape[0], int(stop - start)), dtype = np.float32) # This data type is the input to the NN
-
-    for i in range(pulse_set.shape[0]):
-        mse = np.zeros((pulse_set.shape[1] - int(stop - start)))
-        segments = np.zeros((pulse_set.shape[1] - int(stop - start), int(stop - start)), dtype = np.float32)
-
-        # Extract the current pulse channel and sliding window
-        pulse = pulse_set[i, :, channel]
-        for j in range(0, pulse_set.shape[1] - int(stop - start)):
-            start_idx = j
-            stop_idx = j + int(stop - start)
-
-            # Extract the sliding window segment
-            segment = pulse[start_idx:stop_idx]
-            mse[j] = np.mean((reference_pulse - segment) ** 2)
-            segments[j,:] = segment
-
-        # Find the shift with the minimal MSE
-        min_mse_index = np.argmin(mse)
-        optimal_start = range(0, pulse_set.shape[1] - int(stop - start))[min_mse_index]
-        optimal_shift = start - optimal_start  
-        
-        delays[i] = optimal_shift
-        aligned_pulses[i,:] = segments[min_mse_index,:]
-
-    return delays, aligned_pulses
-
 
 # -------------------------------------------------------------------------
 # ---------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -168,8 +136,8 @@ print(MAE[-1])
 
 
 # Plot
-plt.hist(test_dec0, bins = nbins, alpha = 0.5, range = [0.2,0.8], label = 'Detector 0');
-plt.hist(test_dec1, bins = nbins, alpha = 0.5, range = [0.2,0.8], label = 'Detector 1');
+plt.hist(test_dec0, bins = nbins, alpha = 0.5, range = [0.0,0.8], label = 'Detector 0');
+plt.hist(test_dec1, bins = nbins, alpha = 0.5, range = [0.0,0.8], label = 'Detector 1');
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')
@@ -261,8 +229,19 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 time_test = np.tile(TEST[0,:,0] , (1000000, 1, 1))
 model_dec0 = model_dec0.to(device)
+time_list_move = []
 time_list_moments = []
 time_list_inference = []
+
+# Start timer move to reference
+move_time_test = np.tile(test_data[0,:,:] , (500000, 1, 1))
+for i in range(10):
+    start_time_move = time.time()
+    delays, moved_pulses = move_to_reference(mean_pulse_dec0, move_time_test, start = start_dec0, stop = stop_dec0, channel = 0)
+    end_time_move = time.time()
+    elapsed_time_move = end_time_move - start_time_move
+    time_list_move.append(elapsed_time_move)
+time_array_move = np.array(time_list_move)
 
 # Start timer moments
 for i in range(10):
@@ -285,10 +264,11 @@ for i in range(10):
     time_list_inference.append(elapsed_time_inference)
 time_array_inference = np.array(time_list_inference)
 
-
+time_array_move = time_array_move[1:]  
 time_array_moments = time_array_moments[1:]   # We discard the first loop because it is artificially slower due to 'warm-up' effect 
 time_array_inference = time_array_inference[1:]
 
+print('Elapsed time move:', np.mean(time_array_move), np.std(time_array_move))
 print('Elapsed time momentos:', np.mean(time_array_moments), np.std(time_array_moments))
 print('Elapsed time inference:', np.mean(time_array_inference), np.std(time_array_inference))
 print('Elapsed time momentos + inference :', np.mean(time_array_moments) + np.mean(time_array_inference), np.std(time_array_moments) + np.std(time_array_inference))
@@ -302,7 +282,7 @@ import shap
 
 model = model_dec0
 channel = 0
-waveforms = np.mean(TEST[:, :, channel], axis = 0)
+waveforms = mean_pulse_dec0[start_dec0:stop_dec0]
 waveforms = torch.tensor(waveforms[None, None, :]).float()
 
 # SHAP Explainer
