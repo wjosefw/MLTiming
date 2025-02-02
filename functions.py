@@ -19,7 +19,6 @@ def gauss_fit(x, y):
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
     return popt
 
-
 def calculate_gaussian_center(vector, nbins = 51, limit = 1):
     """
     Calculate Gaussian fit centroid for each row of the input vector.
@@ -91,27 +90,42 @@ def plot_gaussian(array, shift, nbins = 51, label = ' ', range = 0.8, limit = 1)
     plt.plot(x_fit, y_fit, color=hist_color)
     plt.legend()
 
-def get_gaussian_params(array, shift, range = 0.8, nbins = 51):
-    histog, bins = np.histogram(array - shift, bins = nbins, range = [-range, range])
-    cbins = 0.5 * (bins[1:] + bins[:-1])  # Calculate bin centers
+def get_gaussian_params(array, shift, nbins = 51, range = 0.5, limit = 1):
+    """
+    Compute Gaussian parameters for a histogram centered around its peak.
+    """
+    
+    # Compute an initial histogram to find the peak
+    histog_full, bins_full = np.histogram(array - shift, bins = nbins, range =[-limit, limit])
+    cbins_full = 0.5 * (bins_full[1:] + bins_full[:-1])
 
-    # Fit the Gaussian to the histogram data
-    x = cbins
-    y = histog
+    # Identify peak bin
+    peak_index = np.argmax(histog_full)
+    peak_value = cbins_full[peak_index]
+
+    # Define a histogram range centered around the peak
+    new_min, new_max = peak_value - range, peak_value + range
+
+    # Compute the histogram within the new range
+    histog, bins = np.histogram(array - shift, bins = nbins, range = (new_min, new_max))
+    cbins = 0.5 * (bins[1:] + bins[:-1])  # Bin centers
+
+    # Fit a Gaussian to the histogram data
+    x, y = cbins, histog
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
-    popt, pcov = curve_fit(gauss, x, y, p0 = [min(y), max(y), mean, sigma])
-    
-    if pcov is None:
-        print("Gaussian fitting failed or parameter errors could not be estimated.")
-        return None
-    
-    HN, AN, x0, sigma = popt
-    
-    FWHM = 2.35482 * sigma
-    perr = np.sqrt(np.diag(pcov))
-    
-    return (HN, AN, x0, FWHM), perr
+
+    try:
+        popt, pcov = curve_fit(gauss, x, y, p0 = [min(y), max(y), mean, sigma])
+        HN, AN, x0, sigma = popt
+        FWHM = 2.35482 * sigma
+        perr = np.sqrt(np.diag(pcov)) if pcov is not None else np.array([np.nan] * 3)
+    except:
+        print("Gaussian fitting failed.")
+        return None, None
+
+    return (HN, x0, FWHM), perr
+
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
