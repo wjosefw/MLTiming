@@ -5,18 +5,34 @@ import torch
 from efficient_kan.src.efficient_kan import KAN
 
 from functions import ( calculate_gaussian_center, plot_gaussian, 
-                       get_gaussian_params, set_seed, momentos, normalize_given_params,
-                       move_to_reference, create_dataloaders)
+                       get_gaussian_params, set_seed, momentos, 
+                       normalize_given_params, move_to_reference)
 from Models import ConvolutionalModel, MLP_Torch
 
 
 #Load data
-dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
-test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
-test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
+dir = '/home/josea/Pulsos15CM20250130/'
+data0 = np.load(os.path.join(dir, 'Na22_norm_pos0.npz'))['data']
+data1 = np.load(os.path.join(dir, 'Na22_norm_pos1.npz'))['data']
+data2 = np.load(os.path.join(dir, 'Na22_norm_pos2.npz'))['data']
+data3 = np.load(os.path.join(dir, 'Na22_norm_pos3.npz'))['data']
+data4 = np.load(os.path.join(dir, 'Na22_norm_pos4.npz'))['data']
+data5 = np.load(os.path.join(dir, 'Na22_norm_pos5.npz'))['data']
+data6 = np.load(os.path.join(dir, 'Na22_norm_pos6.npz'))['data']
 
-test_data  = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
+data_min_1 = np.load(os.path.join(dir, 'Na22_norm_pos_min_1.npz'))['data']
+data_min_2 = np.load(os.path.join(dir, 'Na22_norm_pos_min_2.npz'))['data']
+data_min_3 = np.load(os.path.join(dir, 'Na22_norm_pos_min_3.npz'))['data']
+data_min_4 = np.load(os.path.join(dir, 'Na22_norm_pos_min_4.npz'))['data']
+data_min_5 = np.load(os.path.join(dir, 'Na22_norm_pos_min_5.npz'))['data']
+data_min_6 = np.load(os.path.join(dir, 'Na22_norm_pos_min_6.npz'))['data']
+
+test_data = np.concatenate((data0[-10000:,:,:], 
+                            data1[-10000:,:,:], data2[-10000:,:,:], data3[-10000:,:,:],
+                            data4[-10000:,:,:], data5[-10000:,:,:], data6[-10000:,:,:],
+                            data_min_1[-10000:,:,:], data_min_2[-10000:,:,:], data_min_3[-10000:,:,:],
+                            data_min_4[-10000:,:,:], data_min_5[-10000:,:,:], data_min_6[-10000:,:,:]), axis = 0)
+
 print('Número de casos de test: ', test_data.shape[0])
 
 
@@ -30,10 +46,11 @@ time_step = 0.2                            # Signal time step in ns
 positions = np.array([0.2, 0.0, -0.2])
 normalization_method = 'standardization'
 moments_order = 6
-start_dec0 = 60
-stop_dec0 = 74
-start_dec1 = 61
-stop_dec1 = 75
+positions = 0.066*np.array([6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4, -5, -6])  # Expected time difference of each position
+start_dec0 = 262
+stop_dec0 = 275
+start_dec1 = 262
+stop_dec1 = 275
 batch_size = 32
 architecture = [moments_order, 3, 1, 1]    # KAN architecture
 Num_Neurons = 32
@@ -116,20 +133,45 @@ test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy
 # Calculate TOF
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
 
-TOF_V00 = TOF[:test_data_55.shape[0]] 
-TOF_V02 = TOF[test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
-TOF_V20 = TOF[test_data_55.shape[0] + test_data_28.shape[0]:] 
 
+TOF_0 = TOF[:10000] 
+TOF_1 = TOF[ 10000:20000] 
+TOF_2 = TOF[ 20000:30000] 
+TOF_3 = TOF[ 30000:40000] 
+TOF_4 = TOF[ 40000:50000] 
+TOF_5 = TOF[ 50000:60000] 
+TOF_6 = TOF[ 60000:70000] 
+TOF_min_1 = TOF[70000:80000] 
+TOF_min_2 = TOF[80000:90000] 
+TOF_min_3 = TOF[90000:100000] 
+TOF_min_4 = TOF[100000:110000] 
+TOF_min_5 = TOF[110000:120000] 
+TOF_min_6 = TOF[120000:] 
 
-# Calulate Test error
-centroid_V00 = calculate_gaussian_center(TOF_V00[np.newaxis,:], nbins = nbins) 
+# Calulate Validation error
+centroid_V00 = calculate_gaussian_center(TOF_0[np.newaxis,:], nbins = nbins, limit = 1) 
 
-error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[2]))
-error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
-error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - positions[0]))
+error_min_6 = abs((TOF_min_6 - centroid_V00[:, np.newaxis] - positions[0]))
+error_min_5 = abs((TOF_min_5 - centroid_V00[:, np.newaxis] - positions[1]))
+error_min_4 = abs((TOF_min_4 - centroid_V00[:, np.newaxis] - positions[2]))
+error_min_3 = abs((TOF_min_3 - centroid_V00[:, np.newaxis] - positions[3]))
+error_min_2 = abs((TOF_min_2 - centroid_V00[:, np.newaxis] - positions[4]))
+error_min_1 = abs((TOF_min_1 - centroid_V00[:, np.newaxis] - positions[5]))
+error_0 = abs((TOF_0 - centroid_V00[:, np.newaxis] - positions[6]))
+error_1 = abs((TOF_1 - centroid_V00[:, np.newaxis] - positions[7]))
+error_2 = abs((TOF_2 - centroid_V00[:, np.newaxis] - positions[8]))
+error_3 = abs((TOF_3 - centroid_V00[:, np.newaxis] - positions[9]))
+error_4 = abs((TOF_4 - centroid_V00[:, np.newaxis] - positions[10]))
+error_5 = abs((TOF_5 - centroid_V00[:, np.newaxis] - positions[11]))
+error_6 = abs((TOF_6 - centroid_V00[:, np.newaxis] - positions[12]))
 
-Error = np.concatenate((error_V02, error_V20, error_V00), axis = 1)
-   
+# Get MAE
+Error = np.concatenate((error_0, 
+                        error_1, error_2, error_3,
+                        error_4, error_5, error_6, 
+                        error_min_1, error_min_2, error_min_3,
+                        error_min_4, error_min_5, error_min_6), axis = 1)   
+
 # Print MAE
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
@@ -146,17 +188,39 @@ plt.show()
 
 
 # Histogram and gaussian fit 
-plot_gaussian(TOF_V02, centroid_V00, range = 0.8, label = '-0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_V00, centroid_V00, range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
-plot_gaussian(TOF_V20, centroid_V00, range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_0, centroid_V00, range = 0.6, label = ' 0.0 ns offset', nbins = nbins)
+plot_gaussian(TOF_3, centroid_V00, range = 0.6, label = '-0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_5, centroid_V00, range = 0.6, label = '-0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_min_3, centroid_V00, range = 0.6, label = '-0.2 ns offset', nbins = nbins)
+plot_gaussian(TOF_min_5, centroid_V00, range = 0.6, label = '-0.2 ns offset', nbins = nbins)
 
-params_V02, errors_V02 = get_gaussian_params(TOF_V02, centroid_V00, range = 0.8, nbins = nbins)
-params_V00, errors_V00 = get_gaussian_params(TOF_V00, centroid_V00, range = 0.8, nbins = nbins)
-params_V20, errors_V20 = get_gaussian_params(TOF_V20, centroid_V00, range = 0.8, nbins = nbins)
+params_0, errors_0 = get_gaussian_params(TOF_0, centroid_V00, range = 0.6, nbins = nbins)
+params_1, errors_1 = get_gaussian_params(TOF_1, centroid_V00, range = 0.6, nbins = nbins)
+params_2, errors_2 = get_gaussian_params(TOF_2, centroid_V00, range = 0.6, nbins = nbins)
+params_3, errors_3 = get_gaussian_params(TOF_3, centroid_V00, range = 0.6, nbins = nbins)
+params_4, errors_4 = get_gaussian_params(TOF_4, centroid_V00, range = 0.6, nbins = nbins)
+params_5, errors_5 = get_gaussian_params(TOF_5, centroid_V00, range = 0.6, nbins = nbins)
+params_6, errors_6 = get_gaussian_params(TOF_6, centroid_V00, range = 0.6, nbins = nbins)
+params_min_1, errors_min_1 = get_gaussian_params(TOF_min_1, centroid_V00, range = 0.6, nbins = nbins)
+params_min_2, errors_min_2 = get_gaussian_params(TOF_min_2, centroid_V00, range = 0.6, nbins = nbins)
+params_min_3, errors_min_3 = get_gaussian_params(TOF_min_3, centroid_V00, range = 0.6, nbins = nbins)
+params_min_4, errors_min_4 = get_gaussian_params(TOF_min_4, centroid_V00, range = 0.6, nbins = nbins)
+params_min_5, errors_min_5 = get_gaussian_params(TOF_min_5, centroid_V00, range = 0.6, nbins = nbins)
+params_min_6, errors_min_6 = get_gaussian_params(TOF_min_6, centroid_V00, range = 0.6, nbins = nbins)
 
-print("V20: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
-print("V00: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
-print("V02: CENTROID(ns) = %.3f +/- %.3f  FWHM(ns) = %.3f +/- %.3f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
+print("min 6: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_6[1], errors_min_6[1], params_min_6[2], errors_min_6[2]))
+print("min 5: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_5[1], errors_min_5[1], params_min_5[2], errors_min_5[2]))
+print("min 4: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_4[1], errors_min_4[1], params_min_4[2], errors_min_4[2]))
+print("min 3: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_3[1], errors_min_3[1], params_min_3[2], errors_min_3[2]))
+print("min 2: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_2[1], errors_min_2[1], params_min_2[2], errors_min_2[2]))
+print("min 1: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_1[1], errors_min_1[1], params_min_1[2], errors_min_1[2]))
+print("0: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_0[1], errors_0[1], params_0[2], errors_0[2]))
+print("1: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_1[1], errors_1[1], params_1[2], errors_1[2]))
+print("2: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_2[1], errors_2[1], params_2[2], errors_2[2]))
+print("3: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_3[1], errors_3[1], params_3[2], errors_3[2]))
+print("4: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_4[1], errors_4[1], params_4[2], errors_4[2]))
+print("5: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_5[1], errors_5[1], params_5[2], errors_5[2]))
+print("6: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_6[1], errors_6[1], params_6[2], errors_6[2]))
 
 print('')
 plt.legend()
@@ -171,39 +235,61 @@ plt.show()
 resolution_list = []
 bias_list = []
 MAE_list = []
-centroid_00 = []
-centroid_02 = []
-centroid_20 = []
-
-size_V00 = int(TOF_V00.shape[0]/10)
-size_V02 = int(TOF_V02.shape[0]/10)
-size_V20 = int(TOF_V20.shape[0]/10)
 
 for i in range(10):
-    centroid_V00 = calculate_gaussian_center(TOF_V00[None, i*size_V00 : (i+1)*size_V00], nbins = nbins) 
-    params_V02, errors_V02 = get_gaussian_params(TOF_V02[i*size_V02 : (i+1)*size_V02], centroid_V00, range = 0.8, nbins = nbins)
-    params_V00, errors_V00 = get_gaussian_params(TOF_V00[i*size_V00 : (i+1)*size_V00], centroid_V00, range = 0.8, nbins = nbins)
-    params_V20, errors_V20 = get_gaussian_params(TOF_V20[i*size_V20 : (i+1)*size_V20], centroid_V00, range = 0.8, nbins = nbins)
+    centroid_V00 = calculate_gaussian_center(TOF_0[None, i*1000 : (i+1)*1000], nbins = nbins) 
+    params_0, errors_0 = get_gaussian_params(TOF_0[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_1, errors_1 = get_gaussian_params(TOF_1[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_2, errors_2 = get_gaussian_params(TOF_2[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_3, errors_3 = get_gaussian_params(TOF_3[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_4, errors_4 = get_gaussian_params(TOF_4[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_5, errors_5 = get_gaussian_params(TOF_5[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_6, errors_6 = get_gaussian_params(TOF_6[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_min_1, errors_min_1 = get_gaussian_params(TOF_min_1[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_min_2, errors_min_2 = get_gaussian_params(TOF_min_2[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_min_3, errors_min_3 = get_gaussian_params(TOF_min_3[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_min_4, errors_min_4 = get_gaussian_params(TOF_min_4[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_min_5, errors_min_5 = get_gaussian_params(TOF_min_5[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+    params_min_6, errors_min_6 = get_gaussian_params(TOF_min_6[i*1000 : (i+1)*1000], centroid_V00, range = 0.6, nbins = nbins)
+
+    resolution = np.mean([params_min_6[2],  params_min_5[2], params_min_4[2],
+                          params_min_3[2],  params_min_2[2], params_min_1[2],
+                          params_0[2],  
+                          params_1[2],  params_2[2], params_3[2], 
+                          params_4[2],  params_5[2], params_6[2],  
+                          ])
     
-    
-    resolution = np.mean((params_V20[3], params_V00[3], params_V02[3]))
     resolution_list.append(resolution)
     
-    centroids = np.array([params_V20[2], params_V00[2], params_V02[2]])
+    centroids = np.array([params_min_6[1],  params_min_5[1], params_min_4[1],
+                         params_min_3[1],  params_min_2[1], params_min_1[1],
+                         params_0[1],  
+                         params_1[1],  params_2[1], params_3[1], 
+                         params_4[1],  params_5[1], params_6[1]])
     bias = np.mean(abs(centroids - positions))
     bias_list.append(bias)
 
-    error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[2]))
-    error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
-    error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - positions[0]))
+    error_min_6 = abs((TOF_min_6 - centroid_V00[:, np.newaxis] - positions[0]))
+    error_min_5 = abs((TOF_min_5 - centroid_V00[:, np.newaxis] - positions[1]))
+    error_min_4 = abs((TOF_min_4 - centroid_V00[:, np.newaxis] - positions[2]))
+    error_min_3 = abs((TOF_min_3 - centroid_V00[:, np.newaxis] - positions[3]))
+    error_min_2 = abs((TOF_min_2 - centroid_V00[:, np.newaxis] - positions[4]))
+    error_min_1 = abs((TOF_min_1 - centroid_V00[:, np.newaxis] - positions[5]))
+    error_0 = abs((TOF_0 - centroid_V00[:, np.newaxis] - positions[6]))
+    error_1 = abs((TOF_1 - centroid_V00[:, np.newaxis] - positions[7]))
+    error_2 = abs((TOF_2 - centroid_V00[:, np.newaxis] - positions[8]))
+    error_3 = abs((TOF_3 - centroid_V00[:, np.newaxis] - positions[9]))
+    error_4 = abs((TOF_4 - centroid_V00[:, np.newaxis] - positions[10]))
+    error_5 = abs((TOF_5 - centroid_V00[:, np.newaxis] - positions[11]))
+    error_6 = abs((TOF_6 - centroid_V00[:, np.newaxis] - positions[12]))
+    
+    Error = np.concatenate((error_0, 
+                        error_1, error_2, error_3,
+                        error_4, error_5, error_6, 
+                        error_min_1, error_min_2, error_min_3,
+                        error_min_4, error_min_5, error_min_6), axis = 1)   
 
-    Error = np.concatenate((error_V02, error_V00, error_V20), axis = 1)   
     MAE_list.append(np.mean(Error)) 
-
-    centroid_00.append(params_V00[2])
-    centroid_02.append(params_V02[2])
-    centroid_20.append(params_V20[2])
-
 
 print('Mean CTR: ', np.mean(np.array(resolution_list))*1000)
 print('Std CTR: ', np.std(np.array(resolution_list))*1000)
@@ -211,13 +297,6 @@ print('Mean bias: ', np.mean(np.array(bias_list))*1000)
 print('Std bias: ', np.std(np.array(bias_list))*1000)
 print('Mean MAE: ', np.mean(np.array(MAE_list))*1000)
 print('Std MAE: ', np.std(np.array(MAE_list))*1000)
-
-print('Mean centroid 00: ', np.mean(np.array(centroid_00))*1000)
-print('Std centroid 00: ', np.std(np.array(centroid_00))*1000)
-print('Mean centroid 02: ', np.mean(np.array(centroid_02))*1000)
-print('Std centroid 02: ', np.std(np.array(centroid_02))*1000)
-print('Mean centroid 20: ', np.mean(np.array(centroid_20))*1000)
-print('Std centroid 20: ', np.std(np.array(centroid_20))*1000)
 
 
 # -------------------------------------------------------------------------
@@ -234,7 +313,7 @@ time_list_moments = []
 time_list_inference = []
 
 # Start timer move to reference
-move_time_test = np.tile(test_data[0,:,:] , (500000, 1, 1))
+move_time_test = np.tile(test_data[0,:,:] , (5000, 1, 1))
 for i in range(10):
     start_time_move = time.time()
     delays, moved_pulses = move_to_reference(mean_pulse_dec0, move_time_test, start = start_dec0, stop = stop_dec0, channel = 0)
