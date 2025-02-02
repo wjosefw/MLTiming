@@ -20,7 +20,7 @@ def gauss_fit(x, y):
     return popt
 
 
-def calculate_gaussian_center(vector, nbins = 51):
+def calculate_gaussian_center(vector, nbins = 51, limit = 1):
     """
     Calculate Gaussian fit centroid for each row of the input vector.
 
@@ -37,7 +37,7 @@ def calculate_gaussian_center(vector, nbins = 51):
 
     for i in range(vector.shape[0]):
         # Calculate the histogram of the current row of data
-        histogN, binsN = np.histogram(vector[i, :], bins = nbins) 
+        histogN, binsN = np.histogram(vector[i, :], bins = nbins, range = [-limit,limit]) 
         
         # Calculate the bin centers
         cbinsN = 0.5 * (binsN[1:] + binsN[:-1]) 
