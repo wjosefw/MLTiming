@@ -103,6 +103,76 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
 
+def train_loop_convolutional_single_det(model, optimizer, train_loader, val_loader, EPOCHS=75, name='model', save=False):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    # Pre-allocate loss tracking tensors
+    loss_list = torch.zeros(EPOCHS, device=device)
+    val_loss_list = torch.zeros(EPOCHS, device=device)
+
+    # Determine validation dataset size (assuming fixed size batches)
+    val_size = sum(batch[0].shape[0] for batch in val_loader)  # Total number of validation samples
+    val_predictions = torch.zeros((EPOCHS, val_size, 2), device=device)  # Preallocate tensor for all predictions
+
+    # Define loss function
+    loss_fn = custom_loss_MSE  
+
+    for epoch in range(EPOCHS):
+        running_loss = 0.0
+        model.train()
+
+        for inputs, labels in train_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            optimizer.zero_grad()
+
+            # Make predictions for this batch
+            outputs_0 = model(inputs[:, None, :, 0])
+            outputs_1 = model(inputs[:, None, :, 1])
+
+            # Compute loss and gradients
+            loss = loss_fn(outputs_0, outputs_1, labels)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+        # Store training loss
+        loss_list[epoch] = running_loss / len(train_loader)
+        print(f'EPOCH {epoch + 1}: LOSS train {loss_list[epoch].item()}')
+
+        # Validation step
+        model.eval()
+        with torch.no_grad():
+            val_loss = 0.0
+            start_idx = 0  # Track position in val_predictions tensor
+
+            for val_data, val_labels in val_loader:
+                val_data, val_labels = val_data.to(device), val_labels.to(device)
+
+                val_0 = model(val_data[:, None, :, 0])
+                val_1 = model(val_data[:, None, :, 1])
+                val_loss += loss_fn(val_0, val_1, val_labels).item()
+
+                batch_size = val_0.shape[0]
+                val_predictions[epoch, start_idx:start_idx + batch_size, 0] = val_0.squeeze()
+                val_predictions[epoch, start_idx:start_idx + batch_size, 1] = val_1.squeeze()
+                start_idx += batch_size  # Update index
+
+        # Store validation loss
+        val_loss_list[epoch] = val_loss / len(val_loader)
+        print(f'LOSS val {val_loss_list[epoch].item()}')
+
+    if save:
+        torch.save(model.state_dict(), name)
+
+    # Convert loss tensors to NumPy arrays
+    return loss_list.cpu().numpy(), val_loss_list.cpu().numpy(), val_predictions.cpu().numpy()
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------  
+
 def train_loop_convolutional_with_target(model, optimizer, train_loader, val_loader, EPOCHS = 75, name = 'model', save = False):
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
