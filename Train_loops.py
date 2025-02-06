@@ -15,7 +15,8 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-
+    test_tensor = test_tensor.to(device)
+    
     # Pre-allocate loss tracking tensors
     loss_list = torch.zeros(EPOCHS, device = device)
     val_loss_list = torch.zeros(EPOCHS, device = device)
@@ -60,7 +61,7 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
         # Calculate predictions on test_tensor
         model.eval()
         with torch.no_grad():
-            test_epoch = model(test_tensor)
+            test_epoch = model(test_tensor[:, None, :])
             test[epoch, :] = test_epoch.squeeze(-1)
 
             val_loss = 0.0
