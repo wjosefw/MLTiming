@@ -63,7 +63,6 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
         with torch.no_grad():
             test_epoch = model(test_tensor[:, None, :])
             test[epoch, :] = test_epoch.squeeze(-1)
-
             val_loss = 0.0
             start_idx = 0  # Track position in val_predictions tensor
 
