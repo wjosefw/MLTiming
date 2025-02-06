@@ -323,9 +323,6 @@ def normalize(data, method = 'standardization'):
     
     return normalized_data, params
 
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 def normalize_given_params(data, params, channel=0, method='standardization'):
     """
     Normalize the given data using the specified method and parameters.
