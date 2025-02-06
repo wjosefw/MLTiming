@@ -12,21 +12,21 @@ from Losses import custom_loss_MAE, custom_loss_bounded, custom_loss_MSE, custom
 #----------------------------------------------------------------------------------------------  
 
 def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    test_tensor = test_tensor.to(device)
 
-    loss_list = []
-    val_loss_list = []
-    test = []
-    val_list = []
+    # Pre-allocate loss tracking tensors
+    loss_list = torch.zeros(EPOCHS, device = device)
+    val_loss_list = torch.zeros(EPOCHS, device = device)
+    test = torch.zeros((EPOCHS, test_tensor.shape[0]), device = device)
+    
+    # Determine validation dataset size (assuming fixed size batches)
+    val_size = sum(batch[0].shape[0] for batch in val_loader)  # Total number of validation samples
+    val_predictions = torch.zeros((EPOCHS, val_size, 2), device = device)  # Preallocate tensor for all predictions
 
     # Define loss function 
     loss_fn = custom_loss_MSE  
-
-    # Cosine Annealing Scheduler
-    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-5)
-    
 
     for epoch in range(EPOCHS):
         running_loss = 0.0
@@ -53,52 +53,40 @@ def train_loop_convolutional(model, optimizer, train_loader, val_loader, test_te
             # Accumulate running loss
             running_loss += loss.item()
 
-        # Step the scheduler
-        #scheduler.step()
-
-        # Calculate average loss per epoch
-        avg_loss_epoch = running_loss / len(train_loader)  
-        loss_list.append(avg_loss_epoch)
-
-        print(f'EPOCH {epoch + 1}: LOSS train {avg_loss_epoch}')
+        # Store training loss
+        loss_list[epoch] = running_loss / len(train_loader)
+        print(f'EPOCH {epoch + 1}: LOSS train {loss_list[epoch].item()}')
 
         # Calculate predictions on test_tensor
         model.eval()
         with torch.no_grad():
-            test_epoch = model(test_tensor[:, None, :])
-            test.append(np.squeeze(test_epoch.cpu().numpy()))
+            test_epoch = model(test_tensor)
+            test[epoch, :] = test_epoch.squeeze(-1)
 
             val_loss = 0.0
-            val_stack = []  # List to hold val_0 and val_1 pairs
+            start_idx = 0  # Track position in val_predictions tensor
 
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
-                 
+
                 val_0 = model(val_data[:, None, :, 0])
                 val_1 = model(val_data[:, None, :, 1])
                 val_loss += loss_fn(val_0, val_1, val_labels).item()
-        
-                # Stack val_0 and val_1 along the last dimension
-                val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
 
-            # Combine all batches into a single array for this epoch
-            epoch_val = np.concatenate(val_stack, axis = 0)  
-            val_list.append(epoch_val)  
-        
-            val_loss_list.append(val_loss / len(val_loader))
-            print(f'LOSS val {val_loss / len(val_loader)}')
+                batch_size = val_0.shape[0]
+                val_predictions[epoch, start_idx:start_idx + batch_size, 0] = val_0.squeeze()
+                val_predictions[epoch, start_idx:start_idx + batch_size, 1] = val_1.squeeze()
+                start_idx += batch_size  # Update index
 
+        # Store validation loss
+        val_loss_list[epoch] = val_loss / len(val_loader)
+        print(f'LOSS val {val_loss_list[epoch].item()}')
 
     if save:
         torch.save(model.state_dict(), name)
 
-    # Convert lists to numpy arrays
-    loss_array = np.array(loss_list, dtype = 'object')
-    test = np.array(test, dtype = 'object')
-    val_loss = np.array(val_loss_list, dtype = 'object')
-    val = np.array(val_list, dtype = 'object')
     
-    return loss_array, test, val_loss, val
+    return loss_list.cpu().numpy(), val_loss_list.cpu().numpy(), test.cpu().numpy(), val_predictions.cpu().numpy()
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
@@ -245,7 +233,6 @@ def train_loop_convolutional_with_target(model, optimizer, train_loader, val_loa
     
     return loss_array, val_loss
 
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
 
@@ -255,21 +242,20 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
     model.to(device)
     test_tensor = test_tensor.to(device)
     
+    # Pre-allocate loss tracking tensors
+    loss_list = torch.zeros(EPOCHS, device = device)
+    val_loss_list = torch.zeros(EPOCHS, device = device)
+    test = torch.zeros((EPOCHS, test_tensor.shape[0]), device = device)
     
-    loss_list = []
-    val_loss_list = []
-    test = []
-    val = []  
+    # Determine validation dataset size (assuming fixed size batches)
+    val_size = sum(batch[0].shape[0] for batch in val_loader)  # Total number of validation samples
+    val_predictions = torch.zeros((EPOCHS, val_size, 2), device = device)  # Preallocate tensor for all predictions
 
     # Define loss function
     loss_fn = custom_loss_MSE
 
-    # Cosine Annealing Scheduler
-    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS)
-
     for epoch in range(EPOCHS):
         running_loss = 0.0
-        avg_loss_epoch = 0.0
         model.train()
         for i, data in enumerate(train_loader):
             # Every data instance is an input + label pair
@@ -293,40 +279,34 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
             # Accumulate running loss
             running_loss += loss.item()
 
-        # Step the scheduler
-        #scheduler.step()
+        # Store training loss
+        loss_list[epoch] = running_loss / len(train_loader)
+        print(f'EPOCH {epoch + 1}: LOSS train {loss_list[epoch].item()}')
 
-        # Calculate average loss per epoch
-        avg_loss_epoch = running_loss / int(i)  # loss per batch
-        loss_list.append(avg_loss_epoch)
-
-        print('EPOCH {}:'.format(epoch + 1))
-        print('LOSS train {}'.format(avg_loss_epoch))
-
-        # Calculate predictions on test_tensor
+        # Validation step
         model.eval()
         with torch.no_grad():
             test_epoch = model(test_tensor)
-            test.append(np.squeeze(test_epoch.cpu().numpy()))
+            test[epoch, :] = test_epoch.squeeze(-1)
 
-            val_loss = 0
-            val_stack = []  # List to hold val_0 and val_1 pairs
+            val_loss = 0.0
+            start_idx = 0  # Track position in val_predictions tensor
 
             for val_data, val_labels in val_loader:
                 val_data, val_labels = val_data.to(device), val_labels.to(device)
+
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += loss_fn(val_0, val_1, val_labels)
-                
-                # Stack val_0 and val_1 along the last dimension
-                val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
-            
-            # Combine all batches into a single array for this epoch
-            epoch_val = np.concatenate(val_stack, axis = 0)  
-            val.append(epoch_val)  
+                val_loss += loss_fn(val_0, val_1, val_labels).item()
 
-            val_loss_list.append(val_loss.cpu().numpy() / len(val_loader))
-            print(f'LOSS val {val_loss / len(val_loader)}')
+                batch_size = val_0.shape[0]
+                val_predictions[epoch, start_idx:start_idx + batch_size, 0] = val_0.squeeze()
+                val_predictions[epoch, start_idx:start_idx + batch_size, 1] = val_1.squeeze()
+                start_idx += batch_size  # Update index
+
+            # Store validation loss
+            val_loss_list[epoch] = val_loss / len(val_loader)
+            print(f'LOSS val {val_loss_list[epoch].item()}')
 
 
     # Save the model at the specified checkpoint frequency if 'save' is True
@@ -334,33 +314,28 @@ def train_loop_MLP(model, optimizer,  train_loader, val_loader, test_tensor, EPO
        torch.save(model.state_dict(), name)
 
     
-    return (
-        np.array(loss_list, dtype = 'object'), 
-        np.array(val_loss_list, dtype = 'object'), 
-        np.array(test, dtype = 'object'), 
-        np.array(val, dtype = 'object')
-    )
+    return loss_list.cpu().numpy(), val_loss_list.cpu().numpy(), test.cpu().numpy(), val_predictions.cpu().numpy()
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
 
 def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
     
-    loss_list = []
-    val_loss_list = []
-    test = []
-    val = []  
-    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
-    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
+    test_tensor = test_tensor.to(device)
+
+    # Pre-allocate loss tracking tensors
+    loss_list = torch.zeros(EPOCHS, device = device)
+    val_loss_list = torch.zeros(EPOCHS, device = device)
+    test = torch.zeros((EPOCHS, test_tensor.shape[0]), device = device)
+    
+    # Determine validation dataset size (assuming fixed size batches)
+    val_size = sum(batch[0].shape[0] for batch in val_loader)  # Total number of validation samples
+    val_predictions = torch.zeros((EPOCHS, val_size, 2), device = device)  # Preallocate tensor for all predictions
     
     # Define loss function
     loss_fn = custom_loss_MSE 
-
-    # Move model and test_tensor to the device
-    model = model.to(device)
-    test_tensor = test_tensor.to(device)
 
     for epoch in range(EPOCHS):
         running_loss = 0.0
@@ -378,45 +353,39 @@ def train_loop_KAN(model, optimizer, train_loader, val_loader, test_tensor, EPOC
             optimizer.step()
 
             running_loss += loss.item()
+       
+        # Store training loss
+        loss_list[epoch] = running_loss / len(train_loader)
+        print(f'EPOCH {epoch + 1}: LOSS train {loss_list[epoch].item()}')
 
-        #scheduler.step()
-        loss_list.append(running_loss / len(train_loader))
-
-        print(f'EPOCH {epoch + 1}:')
-        print(f'LOSS train {running_loss / len(train_loader)}')
-
+        # Validation step
         with torch.no_grad():
             test_epoch = model(test_tensor)
-            test.append(np.squeeze(test_epoch.cpu().detach().numpy()))
+            test[epoch, :] = test_epoch.squeeze(-1)
 
-            val_loss = 0
-            val_stack = []  # List to hold val_0 and val_1 pairs
-            
+            val_loss = 0.0
+            start_idx = 0  # Track position in val_predictions tensor
+
             for val_data, val_labels in val_loader:
-                val_data, val_labels = val_data.to(device), val_labels.to(device) 
+                val_data, val_labels = val_data.to(device), val_labels.to(device)
+
                 val_0 = model(val_data[:, :, 0])
                 val_1 = model(val_data[:, :, 1])
-                val_loss += loss_fn(val_0, val_1, val_labels)
+                val_loss += loss_fn(val_0, val_1, val_labels).item()
 
-                # Stack val_0 and val_1 along the last dimension
-                val_stack.append(np.stack((np.squeeze(val_0.cpu().detach().numpy()), np.squeeze(val_1.cpu().detach().numpy())), axis = -1))
+                batch_size = val_0.shape[0]
+                val_predictions[epoch, start_idx:start_idx + batch_size, 0] = val_0.squeeze()
+                val_predictions[epoch, start_idx:start_idx + batch_size, 1] = val_1.squeeze()
+                start_idx += batch_size  # Update index
 
-            # Combine all batches into a single array for this epoch
-            epoch_val = np.concatenate(val_stack, axis = 0)  
-            val.append(epoch_val)  
-            
-            val_loss_list.append(val_loss.item() / len(val_loader))
-            print(f'LOSS val {val_loss / len(val_loader)}')
+            # Store validation loss
+            val_loss_list[epoch] = val_loss / len(val_loader)
+            print(f'LOSS val {val_loss_list[epoch].item()}')
 
     if save:
         torch.save(model.state_dict(), name)
 
-    return (
-        np.array(loss_list, dtype = 'object'), 
-        np.array(val_loss_list, dtype = 'object'), 
-        np.array(test, dtype = 'object'), 
-        np.array(val, dtype = 'object')
-    )
+    return loss_list.cpu().numpy(), val_loss_list.cpu().numpy(), test.cpu().numpy(), val_predictions.cpu().numpy()
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
@@ -478,130 +447,3 @@ def train_loop_KAN_with_target(model, optimizer, train_loader, val_loader, EPOCH
         np.array(val_loss_list, dtype = 'object')
     )
 
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------  
-
-def train_loop_T_Ref(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, checkpoint = 15, name = 'model', save = False):
-    loss_list = []
-    val_loss_list = []
-    test = []
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
-    
-    # Define loss function
-    loss_fn = nn.MSELoss()
-    
-    for epoch in range(EPOCHS):
-        running_loss = 0.0
-
-        for data in train_loader:
-            inputs, labels = data
-            optimizer.zero_grad()
-            
-            outputs = model(inputs)
-
-            loss = loss_fn(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
-        scheduler.step()
-        loss_list.append(running_loss / len(train_loader))
-
-        print(f'EPOCH {epoch + 1}:')
-        print(f'LOSS train {running_loss / len(train_loader)}')
-
-        with torch.no_grad():
-            test_epoch = model(test_tensor)
-            test.append(np.squeeze(test_epoch.detach().numpy()))
-
-            val_loss = 0
-            for val_data, val_labels in val_loader:
-                val_output = model(val_data)
-                val_loss += loss_fn(val_output, val_labels)
-            val_loss_list.append(val_loss / len(val_loader))
-            print(f'LOSS val {val_loss / len(val_loader)}')
-
-        if save and epoch % checkpoint == 0:
-            torch.save(model.state_dict(), f'{name}_{epoch}')
-
-    return np.array(loss_list, dtype = 'object'), np.array(val_loss_list, dtype = 'object'), np.array(test, dtype = 'object')
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------  
-
-def train_loop_convolutional_Threshold(model, optimizer, train_loader, val_loader, test_tensor, EPOCHS = 75, name = 'model', save = False):
-    
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-    test_tensor = test_tensor.to(device)
-    
-    loss_list = []
-    val_loss_list = []
-    test = []
-    
-    # Define loss function
-    loss_fn = custom_loss_with_huber  
-
-    # Cosine Annealing Scheduler
-    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCHS, eta_min = 1e-6)
-
-    for epoch in range(EPOCHS):
-        running_loss = 0.0
-        model.train()
-        for data in train_loader:
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
-            
-            # Zero gradients
-            optimizer.zero_grad()
-
-            # Make predictions for this batch 
-            outputs_0 = model(inputs[:, None, :, :, 0])
-            outputs_1 = model(inputs[:, None, :, :, 1])
-            
-            # Compute the loss and its gradients
-            loss = loss_fn(outputs_0, outputs_1, labels)
-            loss.backward()
-
-            # Adjust learning weights
-            optimizer.step()
-
-            # Accumulate running loss
-            running_loss += loss.item()
-
-        # Step the scheduler
-        #scheduler.step()
-
-        # Calculate average loss per epoch
-        avg_loss_epoch = running_loss / len(train_loader)  
-        loss_list.append(avg_loss_epoch)
-
-        print(f'EPOCH {epoch + 1}: LOSS train {avg_loss_epoch}')
-
-        # Calculate predictions on test_tensor
-        model.eval()
-        with torch.no_grad():
-            test_epoch = model(test_tensor[:, None, :, :])
-            test.append(np.squeeze(test_epoch.cpu().numpy()))
-
-            val_loss = 0.0
-            for val_data, val_labels in val_loader:
-                val_data, val_labels = val_data.to(device), val_labels.to(device)
-                 
-                val_0 = model(val_data[:, None, :, :, 0])
-                val_1 = model(val_data[:, None, :, :, 1])
-                val_loss += loss_fn(val_0, val_1, val_labels).item()
-        val_loss_list.append(val_loss / len(val_loader))
-        print(f'LOSS val {val_loss / len(val_loader)}')
-
-
-    if save:
-        torch.save(model.state_dict(), name)
-
-    # Convert lists to numpy arrays
-    loss_array = np.array(loss_list, dtype = 'object')
-    test = np.array(test, dtype = 'object')
-    val = np.array(val_loss_list, dtype = 'object')
-    
-    return loss_array, test, val
