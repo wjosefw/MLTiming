@@ -429,9 +429,6 @@ def get_closest(ref_pulse, pulse_set, channel = 0):
 
   return index_of_closest
 
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 def create_set(og_set, channel = 0):
     """
     Create a new set of pulses where each pulse is paired with its closest match from the original set.
@@ -482,9 +479,6 @@ def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift 
         New_position[i,:t_shift,channel_to_move] = pulse_set[i,:t_shift,channel_to_move]
     
     return New_position
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
 
 def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop = 74, delay_time = 1):
     
@@ -552,56 +546,6 @@ def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop =
 
     return INPUT_2, REF
 
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-
-def create_delays_uniform(pulse_set, time_step, start = 50, stop = 74, delay_time = 1):
-    
-
-    INPUT = np.zeros((pulse_set.shape[0], int(stop-start), 2))
-    INPUT_2 = np.zeros((pulse_set.shape[0], int(stop-start), 2))
-    REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
-
-    NRD = np.random.triangular(-0.1, 0, delay_time, size = pulse_set.shape[0]) #np.random.uniform(low = -0.1, high = delay_time, size = pulse_set.shape[0])
-    
-    for i in range(pulse_set.shape[0]):
-        
-        if NRD[i] >= 0:
-            res_1 = NRD[i] % time_step  
-            for j in range(int(stop-start) - 1, 0, -1):
-                slope = (pulse_set[i, start + j] - pulse_set[i, start + j - 1]) / time_step
-                INPUT[i, j, 1] = pulse_set[i, start + j] - slope * res_1 
-            INPUT[i, 0, 1] = pulse_set[i, start] 
-
-            idel_1 = int(NRD[i] / time_step) 
-            INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
-            INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
-        
-        if NRD[i] < 0:
-           res_1 = NRD[i] % time_step  # Fractional part of the delay
-           for j in range(int(stop-start) - 1):
-               slope = (pulse_set[i, start + j + 1] - pulse_set[i, start + j]) / time_step
-               INPUT[i, j, 1] = pulse_set[i, start + j] + slope * res_1 
-           INPUT[i, -1, 1] = pulse_set[i, stop] 
-           
-           idel_1 = int(NRD[i] / time_step) 
-           if idel_1 != 0:
-            INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
-            INPUT_2[i,idel_1:,1] = pulse_set[i, stop + 1:stop + abs(idel_1) + 1]
-           else:
-            INPUT_2[i,:,1] = INPUT[i,:,1]
-        
-        INPUT_2[i,:,0] = pulse_set[i,start:stop]
-        REF[i] =  - NRD[i]
-
-    return INPUT_2, REF
-
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-
 def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
     
 
@@ -635,16 +579,12 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
         INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
         INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
         
-        #INPUT_2[i,:,0] = INPUT_2[i,:,0] + np.random.normal(0, 0.01, pulse_set.shape[1]) 
-        #INPUT_2[i,:,1] = INPUT_2[i,:,1] + np.random.normal(0, 0.01, pulse_set.shape[1])
         REF[i] = NRD0[i] - NRD1[i]  
 
     return INPUT_2, REF
 
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
     
@@ -671,24 +611,7 @@ def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
     aligned_pulses[:] = segments[np.arange(num_pulses), min_mse_indices, :]
 
     return delays, aligned_pulses
-
    
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-    
-def get_points_after_threshold(vector, fraction = 0.2, num_points = 10):
-
-    new_vector = np.zeros((vector.shape[0], int(num_points), 2))
-    
-    for i in range(vector.shape[0]):
-        # Find indices where the signal in each channel exceeds the fraction threshold
-        idx_channel0 = np.where(vector[i,:, 0] >= fraction)[0][0]
-        idx_channel1 = np.where(vector[i,:, 1] >= fraction)[0][0]
-        
-        new_vector[i,:, 0] = vector[i,idx_channel0:idx_channel0 + num_points,0]
-        new_vector[i,:, 1] = vector[i,idx_channel1:idx_channel1 + num_points,1]
-
-    return new_vector    
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -932,9 +855,7 @@ def extract_signal_along_time(vector, time_step, fraction = 0.2, window_low = 14
     new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
     time_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
     t = np.arange(0, time_step*vector.shape[1], time_step)
-    #t = np.linspace(0, 1, vector.shape[1])
-    #t = np.arange(0, time_step*vector.shape[1], time_step)
-    
+
     a = 0
     b = 0    
     for i in range(vector.shape[0]):
