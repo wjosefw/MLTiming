@@ -41,7 +41,7 @@ data_min_5_test = np.load(os.path.join(dir, 'Na22_norm_pos_min_5_test.npz'), mma
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1                # Max delay to training pulses in ns
+delay_time = 1                  # Max delay to training pulses in ns
 time_step = 0.2                 # Signal time step in ns
 set_seed(42)                    # Fix seeds
 nbins = 51                      # Num bins for all histograms
@@ -117,26 +117,26 @@ val_loader_dec1  = create_dataloaders(val_dec1, REF_val_dec1, batch_size =  val_
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-#set_seed(42)
-#model_dec0 = ConvolutionalModel(int(stop_dec0-start_dec0))
-#set_seed(42)
-#model_dec1 = ConvolutionalModel(int(stop_dec1-start_dec1))
+set_seed(42)
+model_dec0 = ConvolutionalModel(int(stop_dec0-start_dec0))
+set_seed(42)
+model_dec1 = ConvolutionalModel(int(stop_dec1-start_dec1))
 
-set_seed(42)
-model_dec0 = MLP_Torch(NM = int(stop_dec0-start_dec1), NN = Num_Neurons, STD_INIT = 0.5)
-set_seed(42)
-model_dec1 = MLP_Torch(NM = int(stop_dec0-start_dec1), NN = Num_Neurons, STD_INIT = 0.5)
+#set_seed(42)
+#model_dec0 = MLP_Torch(NM = int(stop_dec0-start_dec0), NN = Num_Neurons, STD_INIT = 0.5)
+#set_seed(42)
+#model_dec1 = MLP_Torch(NM = int(stop_dec1-start_dec1), NN = Num_Neurons, STD_INIT = 0.5)
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
-optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr, weight_decay = 1e-5) 
-optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr, weight_decay = 1e-5) 
+optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr) 
+optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr) 
 
 # Execute train loop
-#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = '../Trained_Models/AG_model_dec0',  save = save) 
-#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = '../Trained_Models/AG_model_dec1',  save = save)
-loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = '../Trained_Models/MLPWAVE_AG_model_dec0', save = save) 
-loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = '../Trained_Models/MLPWAVE_AG_model_dec1', save = save)
+loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = '../Trained_Models/AG_model_dec0',  save = save) 
+loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = '../Trained_Models/AG_model_dec1',  save = save)
+#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = '../Trained_Models/MLPWAVE_AG_model_dec0', save = save) 
+#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = '../Trained_Models/MLPWAVE_AG_model_dec1', save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -249,7 +249,7 @@ plt.show()
 # -------------------- SAVE RESULTS OVER EPOCHS ---------------------------
 # -------------------------------------------------------------------------
 
-idx = 20
+idx = 0
 TOF_0 = TOF_0[idx:]
 TOF_1 = TOF_1[idx:]
 TOF_2 = TOF_2[idx:]
@@ -266,38 +266,6 @@ val_dec0 = val_dec0[idx:,:,:]
 val_dec1 = val_dec1[idx:,:,:]
 MAE = MAE[idx:]
 
-centroid_0 = calculate_gaussian_center(TOF_0, nbins = nbins) 
-centroid_1 = calculate_gaussian_center(TOF_1 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1) 
-centroid_2 = calculate_gaussian_center(TOF_2 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1)
-centroid_3 = calculate_gaussian_center(TOF_3 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1) 
-centroid_4 = calculate_gaussian_center(TOF_4 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1) 
-centroid_5 = calculate_gaussian_center(TOF_5 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1)
-centroid_min_1 = calculate_gaussian_center(TOF_min_1 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1) 
-centroid_min_2 = calculate_gaussian_center(TOF_min_2 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1)
-centroid_min_3 = calculate_gaussian_center(TOF_min_3 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1) 
-centroid_min_4 = calculate_gaussian_center(TOF_min_4 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1) 
-centroid_min_5 = calculate_gaussian_center(TOF_min_5 - centroid_0[:, np.newaxis], nbins = nbins, limit = 1)
-
-error_min_5_centroid = abs((centroid_min_5 - positions[0]))
-error_min_4_centroid = abs((centroid_min_4 - positions[1]))
-error_min_3_centroid = abs((centroid_min_3 - positions[2]))
-error_min_2_centroid = abs((centroid_min_2 - positions[3]))
-error_min_1_centroid = abs((centroid_min_1 - positions[4]))
-
-error_0_centroid = abs((centroid_0 - positions[5]))
-error_1_centroid = abs((centroid_1 - positions[6]))
-error_2_centroid = abs((centroid_2 - positions[7]))
-error_3_centroid = abs((centroid_3 - positions[8]))
-error_4_centroid = abs((centroid_4 - positions[9]))
-error_5_centroid = abs((centroid_5 - positions[10]))
-
-
-avg_bias = np.mean(np.stack((error_0_centroid, error_1_centroid, error_2_centroid, 
-                             error_3_centroid, error_4_centroid, error_5_centroid,
-                             error_min_1_centroid,  error_min_2_centroid, error_min_3_centroid,
-                             error_min_4_centroid,  error_min_5_centroid), axis = -1), axis = 1)
-
-
 # Plot MAE_singles vs MAE_coincidences
 err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
 err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
@@ -306,9 +274,10 @@ mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
 np.savez_compressed('../predictions/mean_err_val_dec0_Na22.npz', data = mean_err_val_dec0)
 np.savez_compressed('../predictions/mean_err_val_dec1_Na22.npz', data = mean_err_val_dec1)
 np.savez_compressed('../predictions/MAE_Na22.npz', data = MAE)
-np.savez_compressed('../predictions/avg_bias.npz', data = avg_bias)
 
 CTR = []
+avg_bias = []
+centroid_0 = calculate_gaussian_center(TOF_0, nbins = nbins, limit = 3) 
 for i in range(TOF_0.shape[0]):
     params_0, errors_0 = get_gaussian_params(TOF_0[i,:], centroid_0[i], range = 0.6, nbins = nbins)
     params_1, errors_1 = get_gaussian_params(TOF_1[i,:], centroid_0[i], range = 0.6, nbins = nbins)
@@ -321,9 +290,30 @@ for i in range(TOF_0.shape[0]):
     params_min_3, errors_min_3 = get_gaussian_params(TOF_min_3[i,:], centroid_0[i], range = 0.6, nbins = nbins)
     params_min_4, errors_min_4 = get_gaussian_params(TOF_min_4[i,:], centroid_0[i], range = 0.6, nbins = nbins)
     params_min_5, errors_min_5 = get_gaussian_params(TOF_min_5[i,:], centroid_0[i], range = 0.6, nbins = nbins)
+    
     CTR.append(np.mean([params_0[2], params_1[2], params_2[2], 
                         params_3[2], params_4[2], params_5[2],  
                         params_min_1[2],  params_min_2[2], params_min_3[2],
                         params_min_4[2],  params_min_5[2]]))
-np.savez_compressed('../predictions/ctr.npz', data = np.array(CTR))
+    
+    error_min_5_centroid = abs((params_min_5[1] - positions[0]))
+    error_min_4_centroid = abs((params_min_4[1] - positions[1]))
+    error_min_3_centroid = abs((params_min_3[1] - positions[2]))
+    error_min_2_centroid = abs((params_min_2[1] - positions[3]))
+    error_min_1_centroid = abs((params_min_1[1] - positions[4]))
 
+    error_0_centroid = abs((params_0[1] - positions[5]))
+    error_1_centroid = abs((params_1[1] - positions[6]))
+    error_2_centroid = abs((params_2[1] - positions[7]))
+    error_3_centroid = abs((params_3[1] - positions[8]))
+    error_4_centroid = abs((params_4[1] - positions[9]))
+    error_5_centroid = abs((params_5[1] - positions[10]))
+
+
+    avg_bias.append(np.mean([error_0_centroid, error_1_centroid, error_2_centroid, 
+                             error_3_centroid, error_4_centroid, error_5_centroid,
+                             error_min_1_centroid,  error_min_2_centroid, error_min_3_centroid,
+                             error_min_4_centroid,  error_min_5_centroid]))
+   
+np.savez_compressed('../predictions/ctr.npz', data = np.array(CTR))
+np.savez_compressed('../predictions/avg_bias.npz', data = np.array(avg_bias))
