@@ -2,12 +2,17 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(device)
-
 import sys
-sys.path.append('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/')
+
+# Import Hyperparameters and Paths
+from config_Gross_Adjustment import (
+    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save,
+    time_step, delay_time, nbins, positions, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, 
+    BASE_DIR
+)
+
+print(device)
+sys.path.append(str(BASE_DIR.parent))
 
 # Import functions 
 from functions import (move_to_reference, create_and_delay_pulse_pair, 
@@ -17,42 +22,14 @@ from functions import (move_to_reference, create_and_delay_pulse_pair,
 from Models import ConvolutionalModel,  count_parameters, MLP_Torch
 from Train_loops import train_loop_convolutional, train_loop_MLP
 
-# Load data 
-dir = '/home/josea/Pulsos15CM20250130_version2/'
+# Load data
+data0_train = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode='r')['data']
+data0_val = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode='r')['data']
 
-data0_train = np.load(os.path.join(dir, 'Na22_norm_pos0_train.npz'), mmap_mode='r')['data']
-data0_val = np.load(os.path.join(dir, 'Na22_norm_pos0_val.npz'), mmap_mode='r')['data']
-
-data0_test = np.load(os.path.join(dir, 'Na22_norm_pos0_test.npz'), mmap_mode='r')['data']
-data1_test = np.load(os.path.join(dir, 'Na22_norm_pos1_test.npz'), mmap_mode='r')['data']
-data2_test = np.load(os.path.join(dir, 'Na22_norm_pos2_test.npz'), mmap_mode='r')['data']
-data3_test = np.load(os.path.join(dir, 'Na22_norm_pos3_test.npz'), mmap_mode='r')['data']
-data4_test = np.load(os.path.join(dir, 'Na22_norm_pos4_test.npz'), mmap_mode='r')['data']
-data5_test = np.load(os.path.join(dir, 'Na22_norm_pos5_test.npz'), mmap_mode='r')['data']
-
-data_min_1_test = np.load(os.path.join(dir, 'Na22_norm_pos_min_1_test.npz'), mmap_mode='r')['data']
-data_min_2_test = np.load(os.path.join(dir, 'Na22_norm_pos_min_2_test.npz'), mmap_mode='r')['data']
-data_min_3_test = np.load(os.path.join(dir, 'Na22_norm_pos_min_3_test.npz'), mmap_mode='r')['data']
-data_min_4_test = np.load(os.path.join(dir, 'Na22_norm_pos_min_4_test.npz'), mmap_mode='r')['data']
-data_min_5_test = np.load(os.path.join(dir, 'Na22_norm_pos_min_5_test.npz'), mmap_mode='r')['data']
-
-
-# -------------------------------------------------------------------------
-#----------------------- IMPORTANT DEFINITIONS ----------------------------
-# -------------------------------------------------------------------------
-
-delay_time = 1                  # Max delay to training pulses in ns
-time_step = 0.2                 # Signal time step in ns
-set_seed(42)                    # Fix seeds
-nbins = 51                      # Num bins for all histograms
-positions = 0.066*np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5])  # Expected time difference of each position
-before  = 8                     # Points to take before threshold
-after = 5                       # Points to take after threshold
-lr = 1e-5
-epochs = 500
-batch_size = 32
-Num_Neurons = 16
-save = True
+test_data_dict = {}
+for i in range(-5, 6):  
+    filename = f"Na22_norm_pos{i}_test.npz" if i >= 0 else f"Na22_norm_pos_min_{abs(i)}_test.npz"
+    test_data_dict[i] = np.load(DATA_DIR / filename, mmap_mode = "r")["data"]
 
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
@@ -60,13 +37,14 @@ save = True
 
 train_data = data0_train
 validation_data = data0_val
-test_data = np.concatenate((data0_test, data1_test, data2_test, 
-                            data3_test, data4_test, data5_test,
-                            data_min_1_test, data_min_2_test, data_min_3_test,
-                            data_min_4_test, data_min_5_test), axis = 0)
+test_data = np.concatenate((test_data_dict[-5], test_data_dict[-4], test_data_dict[-3], 
+                            test_data_dict[-2], test_data_dict[-1], test_data_dict[0],  
+                            test_data_dict[1], test_data_dict[2], test_data_dict[3],
+                            test_data_dict[4], test_data_dict[5]), axis = 0)
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
+set_seed(seed)                    # Fix seeds
 
 # -------------------------------------------------------------------------
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
@@ -75,8 +53,8 @@ print('Número de casos de test: ', test_data.shape[0])
 mean_pulse_dec0 = get_mean_pulse_from_set(train_data, channel = 0)
 mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
 
-np.savez_compressed('../predictions/reference_pulse_dec0.npz', data = mean_pulse_dec0)
-np.savez_compressed('../predictions/reference_pulse_dec1.npz', data = mean_pulse_dec1)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec0.npz"), data=mean_pulse_dec0)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec1.npz"), data=mean_pulse_dec1)
 
 # Get start and stop
 crossing_dec0 = calculate_slope_y_intercept(mean_pulse_dec0, time_step, threshold = 0.1)
@@ -129,14 +107,14 @@ model_dec1 = ConvolutionalModel(int(stop_dec1-start_dec1))
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
-optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr) 
-optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr) 
+optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate) 
+optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate) 
 
 # Execute train loop
-loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = '../Trained_Models/AG_model_dec0',  save = save) 
-loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = '../Trained_Models/AG_model_dec1',  save = save)
-#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = '../Trained_Models/MLPWAVE_AG_model_dec0', save = save) 
-#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = '../Trained_Models/MLPWAVE_AG_model_dec1', save = save)
+loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec0'),  save = save) 
+loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec1'),  save = save)
+#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0'), save = save) 
+#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0'), save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -146,40 +124,20 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_d
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
 
 size = int(TOF.shape[1]/positions.shape[0])
-TOF_0 = TOF[:,:size] 
-TOF_1 = TOF[:, size:2*size] 
-TOF_2 = TOF[:, 2*size:3*size] 
-TOF_3 = TOF[:, 3*size:4*size] 
-TOF_4 = TOF[:, 4*size:5*size] 
-TOF_5 = TOF[:, 5*size:6*size] 
-TOF_min_1 = TOF[:, 6*size:7*size] 
-TOF_min_2 = TOF[:, 7*size:8*size] 
-TOF_min_3 = TOF[:, 8*size:9*size] 
-TOF_min_4 = TOF[:, 9*size:10*size] 
-TOF_min_5 = TOF[:, 10*size:] 
+TOF_dict = {}  
+for i in range(-5, 6):  
+    TOF_dict[i] = TOF[:, (i + 5) * size : (i + 6) * size]  # Assign slices dynamically
 
-# Calulate Validation error
-centroid_V00 = calculate_gaussian_center(TOF_0, nbins = nbins, limit = 1) 
+# Calulate Error
+centroid_V00 = calculate_gaussian_center(TOF_dict[0][np.newaxis,:], nbins = nbins, limit = 6) 
+error_dict = {} 
+for i in range(-5, 6):  
+    error_dict[i] = abs(TOF_dict[i] - centroid_V00[:, np.newaxis] - positions[i + 5])  # Compute error per position
 
-error_min_5 = abs((TOF_min_5 - centroid_V00[:, np.newaxis] - positions[0]))
-error_min_4 = abs((TOF_min_4 - centroid_V00[:, np.newaxis] - positions[1]))
-error_min_3 = abs((TOF_min_3 - centroid_V00[:, np.newaxis] - positions[2]))
-error_min_2 = abs((TOF_min_2 - centroid_V00[:, np.newaxis] - positions[3]))
-error_min_1 = abs((TOF_min_1 - centroid_V00[:, np.newaxis] - positions[4]))
-error_0 = abs((TOF_0 - centroid_V00[:, np.newaxis] - positions[5]))
-error_1 = abs((TOF_1 - centroid_V00[:, np.newaxis] - positions[6]))
-error_2 = abs((TOF_2 - centroid_V00[:, np.newaxis] - positions[7]))
-error_3 = abs((TOF_3 - centroid_V00[:, np.newaxis] - positions[8]))
-error_4 = abs((TOF_4 - centroid_V00[:, np.newaxis] - positions[9]))
-error_5 = abs((TOF_5 - centroid_V00[:, np.newaxis] - positions[10]))
-
-# Get MAE
-Error = np.concatenate((error_0, error_1, error_2, 
-                        error_3, error_4, error_5, 
-                        error_min_1, error_min_2, error_min_3,
-                        error_min_4, error_min_5), axis = 1)   
+Error = np.concatenate(list(error_dict.values()), axis = 1)   
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
+
 
 # Plot
 plt.figure(figsize = (20,5))
@@ -209,35 +167,11 @@ plt.legend()
 plt.show()
 
 # Histogram and gaussian fit 
-plot_gaussian(TOF_0[-1,:], centroid_V00[-1], range = 0.6, label = ' 0.0 ns offset', nbins = nbins)
-plot_gaussian(TOF_3[-1,:], centroid_V00[-1], range = 0.6, label = '-0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_5[-1,:], centroid_V00[-1], range = 0.6, label = '-0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_min_3[-1,:], centroid_V00[-1], range = 0.6, label = '-0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_min_5[-1,:], centroid_V00[-1], range = 0.6, label = '-0.2 ns offset', nbins = nbins)
-
-params_0, errors_0 = get_gaussian_params(TOF_0[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_1, errors_1 = get_gaussian_params(TOF_1[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_2, errors_2 = get_gaussian_params(TOF_2[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_3, errors_3 = get_gaussian_params(TOF_3[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_4, errors_4 = get_gaussian_params(TOF_4[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_5, errors_5 = get_gaussian_params(TOF_5[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_min_1, errors_min_1 = get_gaussian_params(TOF_min_1[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_min_2, errors_min_2 = get_gaussian_params(TOF_min_2[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_min_3, errors_min_3 = get_gaussian_params(TOF_min_3[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_min_4, errors_min_4 = get_gaussian_params(TOF_min_4[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-params_min_5, errors_min_5 = get_gaussian_params(TOF_min_5[-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-
-print("min 5: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_5[1], errors_min_5[2], params_min_5[2], errors_min_5[3]))
-print("min 4: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_4[1], errors_min_4[2], params_min_4[2], errors_min_4[3]))
-print("min 3: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_3[1], errors_min_3[2], params_min_3[2], errors_min_3[3]))
-print("min 2: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_2[1], errors_min_2[2], params_min_2[2], errors_min_2[3]))
-print("min 1: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_min_1[1], errors_min_1[2], params_min_1[2], errors_min_1[3]))
-print("0: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_0[1], errors_0[2], params_0[2], errors_0[3]))
-print("1: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_1[1], errors_1[2], params_1[2], errors_1[3]))
-print("2: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_2[1], errors_2[2], params_2[2], errors_2[3]))
-print("3: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_3[1], errors_3[2], params_3[2], errors_3[3]))
-print("4: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_4[1], errors_4[2], params_4[2], errors_4[3]))
-print("5: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_5[1], errors_5[2], params_5[2], errors_5[3]))
+plt.figure(figsize = (16,6))
+for i in range(-5, 6):  
+    plot_gaussian(TOF_dict[i][-1,:], centroid_V00, range = 0.6, label = 'pos' + str(i), nbins = nbins)
+    params, errors = get_gaussian_params(TOF_dict[i][-1,:], centroid_V00, range = 0.6, nbins = nbins)
+    print(f"{i}: CENTROID(ns) = {params[1]:.4f} +/- {errors[2]:.5f}  FWHM(ns) = {params[2]:.4f} +/- {errors[3]:.5f}")
 
 print('')
 plt.legend()
@@ -250,17 +184,17 @@ plt.show()
 # -------------------------------------------------------------------------
 
 idx = 0
-TOF_0 = TOF_0[idx:]
-TOF_1 = TOF_1[idx:]
-TOF_2 = TOF_2[idx:]
-TOF_3 = TOF_3[idx:]
-TOF_4 = TOF_4[idx:]
-TOF_5 = TOF_5[idx:]
-TOF_min_1 = TOF_min_1[idx:]
-TOF_min_2 = TOF_min_2[idx:]
-TOF_min_3 = TOF_min_3[idx:]
-TOF_min_4 = TOF_min_4[idx:]
-TOF_min_5 = TOF_min_5[idx:]
+TOF_0 = TOF_dict[0][idx:]
+TOF_1 = TOF_dict[1][idx:]
+TOF_2 = TOF_dict[2][idx:]
+TOF_3 = TOF_dict[3][idx:]
+TOF_4 = TOF_dict[4][idx:]
+TOF_5 = TOF_dict[5][idx:]
+TOF_min_1 = TOF_dict[-1][idx:]
+TOF_min_2 = TOF_dict[-2][idx:]
+TOF_min_3 = TOF_dict[-3][idx:]
+TOF_min_4 = TOF_dict[-4][idx:]
+TOF_min_5 = TOF_dict[-5][idx:]
 
 val_dec0 = val_dec0[idx:,:,:] 
 val_dec1 = val_dec1[idx:,:,:]
