@@ -25,7 +25,7 @@ dist/
 .DS_Store
 
 # Ignore the large dataset file
-Na22_filtered_data/
+Pulsos15CM20250130_version2/
 efficient-kan/
 faster_kan/
 Deprecated_notebooks/
