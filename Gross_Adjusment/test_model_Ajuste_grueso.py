@@ -120,13 +120,13 @@ TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_t
 size = int(TOF.shape[0]/Theoretical_TOF.shape[0])
 TOF_dict = {}  
 for i in range(np.min(positions), np.max(positions) + 1):  
-    TOF_dict[i] = TOF[(i + 5) * size : (i + 6) * size]  # Assign slices dynamically
+    TOF_dict[i] = TOF[(i + np.max(positions)) * size : (i + np.max(positions) + 1) * size]  # Assign slices dynamically
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0][np.newaxis,:], nbins = nbins, limit = 6) 
 error_dict = {} 
 for i in range(np.min(positions), np.max(positions) + 1):    
-    error_dict[i] = abs(TOF_dict[i] - centroid_V00 - Theoretical_TOF[i + 5])  # Compute error per position
+    error_dict[i] = abs(TOF_dict[i] - centroid_V00 - Theoretical_TOF[i + np.max(positions)])  # Compute error per position
 
 MAE = np.mean(list(error_dict.values()))   
 print(MAE)
