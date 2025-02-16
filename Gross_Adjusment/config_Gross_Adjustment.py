@@ -19,7 +19,9 @@ architecture = [moments_order, 5, 1, 1]    # KAN architecture
 time_step = 0.2  # Signal time step in ns
 delay_time = 1   # Max delay to training pulses in ns
 nbins = 51       # Number of histogram bins
-positions = 0.066 * np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5])
+positions = np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]) 
+step_size = 0.066 # 1 cm is a TOF difference of 66.6 ps 
+Theoretical_TOF = step_size*positions
 before = 8
 after = 5
 
