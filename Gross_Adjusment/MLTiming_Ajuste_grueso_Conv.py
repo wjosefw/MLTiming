@@ -7,8 +7,8 @@ import sys
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save,
-    time_step, delay_time, nbins, positions, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, 
-    BASE_DIR
+    time_step, delay_time, nbins, positions, Theoretical_TOF, DATA_DIR, MODEL_SAVE_DIR, 
+    REF_PULSE_SAVE_DIR, BASE_DIR
 )
 
 print(device)
@@ -30,7 +30,7 @@ train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mo
 validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode='r')['data']
 
 test_data_dict = {}
-for i in range(-5, 6):  
+for i in range(np.min(positions), np.max(positions) + 1):   
     filename = f"Na22_norm_pos{i}_test.npz" if i >= 0 else f"Na22_norm_pos_min_{abs(i)}_test.npz"
     test_data_dict[i] = np.load(DATA_DIR / filename, mmap_mode = "r")["data"]
 
@@ -122,14 +122,14 @@ TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_t
 
 size = int(TOF.shape[1]/positions.shape[0])
 TOF_dict = {}  
-for i in range(-5, 6):  
-    TOF_dict[i] = TOF[:, (i + 5) * size : (i + 6) * size]  # Assign slices dynamically
+for i in range(np.min(positions), np.max(positions) + 1): 
+    TOF_dict[i] = TOF[:, (i + np.max(positions)) * size : (i + np.max(positions) + 1) * size]  # Assign slices dynamically
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
 error_dict = {} 
-for i in range(-5, 6):  
-    error_dict[i] = abs(TOF_dict[i] - centroid_V00[:, np.newaxis] - positions[i + 5])  # Compute error per position
+for i in range(np.min(positions), np.max(positions) + 1):   
+    error_dict[i] = abs(TOF_dict[i] - centroid_V00[:, np.newaxis] - Theoretical_TOF[i + np.max(positions)])  # Compute error per position
 
 Error = np.concatenate(list(error_dict.values()), axis = 1)   
 MAE = np.mean(Error, axis = 1)
@@ -165,8 +165,8 @@ plt.show()
 
 
 # Histogram and gaussian fit 
-plt.figure(figsize = (16,6))
-for i in range(-5, 6):  
+plt.figure(figsize = (16, 6))
+for i in range(np.min(positions), np.max(positions) + 1):     
     plot_gaussian(TOF_dict[i][-1,:], centroid_V00[-1], range = 0.6, label = 'pos' + str(i), nbins = nbins)
     params, errors = get_gaussian_params(TOF_dict[i][-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
     print(f"{i}: CENTROID(ns) = {params[1]:.4f} +/- {errors[2]:.5f}  FWHM(ns) = {params[2]:.4f} +/- {errors[3]:.5f}")
@@ -182,18 +182,6 @@ plt.show()
 # -------------------------------------------------------------------------
 
 idx = 0
-TOF_0 = TOF_dict[0][idx:]
-TOF_1 = TOF_dict[1][idx:]
-TOF_2 = TOF_dict[2][idx:]
-TOF_3 = TOF_dict[3][idx:]
-TOF_4 = TOF_dict[4][idx:]
-TOF_5 = TOF_dict[5][idx:]
-TOF_min_1 = TOF_dict[-1][idx:]
-TOF_min_2 = TOF_dict[-2][idx:]
-TOF_min_3 = TOF_dict[-3][idx:]
-TOF_min_4 = TOF_dict[-4][idx:]
-TOF_min_5 = TOF_dict[-5][idx:]
-
 val_dec0 = val_dec0[idx:,:,:] 
 val_dec1 = val_dec1[idx:,:,:]
 MAE = MAE[idx:]
@@ -207,45 +195,24 @@ np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'mean_err_val_dec0_Na22.npz
 np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'mean_err_val_dec1_Na22.npz'), data = mean_err_val_dec1)
 np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'MAE_Na22.npz'), data = MAE)
 
-CTR = []
-avg_bias = []
-centroid_0 = calculate_gaussian_center(TOF_0, nbins = nbins, limit = 3) 
-for i in range(TOF_0.shape[0]):
-    params_0, errors_0 = get_gaussian_params(TOF_0[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_1, errors_1 = get_gaussian_params(TOF_1[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_2, errors_2 = get_gaussian_params(TOF_2[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_3, errors_3 = get_gaussian_params(TOF_3[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_4, errors_4 = get_gaussian_params(TOF_4[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_5, errors_5 = get_gaussian_params(TOF_5[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_min_1, errors_min_1 = get_gaussian_params(TOF_min_1[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_min_2, errors_min_2 = get_gaussian_params(TOF_min_2[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_min_3, errors_min_3 = get_gaussian_params(TOF_min_3[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_min_4, errors_min_4 = get_gaussian_params(TOF_min_4[i,:], centroid_0[i], range = 0.6, nbins = nbins)
-    params_min_5, errors_min_5 = get_gaussian_params(TOF_min_5[i,:], centroid_0[i], range = 0.6, nbins = nbins)
+
+avg_bias = np.zeros((TOF_dict[0].shape[0],))
+CTR = np.zeros((TOF_dict[0].shape[0],))
+centroid_0 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 3) 
+for i in range(TOF_dict[0].shape[0]):
+
+    resolution_dict = {} # Initialize dictionaries
+    centroids_dict = {} 
+    error_dict = {} 
+
+    for j in range(np.min(positions), np.max(positions) + 1):  
+        params, errors = get_gaussian_params(TOF_dict[j][i,idx:], centroid_0[i], range = 0.6, nbins = nbins)
+        resolution_dict[j] = params[2]
+        centroids_dict[j] = params[1]
     
-    CTR.append(np.mean([params_0[2], params_1[2], params_2[2], 
-                        params_3[2], params_4[2], params_5[2],  
-                        params_min_1[2],  params_min_2[2], params_min_3[2],
-                        params_min_4[2],  params_min_5[2]]))
-    
-    error_min_5_centroid = abs((params_min_5[1] - positions[0]))
-    error_min_4_centroid = abs((params_min_4[1] - positions[1]))
-    error_min_3_centroid = abs((params_min_3[1] - positions[2]))
-    error_min_2_centroid = abs((params_min_2[1] - positions[3]))
-    error_min_1_centroid = abs((params_min_1[1] - positions[4]))
+    centroids = list(centroids_dict.values())   
+    avg_bias[i] = np.mean(abs(centroids - Theoretical_TOF))  
+    CTR[i] = np.mean(list(resolution_dict.values()))  
 
-    error_0_centroid = abs((params_0[1] - positions[5]))
-    error_1_centroid = abs((params_1[1] - positions[6]))
-    error_2_centroid = abs((params_2[1] - positions[7]))
-    error_3_centroid = abs((params_3[1] - positions[8]))
-    error_4_centroid = abs((params_4[1] - positions[9]))
-    error_5_centroid = abs((params_5[1] - positions[10]))
-
-
-    avg_bias.append(np.mean([error_0_centroid, error_1_centroid, error_2_centroid, 
-                             error_3_centroid, error_4_centroid, error_5_centroid,
-                             error_min_1_centroid,  error_min_2_centroid, error_min_3_centroid,
-                             error_min_4_centroid,  error_min_5_centroid]))
-   
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'ctr.npz'), data = np.array(CTR))
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'avg_bias.npz'), data = np.array(avg_bias))
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'ctr.npz'), data = CTR)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'avg_bias.npz'), data = avg_bias)
