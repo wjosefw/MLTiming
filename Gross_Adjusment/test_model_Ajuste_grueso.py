@@ -7,8 +7,8 @@ import torch
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
-    architecture, time_step, nbins, positions, DATA_DIR, REF_PULSE_SAVE_DIR, MODEL_SAVE_DIR, 
-    BASE_DIR
+    architecture, time_step, nbins, Theoretical_TOF, positions, DATA_DIR, 
+    REF_PULSE_SAVE_DIR, MODEL_SAVE_DIR, BASE_DIR
 )
 
 print(device)
@@ -23,7 +23,7 @@ from efficient_kan.src.efficient_kan import KAN
 
 #Load data
 test_data_dict = {}
-for i in range(-5, 6):  
+for i in range(np.min(positions), np.max(positions) + 1):  
     filename = f"Na22_norm_pos{i}_test.npz" if i >= 0 else f"Na22_norm_pos_min_{abs(i)}_test.npz"
     test_data_dict[i] = np.load(DATA_DIR / filename, mmap_mode="r")["data"]
 
@@ -117,16 +117,16 @@ test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy
 # Calculate TOF and decompress
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
 
-size = int(TOF.shape[0]/positions.shape[0])
+size = int(TOF.shape[0]/Theoretical_TOF.shape[0])
 TOF_dict = {}  
-for i in range(-5, 6):  
+for i in range(np.min(positions), np.max(positions) + 1):  
     TOF_dict[i] = TOF[(i + 5) * size : (i + 6) * size]  # Assign slices dynamically
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0][np.newaxis,:], nbins = nbins, limit = 6) 
 error_dict = {} 
-for i in range(-5, 6):  
-    error_dict[i] = abs(TOF_dict[i] - centroid_V00 - positions[i + 5])  # Compute error per position
+for i in range(np.min(positions), np.max(positions) + 1):    
+    error_dict[i] = abs(TOF_dict[i] - centroid_V00 - Theoretical_TOF[i + 5])  # Compute error per position
 
 MAE = np.mean(list(error_dict.values()))   
 print(MAE)
@@ -143,7 +143,7 @@ plt.show()
 
 # Histogram and gaussian fit 
 plt.figure(figsize = (16,6))
-for i in range(-5, 6):  
+for i in range(np.min(positions), np.max(positions) + 1):    
     plot_gaussian(TOF_dict[i], centroid_V00, range = 0.6, label = 'pos' + str(i), nbins = nbins)
     params, errors = get_gaussian_params(TOF_dict[i], centroid_V00, range = 0.6, nbins = nbins)
     print(f"{i}: CENTROID(ns) = {params[1]:.4f} +/- {errors[2]:.5f}  FWHM(ns) = {params[2]:.4f} +/- {errors[3]:.5f}")
@@ -171,14 +171,14 @@ for i in range(num_subsets):
     resolution_dict = {} # Initialize dictionaries
     centroids_dict = {} 
     error_dict = {} 
-    for j in range(-5, 6):  
+    for j in range(np.min(positions), np.max(positions) + 1):    
         params, errors = get_gaussian_params(TOF_dict[j][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-        error_dict[j] = abs(TOF_dict[j][i*size : (i+1)*size] - centroid_V00 - positions[j + 5])  # Compute error per position
+        error_dict[j] = abs(TOF_dict[j][i*size : (i+1)*size] - centroid_V00 - Theoretical_TOF[j + 5])  # Compute error per position
         resolution_dict[j] = params[2]
         centroids_dict[j] = params[1]
     
     centroids = list(centroids_dict.values())   
-    bias[i] = np.mean(abs(centroids - positions))  
+    bias[i] = np.mean(abs(centroids - Theoretical_TOF))  
     MAE[i] = np.mean(list(error_dict.values()))  
     resolution[i] = np.mean(list(resolution_dict.values()))  
 
