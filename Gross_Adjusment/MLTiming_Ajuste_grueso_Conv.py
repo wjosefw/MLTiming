@@ -22,21 +22,18 @@ from functions import (move_to_reference, create_and_delay_pulse_pair,
 from Models import ConvolutionalModel,  count_parameters, MLP_Torch
 from Train_loops import train_loop_convolutional, train_loop_MLP
 
-# Load data
-data0_train = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode='r')['data']
-data0_val = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode='r')['data']
+# -------------------------------------------------------------------------
+#---------------------------- LOAD DATA -----------------------------------
+# -------------------------------------------------------------------------
+
+train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode='r')['data']
+validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode='r')['data']
 
 test_data_dict = {}
 for i in range(-5, 6):  
     filename = f"Na22_norm_pos{i}_test.npz" if i >= 0 else f"Na22_norm_pos_min_{abs(i)}_test.npz"
     test_data_dict[i] = np.load(DATA_DIR / filename, mmap_mode = "r")["data"]
 
-# -------------------------------------------------------------------------
-#----------------------- TRAIN/TEST SPLIT ---------------------------------
-# -------------------------------------------------------------------------
-
-train_data = data0_train
-validation_data = data0_val
 test_data = np.concatenate((test_data_dict[-5], test_data_dict[-4], test_data_dict[-3], 
                             test_data_dict[-2], test_data_dict[-1], test_data_dict[0],  
                             test_data_dict[1], test_data_dict[2], test_data_dict[3],
@@ -53,8 +50,8 @@ set_seed(seed)                    # Fix seeds
 mean_pulse_dec0 = get_mean_pulse_from_set(train_data, channel = 0)
 mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
 
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec0.npz"), data=mean_pulse_dec0)
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec1.npz"), data=mean_pulse_dec1)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec0.npz"), data = mean_pulse_dec0)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec1.npz"), data = mean_pulse_dec1)
 
 # Get start and stop
 crossing_dec0 = calculate_slope_y_intercept(mean_pulse_dec0, time_step, threshold = 0.1)
@@ -129,7 +126,7 @@ for i in range(-5, 6):
     TOF_dict[i] = TOF[:, (i + 5) * size : (i + 6) * size]  # Assign slices dynamically
 
 # Calulate Error
-centroid_V00 = calculate_gaussian_center(TOF_dict[0][np.newaxis,:], nbins = nbins, limit = 6) 
+centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
 error_dict = {} 
 for i in range(-5, 6):  
     error_dict[i] = abs(TOF_dict[i] - centroid_V00[:, np.newaxis] - positions[i + 5])  # Compute error per position
@@ -166,11 +163,12 @@ plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
+
 # Histogram and gaussian fit 
 plt.figure(figsize = (16,6))
 for i in range(-5, 6):  
-    plot_gaussian(TOF_dict[i][-1,:], centroid_V00, range = 0.6, label = 'pos' + str(i), nbins = nbins)
-    params, errors = get_gaussian_params(TOF_dict[i][-1,:], centroid_V00, range = 0.6, nbins = nbins)
+    plot_gaussian(TOF_dict[i][-1,:], centroid_V00[-1], range = 0.6, label = 'pos' + str(i), nbins = nbins)
+    params, errors = get_gaussian_params(TOF_dict[i][-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
     print(f"{i}: CENTROID(ns) = {params[1]:.4f} +/- {errors[2]:.5f}  FWHM(ns) = {params[2]:.4f} +/- {errors[3]:.5f}")
 
 print('')
@@ -205,9 +203,9 @@ err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:
 err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
 mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
 mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
-np.savez_compressed('../predictions/mean_err_val_dec0_Na22.npz', data = mean_err_val_dec0)
-np.savez_compressed('../predictions/mean_err_val_dec1_Na22.npz', data = mean_err_val_dec1)
-np.savez_compressed('../predictions/MAE_Na22.npz', data = MAE)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'mean_err_val_dec0_Na22.npz'), data = mean_err_val_dec0)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'mean_err_val_dec1_Na22.npz'), data = mean_err_val_dec1)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'MAE_Na22.npz'), data = MAE)
 
 CTR = []
 avg_bias = []
@@ -249,5 +247,5 @@ for i in range(TOF_0.shape[0]):
                              error_min_1_centroid,  error_min_2_centroid, error_min_3_centroid,
                              error_min_4_centroid,  error_min_5_centroid]))
    
-np.savez_compressed('../predictions/ctr.npz', data = np.array(CTR))
-np.savez_compressed('../predictions/avg_bias.npz', data = np.array(avg_bias))
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'ctr.npz'), data = np.array(CTR))
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'avg_bias.npz'), data = np.array(avg_bias))
