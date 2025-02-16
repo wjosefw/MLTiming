@@ -126,11 +126,10 @@ for i in range(-5, 6):
 centroid_V00 = calculate_gaussian_center(TOF_dict[0][np.newaxis,:], nbins = nbins, limit = 6) 
 error_dict = {} 
 for i in range(-5, 6):  
-    error_dict[i] = abs(TOF_dict[i] - centroid_V00[:, np.newaxis] - positions[i + 5])  # Compute error per position
+    error_dict[i] = abs(TOF_dict[i] - centroid_V00 - positions[i + 5])  # Compute error per position
 
-Error = np.concatenate(list(error_dict.values()), axis = 1)   
-MAE = np.mean(Error, axis = 1)
-print(MAE[-1])
+MAE = np.mean(list(error_dict.values()))   
+print(MAE)
 
 # Plot
 plt.hist(test_dec0, bins = nbins, alpha = 0.5, label = 'Detector 0');
@@ -159,79 +158,42 @@ plt.show()
 #--------------------------- BOOTSTRAPING ---------------------------------
 # -------------------------------------------------------------------------
 
-resolution_list = []
-bias_list = []
-MAE_list = []
-size = int(size / 10) # Divide the set in the subsets
+num_subsets = 10 # Number of subsets for bootstraping
 
-for i in range(10):
+resolution = np.zeros((num_subsets,))
+bias = np.zeros((num_subsets,))
+MAE = np.zeros((num_subsets,))
+size = int(size / num_subsets) # Divide the set in the subsets
+
+for i in range(num_subsets):
     centroid_V00 = calculate_gaussian_center(TOF_dict[0][None, i*size : (i+1)*size], nbins = nbins) 
-    params_0, errors_0 = get_gaussian_params(TOF_dict[0][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_1, errors_1 = get_gaussian_params(TOF_dict[1][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_2, errors_2 = get_gaussian_params(TOF_dict[2][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_3, errors_3 = get_gaussian_params(TOF_dict[3][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_4, errors_4 = get_gaussian_params(TOF_dict[4][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_5, errors_5 = get_gaussian_params(TOF_dict[5][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
 
-    params_min_1, errors_min_1 = get_gaussian_params(TOF_dict[-1][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_min_2, errors_min_2 = get_gaussian_params(TOF_dict[-2][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_min_3, errors_min_3 = get_gaussian_params(TOF_dict[-3][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_min_4, errors_min_4 = get_gaussian_params(TOF_dict[-4][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-    params_min_5, errors_min_5 = get_gaussian_params(TOF_dict[-5][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-
+    resolution_dict = {} # Initialize dictionaries
+    centroids_dict = {} 
+    error_dict = {} 
+    for j in range(-5, 6):  
+        params, errors = get_gaussian_params(TOF_dict[j][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
+        error_dict[j] = abs(TOF_dict[j][i*size : (i+1)*size] - centroid_V00 - positions[j + 5])  # Compute error per position
+        resolution_dict[j] = params[2]
+        centroids_dict[j] = params[1]
     
-    resolution = np.mean([params_min_5[2], params_min_4[2],
-                          params_min_3[2], params_min_2[2], 
-                          params_min_1[2], params_0[2],  
-                          params_1[2], params_2[2], params_3[2], 
-                          params_4[2], params_5[2],  
-                          ])
-    
-    resolution_list.append(resolution)
-    
-    centroids = np.array([params_min_5[1], params_min_4[1],
-                          params_min_3[1], params_min_2[1], 
-                          params_min_1[1], params_0[1],  
-                          params_1[1],  params_2[1], params_3[1], 
-                          params_4[1],  params_5[1]])
-    bias = np.mean(abs(centroids - positions))
-    bias_list.append(bias)
+    centroids = list(centroids_dict.values())   
+    bias[i] = np.mean(abs(centroids - positions))  
+    MAE[i] = np.mean(list(error_dict.values()))  
+    resolution[i] = np.mean(list(resolution_dict.values()))  
 
-    error_min_5 = abs((TOF_dict[-5] - centroid_V00[:, np.newaxis] - positions[0]))
-    error_min_4 = abs((TOF_dict[-4] - centroid_V00[:, np.newaxis] - positions[1]))
-    error_min_3 = abs((TOF_dict[-3] - centroid_V00[:, np.newaxis] - positions[2]))
-    error_min_2 = abs((TOF_dict[-2] - centroid_V00[:, np.newaxis] - positions[3]))
-    error_min_1 = abs((TOF_dict[-1] - centroid_V00[:, np.newaxis] - positions[4]))
-    error_0 = abs((TOF_dict[0] - centroid_V00[:, np.newaxis] - positions[5]))
-    error_1 = abs((TOF_dict[1] - centroid_V00[:, np.newaxis] - positions[6]))
-    error_2 = abs((TOF_dict[2] - centroid_V00[:, np.newaxis] - positions[7]))
-    error_3 = abs((TOF_dict[3] - centroid_V00[:, np.newaxis] - positions[8]))
-    error_4 = abs((TOF_dict[4] - centroid_V00[:, np.newaxis] - positions[9]))
-    error_5 = abs((TOF_dict[5] - centroid_V00[:, np.newaxis] - positions[10]))
-    
-    Error = np.concatenate((error_0, 
-                            error_1, error_2, error_3,
-                            error_4, error_5, 
-                            error_min_1, error_min_2, error_min_3,
-                            error_min_4, error_min_5), axis = 1)    
-
-    MAE_list.append(np.mean(Error)) 
-
-print('Mean CTR: ', np.mean(np.array(resolution_list))*1000)
-print('Std CTR: ', np.std(np.array(resolution_list))*1000)
-print('Mean bias: ', np.mean(np.array(bias_list))*1000)
-print('Std bias: ', np.std(np.array(bias_list))*1000)
-print('Mean MAE: ', np.mean(np.array(MAE_list))*1000)
-print('Std MAE: ', np.std(np.array(MAE_list))*1000)
-
+print('Mean CTR: ', np.mean(resolution)*1000)
+print('Std CTR: ', np.std(resolution)*1000)
+print('Mean bias: ', np.mean(bias)*1000)
+print('Std bias: ', np.std(bias)*1000)
+print('Mean MAE: ', np.mean(MAE)*1000)
+print('Std MAE: ', np.std(MAE)*1000)
 
 # -------------------------------------------------------------------------
 #-------------------------- INFERENCE TIME --------------------------------
 # -------------------------------------------------------------------------
 
-
 import time
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 time_test = np.tile(TEST[0,:,0] , (1000000, 1, 1))
 model_dec0 = model_dec0.to(device)
