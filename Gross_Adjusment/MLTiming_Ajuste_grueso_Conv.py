@@ -111,7 +111,7 @@ optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate)
 loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec0'),  save = save) 
 loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec1'),  save = save)
 #loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(TEST[:,:,0]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0'), save = save) 
-#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0'), save = save)
+#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(TEST[:,:,1]).float(), EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec1'), save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -181,38 +181,38 @@ plt.show()
 # -------------------- SAVE RESULTS OVER EPOCHS ---------------------------
 # -------------------------------------------------------------------------
 
-idx = 0
-val_dec0 = val_dec0[idx:,:,:] 
-val_dec1 = val_dec1[idx:,:,:]
-MAE = MAE[idx:]
-
-# Plot MAE_singles vs MAE_coincidences
-err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
-err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
-mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
-mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'mean_err_val_dec0_Na22.npz'), data = mean_err_val_dec0)
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'mean_err_val_dec1_Na22.npz'), data = mean_err_val_dec1)
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'MAE_Na22.npz'), data = MAE)
-
-
-avg_bias = np.zeros((TOF_dict[0].shape[0],))
-CTR = np.zeros((TOF_dict[0].shape[0],))
-centroid_0 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 3) 
-for i in range(TOF_dict[0].shape[0]):
-
-    resolution_dict = {} # Initialize dictionaries
-    centroids_dict = {} 
-    error_dict = {} 
-
-    for j in range(np.min(positions), np.max(positions) + 1):  
-        params, errors = get_gaussian_params(TOF_dict[j][i,idx:], centroid_0[i], range = 0.6, nbins = nbins)
-        resolution_dict[j] = params[2]
-        centroids_dict[j] = params[1]
-    
-    centroids = list(centroids_dict.values())   
-    avg_bias[i] = np.mean(abs(centroids - Theoretical_TOF))  
-    CTR[i] = np.mean(list(resolution_dict.values()))  
-
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'ctr.npz'), data = CTR)
-np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'avg_bias.npz'), data = avg_bias)
+#idx = 0
+#val_dec0 = val_dec0[idx:,:,:] 
+#val_dec1 = val_dec1[idx:,:,:]
+#MAE = MAE[idx:]
+#
+## Plot MAE_singles vs MAE_coincidences
+#err_val_dec0 = abs(val_dec0[:,:,0] - val_dec0[:,:,1] - REF_val_dec0[np.newaxis,:])
+#err_val_dec1 = abs(val_dec1[:,:,0] - val_dec1[:,:,1] - REF_val_dec1[np.newaxis,:])
+#mean_err_val_dec0 = np.mean(err_val_dec0, axis = 1)
+#mean_err_val_dec1 = np.mean(err_val_dec1, axis = 1)
+#np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'mean_err_val_dec0_Na22.npz'), data = mean_err_val_dec0)
+#np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'mean_err_val_dec1_Na22.npz'), data = mean_err_val_dec1)
+#np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'MAE_Na22.npz'), data = MAE)
+#
+#
+#avg_bias = np.zeros((TOF_dict[0].shape[0],))
+#CTR = np.zeros((TOF_dict[0].shape[0],))
+#centroid_0 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 3) 
+#for i in range(TOF_dict[0].shape[0]):
+#
+#    resolution_dict = {} # Initialize dictionaries
+#    centroids_dict = {} 
+#    error_dict = {} 
+#
+#    for j in range(np.min(positions), np.max(positions) + 1):  
+#        params, errors = get_gaussian_params(TOF_dict[j][i,idx:], centroid_0[i], range = 0.6, nbins = nbins)
+#        resolution_dict[j] = params[2]
+#        centroids_dict[j] = params[1]
+#    
+#    centroids = list(centroids_dict.values())   
+#    avg_bias[i] = np.mean(abs(centroids - Theoretical_TOF))  
+#    CTR[i] = np.mean(list(resolution_dict.values()))  
+#
+#np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'ctr.npz'), data = CTR)
+#np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'avg_bias.npz'), data = avg_bias)
