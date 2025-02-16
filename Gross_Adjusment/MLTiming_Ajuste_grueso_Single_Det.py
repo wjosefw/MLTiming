@@ -4,9 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
-sys.path.append('/home/josea/DEEP_TIMING/DEEP_TIMING_VS/')
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# Import Hyperparameters and Paths
+from config_Gross_Adjustment import (
+    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save, 
+    time_step, delay_time, nbins, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR
+)
+
 print(device)
+sys.path.append(str(BASE_DIR.parent))
+
 
 # Import functions 
 from functions import (move_to_reference, create_and_delay_pulse_pair, 
@@ -16,39 +22,19 @@ from Models import ConvolutionalModel,  count_parameters, MLP_Torch
 from Train_loops import train_loop_convolutional_single_det, train_loop_MLP_Single_Det
 
 # Load data 
-dir = '/home/josea/Pulsos15CM20250130_version2/'
+train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
+validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
 
-data0_train = np.load(os.path.join(dir, 'Na22_norm_pos0_train.npz'), mmap_mode='r')['data']
-data0_val = np.load(os.path.join(dir, 'Na22_norm_pos0_val.npz'), mmap_mode='r')['data']
-
+print('Número de casos de entrenamiento: ', train_data.shape[0])
+print('Número de casos de validacion: ', validation_data.shape[0])
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1                  # Max delay to training pulses in ns
-time_step = 0.2                 # Signal time step in ns
-set_seed(42)                    # Fix seeds
-nbins = 51                      # Num bins for all histograms
-lr = 1e-5
-epochs = 500
-batch_size = 32
-before  = 8                     # Points to take before threshold
-after = 5                       # Points to take after threshold
 channel = 0
-Num_Neurons = 16
-save = True
-save_name = '../Trained_Models/AG_model_dec' + str(channel)
-
-# -------------------------------------------------------------------------
-#----------------------- TRAIN/TEST SPLIT ---------------------------------
-# -------------------------------------------------------------------------
-
-train_data = data0_train
-validation_data = data0_val
-
-print('Número de casos de entrenamiento: ', train_data.shape[0])
-print('Número de casos de validacion: ', validation_data.shape[0])
+set_seed(seed)                    # Fix seeds
+save_name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec' + str(channel))
 
 # -------------------------------------------------------------------------
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
@@ -57,7 +43,7 @@ print('Número de casos de validacion: ', validation_data.shape[0])
 # Calculate mean pulse
 mean_pulse = get_mean_pulse_from_set(train_data, channel = channel)
 
-np.savez_compressed('../predictions/reference_pulse_dec' + str(channel) + '.npz', data = mean_pulse)
+np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, 'reference_pulse_dec' + str(channel) + '.npz'), data = mean_pulse)
 
 # Get start and stop
 crossing = calculate_slope_y_intercept(mean_pulse, time_step, threshold = 0.1)
@@ -87,11 +73,11 @@ model = MLP_Torch(NM = int(stop- start), NN = Num_Neurons, STD_INIT = 0.5)
 
 print(f"Total number of parameters: {count_parameters(model)}")
 
-optimizer = torch.optim.AdamW(model.parameters(), lr = lr, weight_decay = 1e-5) 
+optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate) 
 
 # Execute train loop
 #loss, val_loss, val = train_loop_convolutional_single_det(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = save_name,  save = save) 
-loss, val_loss, val = train_loop_MLP_Single_Det(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = '../Trained_Models/MLPWAVE_AG_model_dec' + str(channel), save = save)
+loss, val_loss, val = train_loop_MLP_Single_Det(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec' + str(channel)), save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
