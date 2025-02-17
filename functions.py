@@ -583,31 +583,46 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
+import cupy as cp
 def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
+    batch_size = 100000 # For an NVIDIA RTX 4090 reduce if smaller GPU
     
     window_size = stop - start
     reference_pulse = reference[start:stop]  # Extract reference pulse
     num_pulses = pulse_set.shape[0]
-    
+
     # Initialize results
-    delays = np.zeros(num_pulses, dtype=np.int32)
-    aligned_pulses = np.zeros((num_pulses, window_size), dtype=np.float32)
+    delays = cp.zeros(num_pulses, dtype = cp.int32)
+    aligned_pulses = cp.zeros((num_pulses, window_size), dtype = cp.float32)
 
-    # Extract sliding windows for all pulses
-    segments = np.lib.stride_tricks.sliding_window_view(pulse_set[:, :, channel], window_size, axis = 1)
+    # Convert reference pulse and pulse set to GPU
+    reference_pulse = cp.asarray(reference_pulse, dtype = cp.float32)
+    pulse_set = cp.asarray(pulse_set, dtype = cp.float32)
 
-    # Compute Mean Squared Error (MSE) in vectorized form
-    mse = np.mean((segments - reference_pulse) ** 2, axis = 2)
+    # Process in batches to avoid memory overload
+    for i in range(0, num_pulses, batch_size):
+        batch_end = min(i + batch_size, num_pulses)
+        batch_pulses = pulse_set[i:batch_end, :, channel]  # Select batch
 
-    # Find optimal shifts
-    min_mse_indices = np.argmin(mse, axis = 1)  # Vectorized across all pulses
-    optimal_shifts = start - min_mse_indices  # Convert to delays
+        # Create sliding windows for the batch
+        segments = cp.lib.stride_tricks.sliding_window_view(batch_pulses, window_shape = window_size, axis = 1).astype(cp.float32)
 
-    # Assign results
-    delays[:] = optimal_shifts
-    aligned_pulses[:] = segments[np.arange(num_pulses), min_mse_indices, :]
+        # Compute Mean Squared Error (MSE)
+        mse = cp.mean((segments - reference_pulse) ** 2, axis=2)
 
-    return delays, aligned_pulses
+        # Find optimal shifts
+        min_mse_indices = cp.argmin(mse, axis = 1)
+        optimal_shifts = start - min_mse_indices
+
+        # Assign batch results
+        delays[i:batch_end] = optimal_shifts
+        aligned_pulses[i:batch_end, :] = segments[cp.arange(batch_end - i), min_mse_indices, :]
+
+        # Free GPU memory
+        del batch_pulses, segments, mse, min_mse_indices, optimal_shifts
+        cp.get_default_memory_pool().free_all_blocks()
+
+    return delays.get(), aligned_pulses.get()
    
 
 #----------------------------------------------------------------------------------------------
