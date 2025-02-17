@@ -202,7 +202,7 @@ time_list_moments = []
 time_list_inference = []
 
 # Start timer move to reference
-move_time_test = np.tile(test_data[0,:,:] , (1000, 1, 1))
+move_time_test = np.tile(test_data[0,:,:] , (1000000, 1, 1))
 for i in range(10):
     start_time_move = time.time()
     delays, moved_pulses = move_to_reference(mean_pulse_dec0, move_time_test, start = start_dec0, stop = stop_dec0, channel = 0)
