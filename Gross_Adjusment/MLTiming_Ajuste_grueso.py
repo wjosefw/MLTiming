@@ -22,6 +22,7 @@ from functions import (momentos, move_to_reference, create_and_delay_pulse_pair,
                        calculate_slope_y_intercept)
 from Models import MLP_Torch,  count_parameters
 from Train_loops import train_loop_KAN, train_loop_MLP
+from Dataset import Datos_LAB_GFN
 from efficient_kan.src.efficient_kan import KAN
 
 # -------------------------------------------------------------------------
@@ -31,15 +32,8 @@ from efficient_kan.src.efficient_kan import KAN
 train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
 validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
 
-test_data_dict = {}
-for i in range(np.min(positions), np.max(positions) + 1):  
-    filename = f"Na22_norm_pos{i}_test.npz" if i >= 0 else f"Na22_norm_pos_min_{abs(i)}_test.npz"
-    test_data_dict[i] = np.load(DATA_DIR / filename, mmap_mode = "r")["data"]
-
-test_data = np.concatenate((test_data_dict[-5], test_data_dict[-4], test_data_dict[-3], 
-                            test_data_dict[-2], test_data_dict[-1], test_data_dict[0],  
-                            test_data_dict[1], test_data_dict[2], test_data_dict[3],
-                            test_data_dict[4], test_data_dict[5]), axis = 0)
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
+test_data = dataset.load_data()
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
@@ -145,21 +139,17 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optim
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-# Calculate TOF
+# Calculate TOF and decompress
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
 
-size = int(TOF.shape[1]/positions.shape[0])
-TOF_dict = {}  
-for i in range(np.min(positions), np.max(positions) + 1):  
-    TOF_dict[i] = TOF[:, (i +  np.max(positions)) * size : (i +  np.max(positions) + 1) * size]  # Assign slices dynamically
+size = int(TOF.shape[1]/Theoretical_TOF.shape[0]) # Size of slice
+TOF_dict = dataset.get_TOF_slices_train(TOF, size)
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
-error_dict = {} 
-for i in range(np.min(positions), np.max(positions) + 1):   
-    error_dict[i] = abs(TOF_dict[i] - centroid_V00[:, np.newaxis] - Theoretical_TOF[i + np.max(positions)])  # Compute error per position
 
-Error = np.concatenate(list(error_dict.values()), axis = 1)   
+error_dict = dataset.compute_error(centroid_V00) # Get error of each position
+Error = np.concatenate(list(error_dict.values()), axis = 1)   # COncatenate all positions
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
 
@@ -201,7 +191,7 @@ for i in range(np.min(positions), np.max(positions) + 1):
 
 print('')
 plt.legend()
-plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
+plt.xlabel(r'\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
