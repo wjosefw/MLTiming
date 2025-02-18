@@ -19,21 +19,17 @@ from functions import ( calculate_gaussian_center, plot_gaussian,
                        normalize_given_params, move_to_reference,
                        calculate_slope_y_intercept)
 from Models import ConvolutionalModel, MLP_Torch
+from Dataset import Datos_LAB_GFN
 from efficient_kan.src.efficient_kan import KAN
 
+
 #Load data
-test_data_dict = {}
-for i in range(np.min(positions), np.max(positions) + 1):  
-    filename = f"Na22_norm_pos{i}_test.npz" if i >= 0 else f"Na22_norm_pos_min_{abs(i)}_test.npz"
-    test_data_dict[i] = np.load(DATA_DIR / filename, mmap_mode="r")["data"]
-
-test_data = np.concatenate((test_data_dict[-5], test_data_dict[-4], test_data_dict[-3], 
-                            test_data_dict[-2], test_data_dict[-1], test_data_dict[0],  
-                            test_data_dict[1], test_data_dict[2], test_data_dict[3],
-                            test_data_dict[4], test_data_dict[5]), axis = 0)
-
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
+test_data = dataset.load_data()
+        
 print('Número de casos de test: ', test_data.shape[0])
 set_seed(seed)   # Fix seeds
+
 
 # -------------------------------------------------------------------------
 # ----------------------- MOVE TO REFERENCE -------------------------------
@@ -99,8 +95,8 @@ model_dec1 = ConvolutionalModel(int(stop_dec1-start_dec1))
 #model_dec0 = MLP_Torch(NM = int(stop_dec0 - start_dec0), NN = Num_Neurons, STD_INIT = 0.5)
 #model_dec1 = MLP_Torch(NM = int(stop_dec1 - start_dec1), NN = Num_Neurons, STD_INIT = 0.5)         
 
-model_dec0.load_state_dict(torch.load(model_dec0_dir))
-model_dec1.load_state_dict(torch.load(model_dec1_dir))
+model_dec0.load_state_dict(torch.load(model_dec0_dir, weights_only = True))
+model_dec1.load_state_dict(torch.load(model_dec1_dir, weights_only = True))
 model_dec0.eval()
 model_dec1.eval()
 
@@ -117,17 +113,13 @@ test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy
 # Calculate TOF and decompress
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
 
-size = int(TOF.shape[0]/Theoretical_TOF.shape[0])
-TOF_dict = {}  
-for i in range(np.min(positions), np.max(positions) + 1):  
-    TOF_dict[i] = TOF[(i + np.max(positions)) * size : (i + np.max(positions) + 1) * size]  # Assign slices dynamically
+size = int(TOF.shape[0]/Theoretical_TOF.shape[0]) # Size of slice
+TOF_dict = dataset.get_TOF_slices_eval(TOF, size)
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0][np.newaxis,:], nbins = nbins, limit = 6) 
-error_dict = {} 
-for i in range(np.min(positions), np.max(positions) + 1):    
-    error_dict[i] = abs(TOF_dict[i] - centroid_V00 - Theoretical_TOF[i + np.max(positions)])  # Compute error per position
 
+error_dict = dataset.compute_error(centroid_V00) # Get error of each position
 MAE = np.mean(list(error_dict.values()))   
 print(MAE)
 
@@ -150,7 +142,7 @@ for i in range(np.min(positions), np.max(positions) + 1):
 
 print('')
 plt.legend()
-plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
+plt.xlabel(r'$\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
 plt.show()
 
@@ -159,21 +151,23 @@ plt.show()
 # -------------------------------------------------------------------------
 
 num_subsets = 10 # Number of subsets for bootstraping
+subset_size = int(size / num_subsets) # Divide the set in the subsets
 
 resolution = np.zeros((num_subsets,))
 bias = np.zeros((num_subsets,))
 MAE = np.zeros((num_subsets,))
-size = int(size / num_subsets) # Divide the set in the subsets
+
 
 for i in range(num_subsets):
-    centroid_V00 = calculate_gaussian_center(TOF_dict[0][None, i*size : (i+1)*size], nbins = nbins) 
+    subset_slice = slice(i * subset_size, (i + 1) * subset_size)
+    centroid_V00 = calculate_gaussian_center(TOF_dict[0][None, subset_slice], nbins = nbins) 
 
     resolution_dict = {} # Initialize dictionaries
     centroids_dict = {} 
     error_dict = {} 
     for j in range(np.min(positions), np.max(positions) + 1):    
-        params, errors = get_gaussian_params(TOF_dict[j][i*size : (i+1)*size], centroid_V00, range = 0.6, nbins = nbins)
-        error_dict[j] = abs(TOF_dict[j][i*size : (i+1)*size] - centroid_V00 - Theoretical_TOF[j + 5])  # Compute error per position
+        params, errors = get_gaussian_params(TOF_dict[j][subset_slice], centroid_V00, range = 0.6, nbins = nbins)
+        error_dict[j] = abs(TOF_dict[j][subset_slice] - centroid_V00 - Theoretical_TOF[j + np.max(positions)])  # Compute error per position
         resolution_dict[j] = params[2]
         centroids_dict[j] = params[1]
     
