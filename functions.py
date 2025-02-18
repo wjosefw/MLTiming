@@ -585,7 +585,7 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
 
 import cupy as cp
 def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
-    batch_size = 100000 # For an NVIDIA RTX 4090 reduce if smaller GPU
+    batch_size = 50000 # For an NVIDIA RTX 4090 reduce if smaller GPU
     
     window_size = stop - start
     reference_pulse = reference[start:stop]  # Extract reference pulse
