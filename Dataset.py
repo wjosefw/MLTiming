@@ -124,7 +124,7 @@ class Datos_LAB_GFN(Dataset):
             raise ValueError("Centroid array cannot be None.")
 
         self.error_dict = {
-            i: abs(self.TOF_dict[i] - centroid[:, np.newaxis] - self.Theoretical_TOF[i + np.max(self.positions)])
+            i: abs(self.TOF_dict[i] - centroid - self.Theoretical_TOF[i + np.max(self.positions)])
             for i in range(np.min(self.positions), np.max(self.positions) + 1)
         }
 
