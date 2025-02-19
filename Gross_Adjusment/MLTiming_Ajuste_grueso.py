@@ -148,7 +148,7 @@ TOF_dict = dataset.get_TOF_slices_train(TOF, size)
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
 
-error_dict = dataset.compute_error(centroid_V00) # Get error of each position
+error_dict = dataset.compute_error(centroid_V00[:,np.newaxis]) # Get error of each position
 Error = np.concatenate(list(error_dict.values()), axis = 1)   # COncatenate all positions
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
