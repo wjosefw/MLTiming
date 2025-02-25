@@ -8,8 +8,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Training parameters
 batch_size = 32
-epochs = 500
-lr = 2e-5
+epochs = 7
+lr = 5e-5
 Num_Neurons = 16
 normalization_method = 'min-max'
 moments_order = 3
@@ -24,7 +24,6 @@ step_size = 0.066 # 1 cm is a TOF difference of 66.6 ps
 Theoretical_TOF = step_size*positions
 start = 60 
 stop =  74
-
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent #Get parent directory of the file
