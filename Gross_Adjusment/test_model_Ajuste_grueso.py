@@ -7,7 +7,7 @@ import torch
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
-    architecture, time_step, nbins, Theoretical_TOF, positions, DATA_DIR, 
+    architecture, time_step, nbins, Theoretical_TOF, positions, step_size, DATA_DIR, 
     REF_PULSE_SAVE_DIR, MODEL_SAVE_DIR, BASE_DIR
 )
 
@@ -22,14 +22,12 @@ from Models import ConvolutionalModel, MLP_Torch
 from Dataset import Datos_LAB_GFN
 from efficient_kan.src.efficient_kan import KAN
 
-
 #Load data
-dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
 test_data = dataset.load_data()
         
 print('Número de casos de test: ', test_data.shape[0])
 set_seed(seed)   # Fix seeds
-
 
 # -------------------------------------------------------------------------
 # ----------------------- MOVE TO REFERENCE -------------------------------
