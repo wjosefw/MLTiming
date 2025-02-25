@@ -2,6 +2,16 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import sys
+
+# Import Hyperparameters and Paths
+from config_Fixed_Window import (device, delay_time, time_step, nbins, 
+                                 seed, epochs, lr, batch_size, save, 
+                                 positions, start, stop, BASE_DIR,
+                                 MODEL_SAVE_DIR)
+
+print(device)
+sys.path.append(str(BASE_DIR.parent))
 
 # Import functions
 from functions import (create_and_delay_pulse_pair, calculate_gaussian_center, 
@@ -12,44 +22,17 @@ from Train_loops import train_loop_convolutional
 
 
 # Load data 
-dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-
-train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data']
-train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
-train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
-
-validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
-validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
-validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
-
-test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
-test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
-test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
-
-
-# -------------------------------------------------------------------------
-#----------------------- IMPORTANT DEFINITIONS ----------------------------
-# -------------------------------------------------------------------------
-
-delay_time = 1               # Max delay to training pulses in ns
-time_step = 0.2              # Signal time step in ns
-nbins = 71                   # Num bins for all histograms                          
-positions = [-0.2, 0.0, 0.2] # Expected time difference of each position
-start = 60 
-stop =  74
-set_seed(42)                 # Fix seeds
-epochs = 250
-lr = 1e-5
-batch_size = 32  
-save = True
+dir = '/home/josea/PracticaTimingDigital'
+data = np.load(os.path.join(dir, 'pulsoNa22:filt_norm.npz'))['data']
+set_seed(seed)                 # Fix seeds
 
 # -------------------------------------------------------------------------
 #----------------------- TRAIN/TEST SPLIT ---------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.concatenate((train_data_55, train_data_28, train_data_82), axis = 0)
-validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
-test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
+train_data = data[:10000,:,:]
+validation_data = data[:1,:,:]
+test_data = data[10000:,:,:]
 
 train_data = train_data[:,start:stop,:]
 validation_data = validation_data[:,start:stop,:] 
@@ -79,9 +62,9 @@ val_loader_dec1  = create_dataloaders(val_dec1, REF_val_dec1, batch_size = batch
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-set_seed(42)
+set_seed(seed)
 model_dec0 = ConvolutionalModel(int(stop-start))
-set_seed(42)
+set_seed(seed)
 model_dec1 = ConvolutionalModel(int(stop-start))
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
@@ -90,8 +73,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = lr, weight_deca
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = lr, weight_decay = 1e-5) 
 
 #Execute train loop
-loss_dec0, test_dec0, val_loss_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(test_data[:,:,0]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/model_dec0',  save = save) 
-loss_dec1, test_dec1, val_loss_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(test_data[:,:,1]).float(), EPOCHS = epochs, name = 'predictions/Convolutional/model_dec1',  save = save)
+loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(test_data[:,:,0]).float(), EPOCHS = epochs, name = 'Trained_Models/Fixed_Window_model_dec0',  save = save) 
+loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(test_data[:,:,1]).float(), EPOCHS = epochs, name = 'Trained_Models/Fixed_Window_model_dec1',  save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -99,21 +82,19 @@ loss_dec1, test_dec1, val_loss_dec1, val_dec1 = train_loop_convolutional(model_d
 
 # Calculate TOF
 TOF = test_dec0 - test_dec1
+print(TOF.shape)
+TOF_V00 = TOF
 
-TOF_V00 = TOF[:,:test_data_55.shape[0]] 
-TOF_V02 = TOF[:, test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
-TOF_V20 = TOF[:, test_data_55.shape[0]  + test_data_28.shape[0]:] 
    
 # Calulate Validation error
-centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
+centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limit = 3) 
     
-error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[0]))
 error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
-error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - positions[2]))
 
 # Get MAE
-Error = np.concatenate((error_V02, error_V20, error_V00),  axis = 1)  
-MAE = np.mean(Error, axis = 1)
+#Error = np.concatenate((error_V02, error_V20, error_V00),  axis = 1)  
+#MAE = np.mean(Error, axis = 1)
+MAE = np.mean(error_V00, axis = 1)
 print(MAE[-1])
 
 
@@ -145,17 +126,13 @@ plt.legend()
 plt.show()
 
 # Histogram and gaussian fit 
-plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
+
 plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
-plot_gaussian(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
 
-params_V02, errors_V02 = get_gaussian_params(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
+
 params_V00, errors_V00 = get_gaussian_params(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
-params_V20, errors_V20 = get_gaussian_params(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
 
-print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
-print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
-print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
+print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[1], errors_V00[2], params_V00[2], errors_V00[3]))
 
 print('')
 plt.legend()
