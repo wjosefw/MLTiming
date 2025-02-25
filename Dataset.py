@@ -7,24 +7,28 @@ class Datos_LAB_GFN(Dataset):
     Dataset containing TOF (Time-of-Flight) data obtained at UCM (Spain) by the Group of Nuclear Physics.
     """
     
-    positions = np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5])  # Discrete position values
-    step_size = 0.066  # Conversion factor: 1 cm corresponds to a TOF difference of 66.6 ps 
-    Theoretical_TOF = step_size * positions  # Theoretical TOF values for each position
-
-    def __init__(self, data_dir):
-        """
-        Initializes the dataset, setting up placeholders for data storage.
-
-        Parameters:
-        - data_dir (str): Path to the dataset directory.
-        """
-        self.data_dir = data_dir
-        #self.data = None  # Stores the loaded dataset
-        self.TOF = None  # Stores the externally provided TOF array
-        self.TOF_dict = None  # Dictionary mapping positions to TOF slices
-        self.error_dict = None  # Dictionary storing error values per position
-        self.Error = None  # Concatenated error array
-        self.MAE = None  # Mean Absolute Error placeholder
+    def __init__(self, data_dir, positions=None, step_size=0.066):
+       """
+       Initializes the dataset, setting up placeholders for data storage.
+       Parameters:
+       - data_dir (str): Path to the dataset directory.
+       - positions (list or numpy array, optional): Discrete position values. Default is [0].
+       - step_size (float, optional): Conversion factor (cm to TOF in ps). Default is 0.066.
+       """
+       
+       self.data_dir = data_dir
+       self.positions = np.array(positions) if positions is not None else np.array([0])
+       self.step_size = step_size
+       
+       # Compute theoretical TOF values based on positions
+       self.Theoretical_TOF = self.step_size * self.positions
+       
+       # Placeholders
+       self.TOF = None  
+       self.TOF_dict = None  
+       self.error_dict = None  
+       self.Error = None  
+       self.MAE = None  
 
     def load_data(self):
         """
