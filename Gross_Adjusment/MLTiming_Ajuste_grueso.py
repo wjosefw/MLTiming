@@ -8,7 +8,7 @@ import sys
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save, 
     moments_order, time_step, delay_time, nbins, positions, Theoretical_TOF, 
-    normalization_method, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR
+    normalization_method, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, step_size
 )
 
 print(device)
@@ -32,7 +32,7 @@ from efficient_kan.src.efficient_kan import KAN
 train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
 validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
 
-dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
 test_data = dataset.load_data()
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
@@ -133,7 +133,7 @@ optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate)
 #loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, M_Test[:,:,0], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, KAN_AG_model_dec0), save = save) 
 #loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, M_Test[:,:,1], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, KAN_AG_model_dec1), save = save)
 loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, M_Test[:,:,0], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec0'), save = save) 
-loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, M_Test[:,:,1], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR,'MLP_AG_model_dec1'), save = save)
+loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, M_Test[:,:,1], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec1'), save = save)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -149,7 +149,7 @@ TOF_dict = dataset.get_TOF_slices_train(TOF, size)
 centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
 
 error_dict = dataset.compute_error(centroid_V00[:,np.newaxis]) # Get error of each position
-Error = np.concatenate(list(error_dict.values()), axis = 1)   # COncatenate all positions
+Error = np.concatenate(list(error_dict.values()), axis = 1)   # Concatenate all positions
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
 
@@ -174,8 +174,8 @@ plt.legend()
 plt.subplot(133)
 plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Training loss Detector 0')
 plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Training loss Detector 1')
-plt.plot(np.log10(val_loss_dec0.astype('float32')), label = 'Val loss Detector 0')
-plt.plot(np.log10(val_loss_dec1.astype('float32')), label = 'Val loss Detector 1')
+#plt.plot(np.log10(val_loss_dec0.astype('float32')), label = 'Val loss Detector 0')
+#plt.plot(np.log10(val_loss_dec1.astype('float32')), label = 'Val loss Detector 1')
 plt.title('Losses')
 plt.xlabel('Epochs')
 plt.legend()
