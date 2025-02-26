@@ -694,8 +694,7 @@ def find_first_zero_crossing_after_minimum(vector, time_step):
     
     # Find index of array min
     min_index = np.argmin(vector)
-    print(min_index)
-
+    
     # Look for the first zero-crossing after the minimum
     for i in range(min_index, len(vector) -  1):
         if vector[i] < 0 and vector[i + 1] > 0:
