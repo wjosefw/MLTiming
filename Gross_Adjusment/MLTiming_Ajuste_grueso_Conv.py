@@ -86,14 +86,14 @@ val_loader_dec1  = create_dataloaders(val_dec1, REF_val_dec1, batch_size =  val_
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-set_seed(42)
+set_seed(seed)
 model_dec0 = ConvolutionalModel(int(stop_dec0-start_dec0))
-set_seed(42)
+set_seed(seed)
 model_dec1 = ConvolutionalModel(int(stop_dec1-start_dec1))
 
-#set_seed(42)
+#set_seed(seed)
 #model_dec0 = MLP_Torch(NM = int(stop_dec0-start_dec0), NN = Num_Neurons, STD_INIT = 0.5)
-#set_seed(42)
+#set_seed(seed)
 #model_dec1 = MLP_Torch(NM = int(stop_dec1-start_dec1), NN = Num_Neurons, STD_INIT = 0.5)
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
