@@ -60,7 +60,6 @@ M_Test = momentos(TEST, order = moments_order)
 params_dec0 = (np.array([-0.07050748,  0.02451204,  0.04299015]), np.array([1.12753489, 0.93094554, 0.81081555]))
 params_dec1 = (np.array([-0.04730621,  0.01841856,  0.03066056]), np.array([1.01901136, 0.83459017, 0.72586663]))
 
-
 M_Test_norm_dec0 = normalize_given_params(M_Test, params_dec0, channel = 0, method = normalization_method)
 M_Test_norm_dec1 = normalize_given_params(M_Test, params_dec1, channel = 1, method = normalization_method)
 M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
@@ -231,7 +230,9 @@ time_array_inference = time_array_inference[1:]
 print('Elapsed time move:', np.mean(time_array_move), np.std(time_array_move))
 print('Elapsed time momentos:', np.mean(time_array_moments), np.std(time_array_moments))
 print('Elapsed time inference:', np.mean(time_array_inference), np.std(time_array_inference))
+print('Elapsed time move + inference :', np.mean(time_array_move) + np.mean(time_array_inference), np.std(time_array_move) + np.std(time_array_inference))
 print('Elapsed time momentos + inference :', np.mean(time_array_moments) + np.mean(time_array_inference), np.std(time_array_moments) + np.std(time_array_inference))
+print('Elapsed time move + momentos + inference :', np.mean(time_array_move) + np.mean(time_array_moments) + np.mean(time_array_inference), np.std(time_array_move) + np.std(time_array_moments) + np.std(time_array_inference))
 
 
 # -------------------------------------------------------------------------
