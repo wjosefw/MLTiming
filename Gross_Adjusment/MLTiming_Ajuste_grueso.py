@@ -8,7 +8,8 @@ import sys
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save, 
     moments_order, time_step, delay_time, nbins, positions, Theoretical_TOF, 
-    normalization_method, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, step_size
+    normalization_method, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, step_size,
+    architecture
 )
 
 print(device)
@@ -130,8 +131,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate)  
 
 # Execute train loop
-#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, M_Test[:,:,0], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, KAN_AG_model_dec0), save = save) 
-#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, M_Test[:,:,1], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, KAN_AG_model_dec1), save = save)
+#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, M_Test[:,:,0], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec0'), save = save) 
+#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, M_Test[:,:,1], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec1'), save = save)
 loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, M_Test[:,:,0], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec0'), save = save) 
 loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, M_Test[:,:,1], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec1'), save = save)
 
@@ -174,8 +175,8 @@ plt.legend()
 plt.subplot(133)
 plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Training loss Detector 0')
 plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Training loss Detector 1')
-#plt.plot(np.log10(val_loss_dec0.astype('float32')), label = 'Val loss Detector 0')
-#plt.plot(np.log10(val_loss_dec1.astype('float32')), label = 'Val loss Detector 1')
+plt.plot(np.log10(val_loss_dec0.astype('float32')), label = 'Val loss Detector 0')
+plt.plot(np.log10(val_loss_dec1.astype('float32')), label = 'Val loss Detector 1')
 plt.title('Losses')
 plt.xlabel('Epochs')
 plt.legend()
