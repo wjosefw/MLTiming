@@ -247,7 +247,6 @@ def normalize_by_max(array_pulsos, fit_polynomial=True):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-
 def simpsons_rule_array(y, h):
     """"Calculate integral using Simpsons' rule"""
     n = y.shape[1]
@@ -453,30 +452,6 @@ def create_set(og_set, channel = 0):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def create_position(pulse_set, channel_to_move = 1, channel_to_fix = 0, t_shift = 8):
-    """
-    Create a new position for the pulse set by shifting one channel and optionally adding noise.
-
-    Parameters:
-    pulse_set (np.ndarray): The input pulse set array of shape (N_pulse_pairs, n_time_points, n_channels).
-    channel_to_move (int): The index of the channel to be shifted. Default is 1.
-    channel_to_fix (int): The index of the channel to remain fixed. Default is 0.
-    t_shift (int): The number of time points to shift the channel. Default is 8.
-
-    Returns:
-    np.ndarray: The new pulse set array with the specified channel shifted and optionally noise added.
-    """
-
-    New_position = np.zeros_like(pulse_set)
-    
-    for i in range(New_position.shape[0]):
-        
-        New_position[i,:,channel_to_fix] = pulse_set[i,:,channel_to_fix]
-        New_position[i,:,channel_to_move] = np.roll(pulse_set[i,:,channel_to_move], t_shift)
-        New_position[i,:t_shift,channel_to_move] = pulse_set[i,:t_shift,channel_to_move]
-    
-    return New_position
-
 def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop = 74, delay_time = 1):
     
 
@@ -624,7 +599,6 @@ def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
 
     return delays.get(), aligned_pulses.get()
    
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -776,7 +750,6 @@ def extract_signal_window_by_LED(vector, time_step = 0.2, threshold = 0.1, windo
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 def calculate_slope_y_intercept(vector, time_step, threshold=0.1):
     """
@@ -975,7 +948,6 @@ def momentos_threshold(vector, time_vector, order = 4):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-
 def create_dataloaders(input, target, batch_size = 32, shuffle = True):
   dataset = torch.utils.data.TensorDataset(torch.from_numpy(input).float(), torch.from_numpy(np.expand_dims(target, axis = -1)).float())
   dataloader = torch.utils.data.DataLoader(dataset, batch_size = batch_size, shuffle = shuffle)
@@ -983,7 +955,6 @@ def create_dataloaders(input, target, batch_size = 32, shuffle = True):
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
 
 def get_mean_pulse_from_set(pulse_set, channel = 0):
     """
