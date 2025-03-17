@@ -7,7 +7,7 @@ import sys
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save, 
-    moments_order, time_step, delay_time, nbins, positions, Theoretical_TOF, 
+    moments_order, time_step, delay_time, nbins, positions, Theoretical_TOF, threshold,
     normalization_method, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, step_size,
     architecture
 )
@@ -51,8 +51,8 @@ mean_pulse_dec1 = get_mean_pulse_from_set(train_data, channel = 1)
 #np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec1.npz"), data = mean_pulse_dec1)
 
 # Get start and stop
-crossing_dec0 = calculate_slope_y_intercept(mean_pulse_dec0, time_step, threshold = 0.1)
-crossing_dec1 = calculate_slope_y_intercept(mean_pulse_dec1, time_step, threshold = 0.1)
+crossing_dec0 = calculate_slope_y_intercept(mean_pulse_dec0, time_step, threshold = threshold)
+crossing_dec1 = calculate_slope_y_intercept(mean_pulse_dec1, time_step, threshold = threshold)
 
 start_dec0 = int(crossing_dec0/time_step) - before
 start_dec1 = int(crossing_dec1/time_step) - before
