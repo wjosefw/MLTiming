@@ -7,8 +7,8 @@ import torch
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
-    architecture, time_step, nbins, Theoretical_TOF, positions, step_size, DATA_DIR, 
-    REF_PULSE_SAVE_DIR, MODEL_SAVE_DIR, BASE_DIR
+    architecture, time_step, nbins, Theoretical_TOF, positions, step_size, threshold, 
+    DATA_DIR, REF_PULSE_SAVE_DIR, MODEL_SAVE_DIR, BASE_DIR
 )
 
 print(device)
@@ -37,8 +37,8 @@ mean_pulse_dec0 = np.load(os.path.join(REF_PULSE_SAVE_DIR, 'reference_pulse_dec0
 mean_pulse_dec1 = np.load(os.path.join(REF_PULSE_SAVE_DIR, 'reference_pulse_dec1.npz'))['data']
 
 # Get start and stop
-crossing_dec0 = calculate_slope_y_intercept(mean_pulse_dec0, time_step, threshold = 0.1)
-crossing_dec1 = calculate_slope_y_intercept(mean_pulse_dec1, time_step, threshold = 0.1)
+crossing_dec0 = calculate_slope_y_intercept(mean_pulse_dec0, time_step, threshold = threshold)
+crossing_dec1 = calculate_slope_y_intercept(mean_pulse_dec1, time_step, threshold = threshold)
 
 start_dec0 = int(crossing_dec0/time_step) - before
 start_dec1 = int(crossing_dec1/time_step) - before
