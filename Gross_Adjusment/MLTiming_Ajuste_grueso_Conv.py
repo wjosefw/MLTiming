@@ -7,8 +7,8 @@ import sys
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save,
-    time_step, delay_time, nbins, positions, step_size, Theoretical_TOF, DATA_DIR, 
-    MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR
+    time_step, delay_time, nbins, positions, step_size, Theoretical_TOF, threshold,
+    DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR
 )
 
 print(device)
@@ -27,8 +27,8 @@ from Train_loops import train_loop_convolutional, train_loop_MLP
 #---------------------------- LOAD DATA -----------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode='r')['data']
-validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode='r')['data']
+train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
+validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
 
 dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
 test_data = dataset.load_data()
@@ -48,8 +48,8 @@ np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec0.npz")
 np.savez_compressed(os.path.join(REF_PULSE_SAVE_DIR, "reference_pulse_dec1.npz"), data = mean_pulse_dec1)
 
 # Get start and stop
-crossing_dec0 = calculate_slope_y_intercept(mean_pulse_dec0, time_step, threshold = 0.1)
-crossing_dec1 = calculate_slope_y_intercept(mean_pulse_dec1, time_step, threshold = 0.1)
+crossing_dec0 = calculate_slope_y_intercept(mean_pulse_dec0, time_step, threshold = threshold)
+crossing_dec1 = calculate_slope_y_intercept(mean_pulse_dec1, time_step, threshold = threshold)
 
 start_dec0 = int(crossing_dec0/time_step) - before
 start_dec1 = int(crossing_dec1/time_step) - before
