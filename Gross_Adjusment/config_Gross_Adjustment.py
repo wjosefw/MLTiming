@@ -22,8 +22,9 @@ nbins = 51       # Number of histogram bins
 positions = np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]) 
 step_size = 0.066 # 1 cm is a TOF difference of 66.6 ps 
 Theoretical_TOF = step_size*positions
-before = 8
+before = 6
 after = 5
+threshold = 0.07  # Reference threshold crop pulses
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent #Get parent directory of the file
