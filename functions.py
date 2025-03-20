@@ -668,7 +668,7 @@ def find_first_zero_crossing_after_minimum(vector, time_step):
     
     # Find index of array min
     min_index = np.argmin(vector)
-    
+
     # Look for the first zero-crossing after the minimum
     for i in range(min_index, len(vector) -  1):
         if vector[i] < 0 and vector[i + 1] > 0:
@@ -679,8 +679,13 @@ def find_first_zero_crossing_after_minimum(vector, time_step):
         if vector[i] == 0:
             crossing_time = t[i]
             break
-    return crossing_time    
-             
+        else:
+            crossing_time = 0 # Placeholder if the other conditions do not get fullfilled
+         
+    if min_index == len(vector) - 1:
+        crossing_time = t[-1]
+    
+    return crossing_time               
 
 def Calculate_CFD(array, fraction = 0.7, shift = 80, time_step = 0.025):
     """
