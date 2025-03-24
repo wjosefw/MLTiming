@@ -19,7 +19,7 @@ def gauss_fit(x, y):
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
     return popt
 
-def calculate_gaussian_center(vector, nbins = 51, limit = 1):
+def calculate_gaussian_center(vector, nbins = 51, limit = 3):
     """
     Calculate Gaussian fit centroid for each row of the input vector.
 
