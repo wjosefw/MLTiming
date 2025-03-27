@@ -186,7 +186,7 @@ print('Std MAE: ', np.std(MAE)*1000)
 
 import time
 
-time_test = np.tile(TEST[0,:,0] , (1000000, 1, 1))
+time_test = np.tile(TEST[0,:,:] , (1000000, 1, 1))
 model_dec0 = model_dec0.to(device)
 time_list_move = []
 time_list_moments = []
@@ -205,19 +205,20 @@ time_array_move = np.array(time_list_move)
 # Start timer moments
 for i in range(10):
     start_time_momentos = time.time()
-    M_time_test = momentos(time_test, order = moments_order)
+    M_time_test = momentos(time_test, order = moments_order).astype(np.float32)
     end_time_momentos = time.time()
     elapsed_time_momentos = end_time_momentos - start_time_momentos
     time_list_moments.append(elapsed_time_momentos)
 time_array_moments = np.array(time_list_moments)
+
 
 # Start timer inference
 for i in range(10):
     start_time_inference = time.time()
     with torch.no_grad():
         assert not torch.is_grad_enabled()
-        #output_time_test = model_dec0(torch.tensor(M_time_test[:,:,:]).float().to(device))
-        output_time_test = model_dec0(torch.tensor(TEST[:,None,:,0]).to(device))
+        #output_time_test = model_dec0(torch.tensor(M_time_test[:,:,0]).to(device))
+        output_time_test = model_dec0(torch.tensor(time_test[:,None,:,0]).to(device))
     end_time_inference = time.time()
     elapsed_time_inference = end_time_inference - start_time_inference
     time_list_inference.append(elapsed_time_inference)
