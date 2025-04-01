@@ -1,13 +1,12 @@
 <p align="center">
-  <img src="/figures/scheme_2 (1).png" alt="Project Logo" width="300"/>
+  <img src="/figures/scheme_2 (1).png" alt="Project Logo" width="800"/>
 </p>
 
 <h1 align="center">MLTiming</h1>
 
 <p align="center">
-  Train neural networks to predict time-of-arrival of gamma pulses using singles!.
+  Train neural networks to predict time-of-arrival of gamma pulses using singles!
   <br />
-  <a href="#installation"><strong>→ Jump to Installation</strong></a>
 </p>
 
 ---
