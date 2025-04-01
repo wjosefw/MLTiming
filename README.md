@@ -25,18 +25,18 @@ Our approach leverages Pairwise learning techniques to train small NN the delive
 
 Begin by cloning the entire repository and navigating to the project directory:
 
-<code>\`\`\`bash</code> 
+```bash
 # Clone the repo
 git clone https://github.com/wjosefw/MLTiming.git
-<code>\`\`\`bash</code> 
+```
 
-This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. To make and activate the conda environment with the necessary packages, run:
+This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. If conda is not already installed, install it from the official site. To make and activate the conda environment with the necessary packages, run:
 
-<code>\`\`\`bash</code> 
+```bash
 # Create the conda environment
 conda env create -f environment.yml
 
 # Activate the environment
 conda activate DT_env
-<code>\`\`\`bash</code> 
+```
 
