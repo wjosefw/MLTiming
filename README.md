@@ -30,7 +30,7 @@ Begin by cloning the entire repository and navigating to the project directory:
 git clone https://github.com/wjosefw/MLTiming.git
 ```
 
-This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. If conda is not already installed, install it from the official site. To make and activate the conda environment with the necessary packages, run:
+This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. To make and activate the conda environment with the necessary packages, run:
 
 ```bash
 # Create the conda environment
