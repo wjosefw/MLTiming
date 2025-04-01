@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/home/josea/DEEP_TIMING/DEEP_TIMING_VS/figures/scheme_2 (1).png" alt="Project Logo" width="300"/>
+  <img src="/figures/scheme_2 (1).png" alt="Project Logo" width="300"/>
 </p>
 
 <h1 align="center">MLTiming</h1>
