@@ -38,7 +38,7 @@ conda env create -f environment.yml
 
 # Activate the environment
 conda activate DT_env
-
-## 📑 Repository Table of Contents 
 ```
+## 📑 Repository Table of Contents 
+
 
