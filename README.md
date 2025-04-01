@@ -18,7 +18,7 @@ MLTiming is a framework that enables user to train machine learning (ML) models 
 Our approach leverages Pairwise learning techniques to train small NN the deliver accurate time-of-arrival predictions. In this repo three different kind of architectures are available for use (CNN, MLP and KANs) but user are encouraged to use our techniques to develop more specific architectures tailored to their specific needs!
 
 
-## 🚀 Features
+## 🚀 Usage
 
 
 ## 🛠️ Installation
@@ -38,5 +38,7 @@ conda env create -f environment.yml
 
 # Activate the environment
 conda activate DT_env
+
+## 📑 Repository Table of Contents 
 ```
 
