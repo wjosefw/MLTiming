@@ -20,6 +20,10 @@ Our approach leverages Pairwise learning techniques to train small NN the delive
 
 ## 🚀 Usage
 
+### OPTION A: Quickstart
+
+In order to get a fast and simple glance on how to use MLTiming got to the quickstart notebook [Link to Notebook](Quickstart_MLTiming.ipynb)
+
 
 ## 🛠️ Installation
 
