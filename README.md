@@ -22,8 +22,11 @@ Our approach leverages Pairwise learning techniques to train small NN the delive
 
 ### OPTION A: Quickstart
 
-In order to get a fast and simple glance on how to use MLTiming got to the quickstart notebook [Link to Notebook](Quickstart_MLTiming.ipynb)
+In order to get a fast and simple glance on how to use MLTiming go to the quickstart notebook [Link to Notebook](Quickstart_MLTiming.ipynb)
 
+### OPTION B: Inference on your data
+
+If you want to perform directly perform inference on your data, utilize the inference.py [Link to Notebook](inference.py) script which outputs a .txt file of the time predictions. Data should be saved in a numpy array of shape (N,M) where N is the number of events and M is the number of time points in the signal. You can choose between the available CNN, MLP and KAN trained models.
 
 ## 🛠️ Installation
 
