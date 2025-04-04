@@ -985,3 +985,37 @@ def get_mean_pulse_from_set(pulse_set, channel = 0):
     mean_pulse = np.real(normalized_reconstructed_signal)
   
     return mean_pulse
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def apply_recursive_filter(waveforms, A, B, C):
+    """
+    Applies a recursive filter to a set of waveforms.
+
+    Parameters:
+    waveforms (ndarray): Input waveforms of shape (N_waveforms, n_points).
+    A (float): Coefficient for the previous output Y[n-1].
+    B (float): Coefficient for the current input x[n].
+    C (float): Coefficient for the previous input x[n-1].
+
+    Returns:
+    ndarray: The filtered waveforms of the same shape (N_waveforms, n_points).
+    """
+    N_waveforms, n_points = waveforms.shape
+    filtered_waveforms = np.zeros_like(waveforms)
+
+    # Process each waveform
+    for i in range(N_waveforms):
+        # Initialize the first point (Y[0])
+        filtered_waveforms[i, 0] = B * waveforms[i, 0]  # Assuming no previous input for x[-1]
+        
+        # Apply recursive filter for the rest of the points
+        for n in range(1, n_points):
+            x_n = waveforms[i, n]
+            x_n_minus_1 = waveforms[i, n - 1]
+            Y_n_minus_1 = filtered_waveforms[i, n - 1]
+            
+            filtered_waveforms[i, n] = A * Y_n_minus_1 + B * x_n + C * x_n_minus_1
+    
+    return filtered_waveforms
