@@ -26,7 +26,11 @@ In order to get a fast and simple glance on how to use MLTiming go to the quicks
 
 ### OPTION B: Inference on your data
 
-If you want to perform directly perform inference on your data, utilize the inference.py [Link to Script](inference.py) script which outputs a .txt file of the time predictions. Data should be saved in a numpy array of shape (N,M) where N is the number of events and M is the number of time points in the signal. You can choose between the available CNN, MLP and KAN trained models.
+If you want to perform directly perform inference on your data, utilize the inference.py [Link to Script](inference.py) script which outputs a .txt file of the time predictions. Data should be saved in a numpy array of shape (N,M) where N is the number of events and M is the number of time points in the signal. You can choose between the available CNN, MLP, MLPWAVE and KAN trained models. For example:
+
+```bash
+python inference.py --data path_to_your_data --model CNN
+```
 
 ## 🛠️ Installation
 
