@@ -3,8 +3,6 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(device)
 
 # Import Hyperparameters and Paths
 from config_Fixed_Window import (device, delay_time, time_step, nbins, 
