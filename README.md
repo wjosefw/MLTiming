@@ -52,4 +52,24 @@ conda activate DT_env
 ```
 ## 📑 Repository Table of Contents 
 
+1. Trained Models
+2. Gross adjusment
+3. Fixed window
+3. Threshold
 
+## Trained Models 🧠
+
+* AG_model: Implementation of MLTiming for the CNN architecture.
+* KAN_AG_model: Implementation of MLTiming for the KAN architecture.
+* MLP_AG_model: Implementation of MLTiming for the MLP architecture with caclculated moments as inputs.
+* MLPWAVE_AG_model: Implementation of MLTiming for the MLP architecture with cropped waveform as input.
+
+## Gross Adjusments
+
+It includes scripts to train ML models for timing in radiation detectors using MLTiming.
+
+* config_Gross_Adjustment.py: Configuration file for training hyperamaters.
+* MLTiming_Ajuste_grueso_Single_Det.py: Train a single detector for timing using its own waveforms.
+* MLTiming_Ajuste_grueso_Conv.py: Train two detectors (separately but in the same script) and evualuate Coincidence time resolution directly for the CNN or MLPWAVE implementation
+* MLTiming_Ajuste_grueso.py: Train two detectors (separately but in the same script) and evualuate Coincidence time resolution directly for the MLP or KAN implementation:
+* test_model_Ajuste_grueso.py: Test trained models on new data. The script is built for testing Coincidence time resolution so data from two detectors is needed. If you just want to perform time inference on a single detectore use the 'inference.py' script referenced in the usage section.
