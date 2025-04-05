@@ -5,60 +5,33 @@ import matplotlib.pyplot as plt
 import torch
 from efficient_kan.src.efficient_kan import KAN
 
-from functions import (momentos, create_and_delay_pulse_pair,
-                       set_seed, calculate_gaussian_center, normalize, 
-                       normalize_given_params, plot_gaussian, get_gaussian_params,
-                       create_dataloaders)
+# Import Hyperparameters and Paths
+from config_Fixed_Window import (device, delay_time, time_step, nbins, 
+                                 seed, epochs, lr, batch_size, save, 
+                                 positions, start, stop, Theoretical_TOF,
+                                 BASE_DIR, MODEL_SAVE_DIR, DATA_DIR, step_size,
+                                 moments_order, normalization_method, architecture)
+
+print(device)
+sys.path.append(str(BASE_DIR.parent))
+
+# Import functions
+from functions import (create_and_delay_pulse_pair, calculate_gaussian_center, 
+                       plot_gaussian, get_gaussian_params, set_seed,
+                       create_dataloaders, momentos, normalize, normalize_given_params)
 from Models import MLP_Torch,  count_parameters
+from Dataset import Datos_LAB_GFN
 from Train_loops import train_loop_MLP, train_loop_KAN
 
-# Device setup
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f'Using device: {device}')
-
-# Load data 
-dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-
-train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data']
-train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
-train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
-
-validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
-validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
-validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
-
-test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
-test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
-test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
-
 # -------------------------------------------------------------------------
-#----------------------- IMPORTANT DEFINITIONS ----------------------------
+#---------------------------- LOAD DATA -----------------------------------
 # -------------------------------------------------------------------------
 
-delay_time = 1                        # Max delay to training pulses in ns
-time_step = 0.2                       # Signal time step in ns
-moments_order = int(sys.argv[1])      # Max order of moments used
-set_seed(42)                          # Fix seeds
-nbins = 71                            # Num bins for all histograms                   
-positions = [-0.2, 0.0, 0.2]          # Expected time difference of each position
-normalization_method = 'standardization'
-start = 60
-stop = 74
-lr = 1e-3
-epochs = 100
-batch_size = 32
-Num_Neurons = 16
-architecture = [moments_order, int(sys.argv[2]), 1, 1]    # KAN architecture
-save = False
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
 
-
-# -------------------------------------------------------------------------
-#----------------------- CROP WAVEFORM ------------------------------------
-# -------------------------------------------------------------------------
-
-train_data = np.concatenate((train_data_55, train_data_28, train_data_82), axis = 0)
-validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
-test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
+train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
+validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
+test_data = dataset.load_data()
 
 train_data = train_data[:,start:stop,:]
 validation_data = validation_data[:,start:stop,:] 
@@ -66,6 +39,7 @@ test_data = test_data[:,start:stop,:]
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
+set_seed(seed)                    # Fix seeds
 
 # -------------------------------------------------------------------------
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
@@ -133,79 +107,63 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optim
 #loss_dec0, val_loss_dec0, test_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, torch.tensor(M_Test[:,:,0]).float(), EPOCHS = epochs, name = 'KAN_models/MLP_model_dec0', save = save) 
 #loss_dec1, val_loss_dec1, test_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, torch.tensor(M_Test[:,:,1]).float(), EPOCHS = epochs, name = 'KAN_models/MLP_model_dec1', save = save)
 
-
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
+# Calculate TOF and decompress
+TOF = test_dec0 - test_dec1 
 
-# Calculate TOF
-TOF = test_dec0 - test_dec1
+size = int(TOF.shape[1]/Theoretical_TOF.shape[0]) # Size of slice
+TOF_dict = dataset.get_TOF_slices_train(TOF, size)
 
-TOF_V00 = TOF[:,:test_data_55.shape[0]] 
-TOF_V02 = TOF[:, test_data_55.shape[0] : test_data_55.shape[0] + test_data_28.shape[0]] 
-TOF_V20 = TOF[:, test_data_55.shape[0]  + test_data_28.shape[0]:] 
-    
+# Calulate Error
+centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
 
-# Calulate Test error
-centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 5) 
-
-error_V02 = abs((TOF_V02 - centroid_V00[:, np.newaxis] - positions[0]))
-error_V00 = abs((TOF_V00 - centroid_V00[:, np.newaxis] - positions[1]))
-error_V20 = abs((TOF_V20 - centroid_V00[:, np.newaxis] - positions[2]))
-
-
-#Get MAE
-Error = np.concatenate((error_V02, error_V20, error_V00), axis = 1) 
+error_dict = dataset.compute_error(centroid_V00[:,np.newaxis]) # Get error of each position
+Error = np.concatenate(list(error_dict.values()), axis = 1)   # Concatenate all positions
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
-
+   
 # Plot
 plt.figure(figsize = (20,5))
 plt.subplot(131)
-plt.plot(np.log10(MAE.astype('float64')), label = 'MAE')
+plt.plot(MAE, label = 'MAE')
 plt.title('Results in coincidence')
 plt.xlabel('Epochs')
 plt.ylabel('Log10')
 plt.legend()
 
 plt.subplot(132)
-plt.hist(test_dec0[-1,:], bins = nbins, alpha = 0.5, label = 'Detector 0');
-plt.hist(test_dec1[-1,:], bins = nbins, alpha = 0.5, label = 'Detector 1');
+plt.hist(test_dec0[-1,:], bins = nbins, range = [-1, 3], alpha = 0.5, label = 'Detector 0');
+plt.hist(test_dec1[-1,:], bins = nbins, range = [-1, 3], alpha = 0.5, label = 'Detector 1');
 plt.title('Single detector prediction histograms')
 plt.xlabel('time (ns)')
 plt.ylabel('Counts')
 plt.legend()
 
 plt.subplot(133)
-plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Train loss Detector 0')
-plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Train loss Detector 1')
-plt.title('Training loss')
+plt.plot(loss_dec0, label = 'Log Training loss Detector 0')
+plt.plot(loss_dec1, label = 'Log Training loss Detector 1')
+plt.plot(val_loss_dec0, label = 'Log Validation loss Detector 0')
+plt.plot(val_loss_dec1, label = 'Log Validation loss Detector 1')
+plt.ylabel('Logarithmic losses')
 plt.xlabel('Epochs')
 plt.legend()
-#plt.show()
+plt.show()
 
 # Histogram and gaussian fit 
-plot_gaussian(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, label = '-0.2 ns offset', nbins = nbins)
-plot_gaussian(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.0 ns offset', nbins = nbins)
-plot_gaussian(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, label = ' 0.2 ns offset', nbins = nbins)
-
-
-params_V02, errors_V02 = get_gaussian_params(TOF_V02[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
-params_V00, errors_V00 = get_gaussian_params(TOF_V00[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
-params_V20, errors_V20 = get_gaussian_params(TOF_V20[-1,:], centroid_V00[-1], range = 0.8, nbins = nbins)
-
-
-print("V20: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V20[2], errors_V20[2], params_V20[3], errors_V20[3]))
-print("V00: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V00[2], errors_V00[2], params_V00[3], errors_V00[3]))
-print("V02: CENTROID(ns) = %.4f +/- %.5f  FWHM(ns) = %.4f +/- %.5f" % (params_V02[2], errors_V02[2], params_V02[3], errors_V02[3]))
-
+plt.figure(figsize = (16, 6))
+for i in range(np.min(positions), np.max(positions) + 1):     
+    plot_gaussian(TOF_dict[i][-1,:], centroid_V00[-1], range = 0.6, label = 'pos' + str(i), nbins = nbins)
+    params, errors = get_gaussian_params(TOF_dict[i][-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
+    print(f"{i}: CENTROID(ns) = {params[1]:.4f} +/- {errors[2]:.5f}  FWHM(ns) = {params[2]:.4f} +/- {errors[3]:.5f}")
 
 print('')
 plt.legend()
-plt.xlabel('$\Delta t$ (ns)', fontsize = 14)
+plt.xlabel(r'\Delta t$ (ns)', fontsize = 14)
 plt.ylabel('Counts', fontsize = 14)
-#plt.show()
+plt.show()
 
 #centroid_V00 = calculate_gaussian_center(TOF_V00, nbins = nbins, limits = 3) 
 #centroid_V02 = calculate_gaussian_center(TOF_V02 - centroid_V00[:, np.newaxis], nbins = nbins, limits = 3) 
