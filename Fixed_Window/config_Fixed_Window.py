@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Training parameters
 batch_size = 32
-epochs = 7
+epochs = 500
 lr = 5e-5
 Num_Neurons = 16
 normalization_method = 'min-max'
@@ -22,8 +22,8 @@ nbins = 51       # Number of histogram bins
 positions = np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]) 
 step_size = 0.066 # 1 cm is a TOF difference of 66.6 ps 
 Theoretical_TOF = step_size*positions
-start = 60 
-stop =  74
+start = 260 
+stop =  280
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent #Get parent directory of the file
