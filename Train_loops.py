@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-from Losses import custom_loss_MAE, custom_loss_bounded, custom_loss_MSE, custom_loss_Limit, custom_loss_with_huber, loss_MAE_KAN, loss_MSE_KAN
+from Losses import custom_loss_MSE
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
