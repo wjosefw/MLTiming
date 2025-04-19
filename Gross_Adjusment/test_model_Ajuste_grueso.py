@@ -3,6 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import argparse
 
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
@@ -21,6 +22,12 @@ from functions import ( calculate_gaussian_center, plot_gaussian,
 from Models import ConvolutionalModel, MLP_Torch
 from Dataset import Datos_LAB_GFN
 from efficient_kan.src.efficient_kan import KAN
+
+# Construct parser
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--model', type = str, required = True, help = 'Model to use (CNN, MLP, MLPWAVE OR KAN)')
+args = parser.parse_args()
 
 #Load data
 dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
@@ -68,29 +75,30 @@ M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
 #--------------------------- LOAD MODELS ----------------------------------
 # -------------------------------------------------------------------------
 
-#model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec0')
-#model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec1')
 
-#model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec0')
-#model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec1')
+if args.model == 'KAN':
+    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec0')
+    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec1')
+    model_dec0 = KAN(architecture)
+    model_dec1 = KAN(architecture)
 
-#model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0')
-#model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec1')
+if args.model == 'MLP':
+    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec0')
+    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec1')
+    model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+    model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
 
-model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec0')
-model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec1')
+if args.model == 'MLPWAVE':
+    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0')
+    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec1')
+    model_dec0 = MLP_Torch(NM = int(stop_dec0 - start_dec0), NN = Num_Neurons, STD_INIT = 0.5)
+    model_dec1 = MLP_Torch(NM = int(stop_dec1 - start_dec1), NN = Num_Neurons, STD_INIT = 0.5)
 
-model_dec0 = ConvolutionalModel(int(stop_dec0-start_dec0))
-model_dec1 = ConvolutionalModel(int(stop_dec1-start_dec1))
-
-#model_dec0 = KAN(architecture)
-#model_dec1 = KAN(architecture)
-
-#model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
-#model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
-
-#model_dec0 = MLP_Torch(NM = int(stop_dec0 - start_dec0), NN = Num_Neurons, STD_INIT = 0.5)
-#model_dec1 = MLP_Torch(NM = int(stop_dec1 - start_dec1), NN = Num_Neurons, STD_INIT = 0.5)         
+if args.model == 'CNN':
+    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec0')
+    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec1')
+    model_dec0 = ConvolutionalModel(int(stop_dec0 - start_dec0))
+    model_dec1 = ConvolutionalModel(int(stop_dec1 - start_dec1))
 
 model_dec0.load_state_dict(torch.load(model_dec0_dir, weights_only = True))
 model_dec1.load_state_dict(torch.load(model_dec1_dir, weights_only = True))
@@ -101,11 +109,13 @@ model_dec1.eval()
 #--------------------------- GET RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0])).detach().numpy())
-test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy())
+if args.model == 'CNN' or args.model == 'MLPWAVE':
+    test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0])).detach().numpy())
+    test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy())
 
-#test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
-#test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
+if args.model == 'KAN' or args.model == 'MLP':
+    test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
+    test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
 
 # Calculate TOF and decompress
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
@@ -128,7 +138,6 @@ plt.xlabel('time (ns)')
 plt.ylabel('Counts')
 plt.legend()
 plt.show()
-
 
 # Histogram and gaussian fit 
 plt.figure(figsize = (16,6))
@@ -153,7 +162,6 @@ subset_size = int(size / num_subsets) # Divide the set in the subsets
 resolution = np.zeros((num_subsets,))
 bias = np.zeros((num_subsets,))
 MAE = np.zeros((num_subsets,))
-
 
 for i in range(num_subsets):
     subset_slice = slice(i * subset_size, (i + 1) * subset_size)
@@ -217,8 +225,12 @@ for i in range(10):
     start_time_inference = time.time()
     with torch.no_grad():
         assert not torch.is_grad_enabled()
-        #output_time_test = model_dec0(torch.tensor(M_time_test[:,:,0]).to(device))
-        output_time_test = model_dec0(torch.tensor(time_test[:,None,:,0]).to(device))
+        
+        if args.model == 'KAN' or args.model == 'MLP':
+            output_time_test = model_dec0(torch.tensor(M_time_test[:,:,0]).to(device))
+        if args.model == 'CNN' or args.model == 'MLPWAVE':
+            output_time_test = model_dec0(torch.tensor(time_test[:,None,:,0]).to(device))
+    
     end_time_inference = time.time()
     elapsed_time_inference = end_time_inference - start_time_inference
     time_list_inference.append(elapsed_time_inference)
@@ -240,26 +252,28 @@ print('Elapsed time move + momentos + inference :', np.mean(time_array_move) + n
 #------------------------------- SHAP -------------------------------------
 # -------------------------------------------------------------------------
 
-import shap
+if args.model == 'CNN' or args.model == 'MLPWAVE':
+    
+    import shap
 
-model = model_dec0
-channel = 0
-waveforms = mean_pulse_dec0[start_dec0:stop_dec0]
-waveforms = torch.tensor(waveforms[None, None, :]).float()
+    model = model_dec0
+    channel = 0
+    waveforms = mean_pulse_dec0[start_dec0:stop_dec0]
+    waveforms = torch.tensor(waveforms[None, None, :]).float()
 
-# SHAP Explainer
-explainer = shap.DeepExplainer(model, torch.tensor(TEST[:, None, :, channel]).to(device))
-shap_values = explainer.shap_values(waveforms, check_additivity = False)
+    # SHAP Explainer
+    explainer = shap.DeepExplainer(model, torch.tensor(TEST[:, None, :, channel]).to(device))
+    shap_values = explainer.shap_values(waveforms, check_additivity = False)
 
-shap_values_flat = shap_values[0][0].squeeze()
-waveform_flat = waveforms.squeeze().detach().numpy()
+    shap_values_flat = shap_values[0][0].squeeze()
+    waveform_flat = waveforms.squeeze().detach().numpy()
 
-# Plot waveform with SHAP values
-plt.figure(figsize=(10, 6))
-plt.plot(waveform_flat, 'b-', label = "Waveform")
-plt.scatter(range(len(waveform_flat)), waveform_flat, c = shap_values_flat, cmap = "coolwarm", label = "SHAP values")
-plt.colorbar(label = "Feature Importance")
-plt.title("SHAP Explanation for Waveform")
-plt.legend()
-plt.show()
+    # Plot waveform with SHAP values
+    plt.figure(figsize=(10, 6))
+    plt.plot(waveform_flat, 'b-', label = "Waveform")
+    plt.scatter(range(len(waveform_flat)), waveform_flat, c = shap_values_flat, cmap = "coolwarm", label = "SHAP values")
+    plt.colorbar(label = "Feature Importance")
+    plt.title("SHAP Explanation for Waveform")
+    plt.legend()
+    plt.show()
     
