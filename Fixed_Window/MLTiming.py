@@ -3,7 +3,6 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from efficient_kan.src.efficient_kan import KAN
 
 # Import Hyperparameters and Paths
 from config_Fixed_Window import (device, delay_time, time_step, nbins, 
@@ -22,6 +21,7 @@ from functions import (create_and_delay_pulse_pair, calculate_gaussian_center,
 from Models import MLP_Torch,  count_parameters
 from Dataset import Datos_LAB_GFN
 from Train_loops import train_loop_MLP, train_loop_KAN
+from efficient_kan.src.efficient_kan import KAN
 
 # -------------------------------------------------------------------------
 #---------------------------- LOAD DATA -----------------------------------
