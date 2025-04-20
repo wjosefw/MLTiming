@@ -1,77 +1,54 @@
 import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from efficient_kan.src.efficient_kan import KAN
 
+# Import Hyperparameters and Paths
+from config_Fixed_Window import (device, delay_time, time_step, nbins, 
+                                 seed, epochs, lr, batch_size, save, 
+                                 start, stop, BASE_DIR, MODEL_SAVE_DIR, 
+                                 DATA_DIR)
 
-from functions import (set_seed, create_and_delay_pulse_pair,
-                       Calculate_CFD, create_dataloaders)
-from Models import  count_parameters, ConvolutionalModel
+print(device)
+sys.path.append(str(BASE_DIR.parent))
+
+# Import functions
+from functions import (create_and_delay_pulse_pair, set_seed, Calculate_CFD,
+                       create_dataloaders)
+from Models import ConvolutionalModel,  count_parameters
 from Train_loops import train_loop_convolutional, train_loop_convolutional_with_target
 
-
-# Device setup
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f'Using device: {device}')
-
-# Load data 
-dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'
-train_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_train.npz'))['data']
-train_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_train.npz'))['data']
-train_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_train.npz'))['data']
-
-validation_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_val.npz'))['data']
-validation_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_val.npz'))['data']
-validation_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_val.npz'))['data']
-
-test_data_82 = np.load(os.path.join(dir, 'Na22_82_norm_ALBA_test.npz'))['data']
-test_data_55 = np.load(os.path.join(dir, 'Na22_55_norm_ALBA_test.npz'))['data']
-test_data_28 = np.load(os.path.join(dir, 'Na22_28_norm_ALBA_test.npz'))['data']
-
 # -------------------------------------------------------------------------
-# ----------------------- IMPORTANT DEFINITIONS ---------------------------
+#----------------------- IMPORTANT DEFINITIONS ----------------------------
 # -------------------------------------------------------------------------
 
-channel = 0                                # Channel to train
-delay_time = 1                             # Max delay to training pulses in ns
-set_seed(42)                               # Fix seeds
-nbins = 71                                 # Num bins for all histograms
-start = 47 
-stop = 74 
-time_step = 0.2                            # Signal time step in ns
-epochs = 500                               # Number of epochs for training (first loop)
-epochs2 = 500                              # Number of epochs for training (second loop) 
-lr = 1e-3                                  # Model learning rate
-batch_size = 32                            # batch size used for training
-save = False                               # Save models or not
-save_name = 'predictions/Convolutional/Conv_model_dec' + str(channel)
-fraction_cfd = 0.064                       # Fraction for CFD 
-shift = 6.8                                # Shift for CFD 
+channel = 0
+epochs2 = 150
+set_seed(seed)                    # Fix seeds
+save_name = os.path.join(MODEL_SAVE_DIR, 'FW_model_dec' + str(channel))
 
-train_data = np.concatenate((train_data_55, train_data_28, train_data_82), axis = 0)
-validation_data = np.concatenate((validation_data_55, validation_data_28, validation_data_82), axis = 0)
-test_data = np.concatenate((test_data_55, test_data_28, test_data_82), axis = 0)
+# -------------------------------------------------------------------------
+#---------------------------- LOAD DATA -----------------------------------
+# -------------------------------------------------------------------------
+
+train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
+validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
+
+train_data = train_data[:, start:stop, channel]
+validation_data = validation_data[:, start:stop, channel] 
+
+print('Número de casos de entrenamiento: ', train_data.shape[0])
+print('Número de casos de validacion: ', validation_data.shape[0])
+set_seed(seed)                    # Fix seeds
 
 # -------------------------------------------------------------------------
 # ---------------------- GET CFD TIMESTAMPS -------------------------------
 # -------------------------------------------------------------------------
 
 # Get CFD timestamps
-timestamps_train = Calculate_CFD(train_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
-timestamps_val = Calculate_CFD(validation_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
-timestamps_test = Calculate_CFD(test_data[:,:200, channel], fraction = fraction_cfd, shift = shift, time_step = time_step)
-
-# -------------------------------------------------------------------------
-#----------------------- CROP WAVEFORM ------------------------------------
-# -------------------------------------------------------------------------
-
-train_data = train_data[:,start:stop,channel]
-validation_data = validation_data[:,start:stop,channel] 
-test_data = test_data[:,start:stop,channel]
-
-print('Número de casos de entrenamiento: ', train_data.shape[0])
-print('Número de casos de validacion: ', validation_data.shape[0])
+timestamps_train = Calculate_CFD(train_data, fraction = 0.05, shift = 6.8, time_step = time_step)
+timestamps_val = Calculate_CFD(validation_data, fraction = 0.05, shift = 6.8, time_step = time_step)
 
 # -------------------------------------------------------------------------
 # ----------------- PREPARE DATA FOR FIRST LOOP ---------------------------
@@ -107,6 +84,8 @@ plt.show()
 
 val = np.squeeze(model(torch.tensor(validation_data[:,None,:]).to(device).float()).cpu().detach().numpy())
 plt.plot(timestamps_val, val - timestamps_val, 'b.')
+plt.xlabel('Validation timestamps')
+plt.ylabel('Validation Errors')
 plt.show()
 
 plt.hist(timestamps_val, bins = 71, alpha = 0.5,  label = 'True timestamps')
@@ -134,7 +113,7 @@ val_loader = create_dataloaders(val, REF_val, batch_size = batch_size, shuffle =
 test0 = np.squeeze(model(torch.tensor(val[:,None,:,0]).to(device).float()).cpu().detach().numpy())
 test1 = np.squeeze(model(torch.tensor(val[:,None,:,1]).to(device).float()).cpu().detach().numpy())
 
-#plot validation delays hists
+# Plot validation delays hists
 plt.hist(test0 - test1, bins = nbins, range = [-2, 2], alpha = 0.5, label = 'Prediction')
 plt.hist(REF_val, bins = nbins, range = [-2, 2], alpha = 0.5, label = 'Reference')
 plt.legend()
@@ -144,7 +123,7 @@ plt.show()
 err_val = test0 - test1 - REF_val
 print('MAE validation: ', np.mean(abs(err_val)))
 
-#Plot validation delay vs error
+# Plot validation delay vs error
 plt.plot(REF_val, err_val, 'b.', markersize = 1.5)
 plt.xlabel('Validation target delay')
 plt.ylabel('Validation prediction error')
@@ -155,7 +134,7 @@ plt.show()
 # -------------------------------------------------------------------------
 
 # Execute train loop
-loss, test, val_loss, val_inf = train_loop_convolutional(model, optimizer, train_loader, val_loader, torch.tensor(test_data).float(), EPOCHS = epochs2, name = save_name,  save = save) 
+loss, val_loss, test, val_inf = train_loop_convolutional(model, optimizer, train_loader, val_loader, torch.tensor(np.zeros_like(validation_data)).float(), EPOCHS = epochs2, name = save_name,  save = save) 
 
 # -------------------------------------------------------------------------
 # ------------------- SECOND TRAINING LOOP RESULTS ------------------------
@@ -169,14 +148,7 @@ plt.xlabel('Epochs')
 plt.legend()
 plt.show()
 
-plt.hist(test[-1,:], bins = nbins, alpha = 0.5, label = 'Detector ' + str(channel));
-plt.title('Single detector prediction histograms')
-plt.xlabel('time (ns)')
-plt.ylabel('Counts')
-plt.legend()
-plt.show()
-
-#plot validation delays hists
+# Plot validation delays hists
 plt.hist(val_inf[-1,:,0] - val_inf[-1,:,1], bins = nbins, alpha = 0.5, label = 'Predicted delays validation')
 plt.hist(REF_val, bins = nbins, alpha = 0.5, label = 'Target delays validation')
 plt.legend()
@@ -186,7 +158,7 @@ plt.show()
 err_val = (val_inf[-1,:,0] - val_inf[-1,:,1]) - REF_val
 print('MAE validation: ', np.mean(abs(err_val)))
 
-#Plot target validation delay vs error
+# Plot target validation delay vs error
 plt.plot(REF_val, err_val, 'b.', markersize = 1.5)
 plt.xlabel('Validation target delay')
 plt.ylabel('Validation prediction error')
