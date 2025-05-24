@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Training parameters
 batch_size = 32
-epochs = 50
+epochs = 500
 learning_rate = 1e-5
 Num_Neurons = 16
 normalization_method = 'min-max'
