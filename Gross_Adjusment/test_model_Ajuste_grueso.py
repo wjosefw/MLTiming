@@ -8,9 +8,8 @@ import argparse
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
-    architecture, time_step, nbins, Theoretical_TOF, positions, step_size, threshold, 
-    DATA_DIR, REF_PULSE_SAVE_DIR, MODEL_SAVE_DIR, BASE_DIR
-)
+    architecture, nbins, threshold, DATA_DIR, REF_PULSE_SAVE_DIR, 
+    MODEL_SAVE_DIR, BASE_DIR)
 
 print(device)
 sys.path.append(str(BASE_DIR.parent))
@@ -30,9 +29,10 @@ parser.add_argument('--model', type = str, required = True, help = 'Model to use
 args = parser.parse_args()
 
 #Load data
-dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
-test_data = dataset.load_data()
-        
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
+test_data = dataset.load_test_data()
+time_step, positions, Theoretical_TOF = dataset.load_params() # Load data parameters
+
 print('Número de casos de test: ', test_data.shape[0])
 set_seed(seed)   # Fix seeds
 
@@ -119,9 +119,7 @@ if args.model == 'KAN' or args.model == 'MLP':
 
 # Calculate TOF and decompress
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
-
-size = int(TOF.shape[0]/Theoretical_TOF.shape[0]) # Size of slice
-TOF_dict = dataset.get_TOF_slices_eval(TOF, size)
+TOF_dict = dataset.get_TOF_slices_eval(TOF)
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0][np.newaxis,:], nbins = nbins, limit = 6) 
@@ -157,6 +155,7 @@ plt.show()
 # -------------------------------------------------------------------------
 
 num_subsets = 10 # Number of subsets for bootstraping
+size = int(TOF.shape[0]/Theoretical_TOF.shape[0]) # Size of slice
 subset_size = int(size / num_subsets) # Divide the set in the subsets
 
 resolution = np.zeros((num_subsets,))
