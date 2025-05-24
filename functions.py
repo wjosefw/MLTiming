@@ -1,7 +1,6 @@
 import torch
 import random
 import numpy as np
-from numba import njit
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
 from scipy.interpolate import interp1d
