@@ -186,13 +186,13 @@ def momentos(vector, order = 4):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def normalize_by_max(array_pulsos, fit_polynomial=True):
+def normalize_by_max(pulse_array, fit_polynomial=True):
     """
     Normalize pulse data by the maximum value, optionally fitting a polynomial 
     for better normalization.
 
     Parameters:
-    array_pulsos (numpy.ndarray): 3D array of pulse data with shape (n_pulses, n_samples, n_channels).
+    pulse_array (numpy.ndarray): 3D array of pulse data with shape (n_pulses, n_samples, n_channels).
     fit_polynomial (bool): If True, fit a polynomial to a window around the maximum 
                            value before normalization. Defaults to True.
 
@@ -200,24 +200,24 @@ def normalize_by_max(array_pulsos, fit_polynomial=True):
     numpy.ndarray: Normalized pulse data with the same shape as input.
     """
     # Initialize the output array with zeros, same shape as input
-    y = np.zeros_like(array_pulsos)
+    y = np.zeros_like(pulse_array)
     
     if fit_polynomial:
         # Loop over each pulse
-        for i in range(array_pulsos.shape[0]):
+        for i in range(pulse_array.shape[0]):
             # Find the index of the maximum value in each channel
-            index_max_channel0 = np.argmax(array_pulsos[i, :, 0])
-            index_max_channel1 = np.argmax(array_pulsos[i, :, 1])
+            index_max_channel0 = np.argmax(pulse_array[i, :, 0])
+            index_max_channel1 = np.argmax(pulse_array[i, :, 1])
         
             # Define the window around the maximum value
             lower_window_channel0 = max(index_max_channel0 - 30, 0)
             lower_window_channel1 = max(index_max_channel1 - 30, 0)
-            higher_window_channel0 = min(index_max_channel0 + 30, array_pulsos.shape[1])
-            higher_window_channel1 = min(index_max_channel1 + 30, array_pulsos.shape[1])
+            higher_window_channel0 = min(index_max_channel0 + 30, pulse_array.shape[1])
+            higher_window_channel1 = min(index_max_channel1 + 30, pulse_array.shape[1])
 
             # Extract the values within the window for each channel
-            y_channel0 = array_pulsos[i, lower_window_channel0:higher_window_channel0, 0]
-            y_channel1 = array_pulsos[i, lower_window_channel1:higher_window_channel1, 1]
+            y_channel0 = pulse_array[i, lower_window_channel0:higher_window_channel0, 0]
+            y_channel1 = pulse_array[i, lower_window_channel1:higher_window_channel1, 1]
         
             # Create the x values corresponding to the window
             x_channel0 = np.arange(lower_window_channel0, higher_window_channel0)
@@ -232,14 +232,14 @@ def normalize_by_max(array_pulsos, fit_polynomial=True):
             y_channel1 = r_channel1[0]*x_channel1**2 + r_channel1[1]*x_channel1 + r_channel1[2]
         
             # Normalize the original pulse data by the maximum value of the fitted polynomial
-            y[i, :, 0] = array_pulsos[i, :, 0] / np.max(y_channel0)
-            y[i, :, 1] = array_pulsos[i, :, 1] / np.max(y_channel1)
+            y[i, :, 0] = pulse_array[i, :, 0] / np.max(y_channel0)
+            y[i, :, 1] = pulse_array[i, :, 1] / np.max(y_channel1)
     
     else:
         # If no polynomial fitting is required, normalize directly by the maximum value in each channel
-        for i in range(array_pulsos.shape[0]):
-            y[i, :, 0] = array_pulsos[i, :, 0] / np.max(array_pulsos[i, :, 0])
-            y[i, :, 1] = array_pulsos[i, :, 1] / np.max(array_pulsos[i, :, 1])
+        for i in range(pulse_array.shape[0]):
+            y[i, :, 0] = pulse_array[i, :, 0] / np.max(pulse_array[i, :, 0])
+            y[i, :, 1] = pulse_array[i, :, 1] / np.max(pulse_array[i, :, 1])
     
     return y
 
