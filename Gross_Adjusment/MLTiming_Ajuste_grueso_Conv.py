@@ -7,9 +7,8 @@ import sys
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save,
-    time_step, delay_time, nbins, positions, step_size, Theoretical_TOF, threshold,
-    DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR
-)
+    delay_time, nbins, threshold, DATA_DIR, MODEL_SAVE_DIR, 
+    REF_PULSE_SAVE_DIR, BASE_DIR)
 
 print(device)
 sys.path.append(str(BASE_DIR.parent))
@@ -27,11 +26,13 @@ from Train_loops import train_loop_convolutional, train_loop_MLP
 #---------------------------- LOAD DATA -----------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
-validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
 
-dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
-test_data = dataset.load_data()
+train_data = dataset.load_train_data()
+validation_data = dataset.load_val_data()
+test_data = dataset.load_test_data()
+
+time_step, positions, Theoretical_TOF = dataset.load_params() # Load data parameters
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
@@ -113,9 +114,7 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_d
 
 # Calculate TOF and decompress
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
-
-size = int(TOF.shape[1]/Theoretical_TOF.shape[0]) # Size of slice
-TOF_dict = dataset.get_TOF_slices_train(TOF, size)
+TOF_dict = dataset.get_TOF_slices_train(TOF) # Cut in slices per each position
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
