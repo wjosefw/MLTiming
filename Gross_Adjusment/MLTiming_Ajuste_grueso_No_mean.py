@@ -7,8 +7,7 @@ import sys
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, before, after, save,
-    time_step, delay_time, nbins, positions, step_size, Theoretical_TOF, threshold,
-    DATA_DIR, MODEL_SAVE_DIR, BASE_DIR
+    delay_time, nbins, threshold, DATA_DIR, MODEL_SAVE_DIR, BASE_DIR
 )
 
 print(device)
@@ -26,11 +25,13 @@ from Train_loops import train_loop_convolutional
 #---------------------------- LOAD DATA -----------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
-validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
 
-dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
-test_data = dataset.load_data()
+train_data = dataset.load_train_data()
+validation_data = dataset.load_val_data()
+test_data = dataset.load_test_data()
+
+time_step, positions, Theoretical_TOF = dataset.load_params() # Load data parameters
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
