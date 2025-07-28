@@ -124,7 +124,7 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_d
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
 
 size = int(TOF.shape[1]/Theoretical_TOF.shape[0]) # Size of slice
-TOF_dict = dataset.get_TOF_slices_train(TOF, size)
+TOF_dict = dataset.get_TOF_slices_train(TOF)
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
