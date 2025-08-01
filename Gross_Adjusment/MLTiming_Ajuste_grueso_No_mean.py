@@ -41,6 +41,7 @@ set_seed(seed)                    # Fix seeds
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
+
 def extract_signal_window_by_fraction(vector, fraction = 0.1, window_low = 140, window_high = 10):
     """
     Extracts a windowed segment of a signal around a threshold crossing point defined by a fraction 
@@ -58,11 +59,17 @@ def extract_signal_window_by_fraction(vector, fraction = 0.1, window_low = 140, 
         crossing = calculate_slope_y_intercept(vector[i, :], time_step, threshold=fraction)
         
         # Convert crossing time to index and define window range
-        start = int(crossing / time_step) - window_low
-        stop = int(crossing / time_step) + window_high
+        start = max(int(crossing / time_step) - window_low, 0)
+        stop = min(int(crossing / time_step) + window_high, vector.shape[1])
      
         # Extract the windowed portion of the signal
-        new_vector[i, :] = vector[i, start:stop]
+        if start == 0: 
+            print(start, stop)
+            seg = vector[i, :int(window_high + window_low)] # Make sure to take the full desired segment
+            new_vector[i, :len(seg)] = seg
+        else:
+            seg = vector[i, start:stop]
+            new_vector[i, :len(seg)] = seg
         
         # Store the negative start index as the delay for alignment
         delays_list.append(-1 * start)
