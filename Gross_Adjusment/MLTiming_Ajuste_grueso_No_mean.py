@@ -16,7 +16,7 @@ sys.path.append(str(BASE_DIR.parent))
 # Import functions 
 from functions import (create_and_delay_pulse_pair, set_seed, create_dataloaders, 
                        calculate_gaussian_center, plot_gaussian, get_gaussian_params,
-                       calculate_slope_y_intercept)
+                       extract_signal_window_by_fraction)
 from Models import ConvolutionalModel,  count_parameters
 from Dataset import Datos_LAB_GFN
 from Train_loops import train_loop_convolutional
@@ -41,51 +41,15 @@ set_seed(seed)                    # Fix seeds
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-
-def extract_signal_window_by_fraction(vector, fraction = 0.1, window_low = 140, window_high = 10):
-    """
-    Extracts a windowed segment of a signal around a threshold crossing point defined by a fraction 
-    of the maximum signal amplitude. Also computes delay indices relative to the crossing point.
-    """
-
-    # Initialize an array to hold the extracted windows for each signal and list to hold delay values 
-    new_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
-    delays_list = []
-
-    # Iterate through each signal in the batch
-    for i in range(vector.shape[0]):
-
-        # Find the crossing time where signal reaches a certain fraction of its max amplitude
-        crossing = calculate_slope_y_intercept(vector[i, :], time_step, threshold=fraction)
-        
-        # Convert crossing time to index and define window range
-        start = max(int(crossing / time_step) - window_low, 0)
-        stop = min(int(crossing / time_step) + window_high, vector.shape[1])
-     
-        # Extract the windowed portion of the signal
-        if start == 0: 
-            print(start, stop)
-            seg = vector[i, :int(window_high + window_low)] # Make sure to take the full desired segment
-            new_vector[i, :len(seg)] = seg
-        else:
-            seg = vector[i, start:stop]
-            new_vector[i, :len(seg)] = seg
-        
-        # Store the negative start index as the delay for alignment
-        delays_list.append(-1 * start)
-        
-    return new_vector, np.array(delays_list)
-
-
 # Delays
-moved_pulses_dec0, delays_dec0 = extract_signal_window_by_fraction(train_data[:,:,0], fraction = threshold, window_low = before, window_high = after)
-moved_pulses_dec1, delays_dec1 = extract_signal_window_by_fraction(train_data[:,:,1], fraction = threshold, window_low = before, window_high = after)
+moved_pulses_dec0, delays_dec0 = extract_signal_window_by_fraction(train_data[:,:,0], time_step, fraction = threshold, window_low = before, window_high = after)
+moved_pulses_dec1, delays_dec1 = extract_signal_window_by_fraction(train_data[:,:,1], time_step, fraction = threshold, window_low = before, window_high = after)
 
-moved_pulses_val_dec0, delays_val_dec0  = extract_signal_window_by_fraction(validation_data[:,:,0], fraction = threshold, window_low = before, window_high = after)
-moved_pulses_val_dec1, delays_val_dec1  = extract_signal_window_by_fraction(validation_data[:,:,1], fraction = threshold, window_low = before, window_high = after)
+moved_pulses_val_dec0, delays_val_dec0  = extract_signal_window_by_fraction(validation_data[:,:,0], time_step, fraction = threshold, window_low = before, window_high = after)
+moved_pulses_val_dec1, delays_val_dec1  = extract_signal_window_by_fraction(validation_data[:,:,1], time_step, fraction = threshold, window_low = before, window_high = after)
 
-moved_pulses_test_dec0, delays_test_dec0 = extract_signal_window_by_fraction(test_data[:,:,0], fraction = threshold, window_low = before, window_high = after)
-moved_pulses_test_dec1, delays_test_dec1 = extract_signal_window_by_fraction(test_data[:,:,1], fraction = threshold, window_low = before, window_high = after)
+moved_pulses_test_dec0, delays_test_dec0 = extract_signal_window_by_fraction(test_data[:,:,0], time_step, fraction = threshold, window_low = before, window_high = after)
+moved_pulses_test_dec1, delays_test_dec1 = extract_signal_window_by_fraction(test_data[:,:,1], time_step, fraction = threshold, window_low = before, window_high = after)
 
 
 # Train/Validation/Test set
@@ -115,7 +79,9 @@ model_dec1 = ConvolutionalModel(int(before + after))
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
+set_seed(seed)
 optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate) 
+set_seed(seed)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate) 
 
 # Execute train loop
