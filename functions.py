@@ -816,28 +816,39 @@ def continuous_delay(vector, time_step = 0.2, delay_time = 1, channel_to_fix = 0
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def extract_signal_window_by_fraction(vector, fraction = 0.2, window_low = 140, window_high = 10):
+def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_low = 140, window_high = 10):
+    """
+    Extracts a windowed segment of a signal around a threshold crossing point defined by a fraction 
+    of the maximum signal amplitude. Also computes delay indices relative to the crossing point.
+    """
 
-    new_vector = np.zeros((vector.shape[0], int(window_high + window_low), 2))
-    
+    # Initialize an array to hold the extracted windows for each signal and list to hold delay values 
+    new_vector = np.zeros((vector.shape[0], int(window_high + window_low)), dtype = np.float32)
+    delays_list = []
+
+    # Iterate through each signal in the batch
     for i in range(vector.shape[0]):
-        # Find indices where the signal in each channel exceeds the fraction threshold
-        indices_channel0 = np.where(vector[i,:, 0] >= fraction)[0]
-        indices_channel1 = np.where(vector[i,:, 1] >= fraction)[0]
-        
-        # Calculate the low and high indices to truncate around the fraction threshold
-        low_index_channel0 = indices_channel0[0] - window_low
-        low_index_channel1 = indices_channel1[0] - window_low
 
-        high_index_channel0 = indices_channel0[0] + window_high
-        high_index_channel1 = indices_channel1[0] + window_high
+        # Find the crossing time where signal reaches a certain fraction of its max amplitude
+        crossing = calculate_slope_y_intercept(vector[i, :], time_step, threshold = fraction)
         
-        # Set values outside the specified windows to zero for each channel
-        new_vector[i,:, 0] =  vector[i,low_index_channel0:high_index_channel0, 0]
-        new_vector[i,:, 1] =  vector[i,low_index_channel1:high_index_channel1, 1]
+        # Convert crossing time to index and define window range
+        start = max(int(crossing / time_step) - window_low, 0)
+        stop = min(int(crossing / time_step) + window_high, vector.shape[1])
+     
+        # Extract the windowed portion of the signal
+        if start == 0: 
+            print(start, stop)
+            seg = vector[i, :int(window_high + window_low)] # Make sure to take the full desired segment
+            new_vector[i, :len(seg)] = seg
+        else:
+            seg = vector[i, start:stop]
+            new_vector[i, :len(seg)] = seg
         
-
-    return new_vector
+        # Store the negative start index as the delay for alignment
+        delays_list.append(-1 * start)
+        
+    return new_vector, np.array(delays_list)
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
