@@ -1,7 +1,6 @@
 # configs/inference.yaml
 data:
   npz_path: Pulsos15CM20250130_version2/Na22_pos0_test_channel0.npz   # path to your npz file
-  channel_index: 0                                                      # channel used for inference
 model:
   name: CNN                           # CNN | MLP | MLPWAVE | KAN
   checkpoint: Trained_Models/AG_model_dec0

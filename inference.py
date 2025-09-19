@@ -45,7 +45,6 @@ print('Number of events to infer:', test_data.shape[0])
 
 output_filename = cfg_get(cfg, 'runtime.output_txt', '')
 time_step = cfg_get(cfg, 'preprocessing.time_step_ns', 0.2)
-channel = cfg_get(cfg, 'data.channel_index', 0)
 threshold = cfg_get(cfg,'preprocessing.crossing_threshold', 0.1)
 before = cfg_get(cfg,'preprocessing.crop.before_samples', 8)
 after = cfg_get(cfg,'preprocessing.crop.after_samples', 5)
