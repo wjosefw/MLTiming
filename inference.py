@@ -2,49 +2,61 @@ import os
 import numpy as np
 import torch
 import argparse
-
-# General settings
-seed = 42
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
-
-
-# Construct parser
-parser = argparse.ArgumentParser()
-
-parser.add_argument('--data', type = str, required = True, help = 'Path to data')
-parser.add_argument('--model', type = str, required = True, help = 'Model to use (CNN, MLP, MLPWAVE OR KAN)')
-args = parser.parse_args()
+import yaml
 
 # Import functions    
-from functions import ( get_mean_pulse_from_set, set_seed, momentos, 
+from functions import ( get_mean_pulse_from_set, set_seed, cfg_get, momentos, 
                        normalize_given_params, move_to_reference,
                        calculate_slope_y_intercept)
 from Models import ConvolutionalModel, MLP_Torch
 from efficient_kan.src.efficient_kan import KAN
 
-#Load data
-test_data = np.load(args.data)['data'][:,:,0]
-test_data = test_data[:,:,None]
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-print('Número de casos de test: ', test_data.shape[0])
-set_seed(seed)   # Fix seeds
+# Construct parser
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', type=str, help = 'Path to YAML config')
+parser.add_argument('--data', type = str, required = False, help = 'Path to data')
+parser.add_argument('--model', type = str, required = False, help = 'Model to use (CNN, MLP, MLPWAVE OR KAN)')
+args, extra = parser.parse_known_args() # parse known args first so the config can supply missing values
+
+cfg = {}
+if args.config:
+    with open(args.config) as f:
+        cfg = yaml.safe_load(f)
+
+# Runtime options
+seed = cfg_get(cfg, 'runtime.seed', 42)
+set_seed(seed)
+
+# fall back to config values when CLI flags are absent
+data_path = args.data or cfg['data']['npz_path']
+model_name = args.model or cfg['model']['name']
+
+#Load data
+test_data = np.load(data_path)['data']
+test_data = test_data[:,:,None] # Some functions need the extra dimention
+
+print('Number of events to infer:', test_data.shape[0])
 
 # -------------------------------------------------------------------------
 # --------------------- IMPORTANT DEFINITIONS -----------------------------
 # -------------------------------------------------------------------------
 
-# Training parameters
-Num_Neurons = 16
-normalization_method = 'min-max'
-moments_order = 3
-architecture = [moments_order, 5, 1, 1]    # KAN architecture
+output_filename = cfg_get(cfg, 'runtime.output_txt', '')
+time_step = cfg_get(cfg, 'preprocessing.time_step_ns', 0.2)
+channel = cfg_get(cfg, 'data.channel_index', 0)
+threshold = cfg_get(cfg,'preprocessing.crossing_threshold', 0.1)
+before = cfg_get(cfg,'preprocessing.crop.before_samples', 8)
+after = cfg_get(cfg,'preprocessing.crop.after_samples', 5)
 
-# Data settings
-time_step = 0.2  # Signal time step in ns
-before = 8
-after = 5
-threshold = 0.1  # Reference threshold crop pulses
+architecture = cfg_get(cfg,'preprocessing.model.architecture', [])
+Num_Neurons = cfg_get(cfg,'preprocessing.model.num_neurons', 16)
+moments_order = cfg_get(cfg,'preprocessing.model.moments_order', 3)
+
+normalization_method = cfg_get(cfg,'preprocessing.normalization.method', 'min-max')
+norm_params_min = cfg_get(cfg,'preprocessing.normalization.params_min', [])
+norm_params_max = cfg_get(cfg,'preprocessing.normalization.params_max', [])
 
 # -------------------------------------------------------------------------
 # ----------------------- MOVE TO REFERENCE -------------------------------
@@ -66,28 +78,26 @@ delays_test, moved_pulses = move_to_reference(mean_pulse, test_data, start = sta
 
 # Calculate moments 
 M_Test = momentos(moved_pulses[:,:,None], order = moments_order)
-
-params = (np.array([-0.07050748,  0.02451204,  0.04299015]), np.array([1.12753489, 0.93094554, 0.81081555]))
-
-M_Test_norm = normalize_given_params(M_Test, params, channel = 0, method = normalization_method)
+norm_params = (np.array(norm_params_min), np.array(norm_params_max))
+M_Test_norm = normalize_given_params(M_Test, norm_params, channel = 0, method = normalization_method)
 
 # -------------------------------------------------------------------------
 #--------------------------- LOAD MODELS ----------------------------------
 # -------------------------------------------------------------------------
 
-if args.model == 'KAN':
+if model_name == 'KAN':
     model_dir = os.path.join('Trained_Models/KAN_AG_model_dec0')
     model = KAN(architecture)
 
-if args.model == 'MLP':
+if model_name  == 'MLP':
     model_dir = os.path.join('Trained_Models/MLP_AG_model_dec0')
     model = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
 
-if args.model == 'MLPWAVE':
+if model_name  == 'MLPWAVE':
     model_dir = os.path.join('Trained_Models/MLPWAVE_AG_model_dec0')
     model = MLP_Torch(NM = int(stop - start), NN = Num_Neurons, STD_INIT = 0.5)
 
-if args.model == 'CNN':
+if model_name  == 'CNN':
     model_dir = os.path.join('Trained_Models/AG_model_dec0')
     model = ConvolutionalModel(int(stop - start))
 
@@ -98,17 +108,17 @@ model.eval()
 #--------------------------- GET RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-if args.model == 'CNN' or args.model == 'MLPWAVE':
+if model_name  == 'CNN' or args.model == 'MLPWAVE':
     test = np.squeeze(model(torch.tensor(moved_pulses[:,None,:])).detach().numpy())
 
-if args.model == 'KAN' or args.model == 'MLP':
+if model_name  == 'KAN' or args.model == 'MLP':
     test = np.squeeze(model(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
 
 decompressed_test = (test - time_step*delays_test)
 
 # Save to txt as one column
 decompressed_test_flat = decompressed_test.flatten()
-np.savetxt('output_timing.txt', decompressed_test_flat, fmt = '%.6f')  
+np.savetxt(output_filename, decompressed_test_flat, fmt = '%.6f')  
 
 
 

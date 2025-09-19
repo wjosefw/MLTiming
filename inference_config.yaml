@@ -1,0 +1,25 @@
+# configs/inference.yaml
+data:
+  npz_path: Pulsos15CM20250130_version2/Na22_pos0_test_channel0.npz   # path to your npz file
+  channel_index: 0                                                      # channel used for inference
+model:
+  name: CNN                           # CNN | MLP | MLPWAVE | KAN
+  checkpoint: Trained_Models/AG_model_dec0
+  architecture: [3, 5, 1, 1]    # KAN architecture
+  num_neurons: 16
+  moments_order: 3
+preprocessing:
+  time_step_ns: 0.2
+  crossing_threshold: 0.1
+  crop:
+    before_samples: 8
+    after_samples: 5
+  normalization:
+    method: min-max
+    params_min: [-0.07050748,  0.02451204,  0.04299015]
+    params_max: [1.12753489, 0.93094554, 0.81081555]
+runtime:
+  seed: 42
+  output_txt: output_timing.txt
+
+
