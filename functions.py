@@ -1029,3 +1029,12 @@ def apply_recursive_filter(waveforms, A, B, C):
             filtered_waveforms[i, n] = A * Y_n_minus_1 + B * x_n + C * x_n_minus_1
     
     return filtered_waveforms
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def cfg_get(cfg, path, default=None):
+    node = cfg
+    for key in path.split('.'):
+        node = node.get(key, {})
+    return node if node else default
