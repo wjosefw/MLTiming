@@ -20,7 +20,7 @@ from functions import (move_to_reference, create_and_delay_pulse_pair,
                        calculate_slope_y_intercept)
 from Models import ConvolutionalModel,  count_parameters, MLP_Torch
 from Dataset import Datos_LAB_GFN
-from Train_loops import train_loop_convolutional, train_loop_MLP
+from Train_loops import train_loop
 
 # -------------------------------------------------------------------------
 #---------------------------- LOAD DATA -----------------------------------
@@ -103,10 +103,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate) 
 
 # Execute train loop
-loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_convolutional(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec0'),  save = save,  test_tensor = torch.tensor(TEST[:,:,0]).float()) 
-loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_convolutional(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec1'),  save = save,  test_tensor = torch.tensor(TEST[:,:,1]).float())
-#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0'), save = save, test_tensor = torch.tensor(TEST[:,:,0]).float()) 
-#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec1'), save = save, test_tensor = torch.tensor(TEST[:,:,1]).float())
+loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec0'),  save = save, model_type = 'CNN', test_tensor = torch.tensor(TEST[:,:,0]).float()) 
+loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec1'),  save = save, model_type = 'CNN', test_tensor = torch.tensor(TEST[:,:,1]).float())
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
