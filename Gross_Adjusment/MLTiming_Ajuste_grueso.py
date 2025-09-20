@@ -7,9 +7,8 @@ import sys
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save, 
-    moments_order, time_step, delay_time, nbins, positions, Theoretical_TOF, threshold,
-    normalization_method, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, step_size,
-    architecture
+    moments_order, delay_time, nbins, threshold, normalization_method, DATA_DIR, 
+    MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, architecture
 )
 
 print(device)
@@ -22,7 +21,7 @@ from functions import (momentos, move_to_reference, create_and_delay_pulse_pair,
                        get_gaussian_params, get_mean_pulse_from_set,
                        calculate_slope_y_intercept)
 from Models import MLP_Torch,  count_parameters
-from Train_loops import train_loop_KAN, train_loop_MLP
+from Train_loops import train_loop
 from Dataset import Datos_LAB_GFN
 from efficient_kan.src.efficient_kan import KAN
 
@@ -30,11 +29,13 @@ from efficient_kan.src.efficient_kan import KAN
 #---------------------------- LOAD DATA -----------------------------------
 # -------------------------------------------------------------------------
 
-train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
-validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
 
-dataset = Datos_LAB_GFN(data_dir = DATA_DIR, positions = positions, step_size = step_size)
-test_data = dataset.load_data()
+train_data = dataset.load_train_data()
+validation_data = dataset.load_val_data()
+test_data = dataset.load_test_data()
+
+time_step, positions, Theoretical_TOF = dataset.load_params() # Load data parameters
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
 print('Número de casos de test: ', test_data.shape[0])
@@ -120,10 +121,10 @@ print("Normalization parameters detector 1:", params_dec1)
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-#model_dec0 = KAN(architecture)
-#model_dec1 = KAN(architecture)
-model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
-model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+model_dec0 = KAN(architecture)
+model_dec1 = KAN(architecture)
+#model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+#model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
                   
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
@@ -131,10 +132,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate)  
 
 # Execute train loop
-#loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_KAN(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, M_Test[:,:,0], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec0'), save = save) 
-#loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_KAN(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, M_Test[:,:,1], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec1'), save = save)
-loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop_MLP(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, M_Test[:,:,0], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec0'), save = save) 
-loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, M_Test[:,:,1], EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec1'), save = save)
+loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec0'), save = save, model_type = 'KAN',  test_tensor = M_Test[:,:,0]) 
+loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec1'), save = save, model_type = 'KAN',  test_tensor = M_Test[:,:,1])
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -142,9 +141,7 @@ loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop_MLP(model_dec1, optim
 
 # Calculate TOF and decompress
 TOF = (test_dec0 - time_step*delays_test_dec0) - (test_dec1 - time_step*delays_test_dec1)
-
-size = int(TOF.shape[1]/Theoretical_TOF.shape[0]) # Size of slice
-TOF_dict = dataset.get_TOF_slices_train(TOF, size)
+TOF_dict = dataset.get_TOF_slices_train(TOF) # Cut in slices per each position
 
 # Calulate Error
 centroid_V00 = calculate_gaussian_center(TOF_dict[0], nbins = nbins, limit = 6) 
