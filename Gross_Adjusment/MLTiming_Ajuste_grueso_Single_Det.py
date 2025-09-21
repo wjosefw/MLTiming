@@ -7,7 +7,7 @@ import torch
 # Import Hyperparameters and Paths
 from config_Gross_Adjustment import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save, 
-    time_step, delay_time, nbins, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR
+    delay_time, nbins, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR
 )
 
 print(device)
@@ -19,14 +19,21 @@ from functions import (move_to_reference, create_and_delay_pulse_pair,
                        set_seed, create_dataloaders, get_mean_pulse_from_set,
                        calculate_slope_y_intercept)
 from Models import ConvolutionalModel,  count_parameters, MLP_Torch
-from Train_loops import train_loop_convolutional_single_det, train_loop_MLP_Single_Det
+from Dataset import Datos_LAB_GFN
+from Train_loops import train_loop
 
 # Load data 
-train_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_train.npz'), mmap_mode = 'r')['data']
-validation_data = np.load(os.path.join(DATA_DIR, 'Na22_norm_pos0_val.npz'), mmap_mode = 'r')['data']
+dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
+
+train_data = dataset.load_train_data()
+validation_data = dataset.load_val_data()
+test_data = dataset.load_test_data()
+
+time_step, positions, Theoretical_TOF = dataset.load_params() # Load data parameters
 
 print('Número de casos de entrenamiento: ', train_data.shape[0])
-print('Número de casos de validacion: ', validation_data.shape[0])
+print('Número de casos de test: ', test_data.shape[0])
+set_seed(seed)                    # Fix seeds
 
 # -------------------------------------------------------------------------
 #----------------------- IMPORTANT DEFINITIONS ----------------------------
@@ -68,16 +75,15 @@ val_loader  = create_dataloaders(val, REF_val, batch_size = val.shape[0], shuffl
 # -------------------------------------------------------------------------
 
 set_seed(42)
-#model = ConvolutionalModel(int(stop - start))
-model = MLP_Torch(NM = int(stop- start), NN = Num_Neurons, STD_INIT = 0.5)
+model = ConvolutionalModel(int(stop - start))
+#model = MLP_Torch(NM = int(stop- start), NN = Num_Neurons, STD_INIT = 0.5)
 
 print(f"Total number of parameters: {count_parameters(model)}")
 
 optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate) 
 
 # Execute train loop
-#loss, val_loss, val = train_loop_convolutional_single_det(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = save_name,  save = save) 
-loss, val_loss, val = train_loop_MLP_Single_Det(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec' + str(channel)), save = save)
+loss, val_loss, val = train_loop(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = save_name,  save = save, model_type = 'CNN') 
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
