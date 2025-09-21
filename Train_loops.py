@@ -85,10 +85,10 @@ def train_loop(
             optimizer.zero_grad(set_to_none=True)
 
             # Forward pass depends on model type
-            if model_type in ['CNN', 'MLP']:
+            if model_type == 'CNN':
                 y0 = model(inputs[:, None, :, 0])  
                 y1 = model(inputs[:, None, :, 1])
-            if model_type == 'KAN':
+            if model_type in ['CNN', 'MLP']:
                 y0 = model(inputs[:, :, 0])
                 y1 = model(inputs[:, :, 1])
 
@@ -109,10 +109,10 @@ def train_loop(
         with torch.no_grad():
             # Compute test predictions if enabled
             if has_test:
+                if model_type == 'CNN':
+                    t = model(test_tensor[:, None, :]).squeeze()
                 if model_type in ['CNN', 'MLP']:
-                    t = model(test_tensor[:, None, :]).squeeze(-1)
-                if model_type == 'KAN':
-                    t = model(test_tensor).squeeze(-1)
+                    t = model(test_tensor).squeeze()
                 test_preds[epoch, :] = t
 
             # Validation forward pass
@@ -121,18 +121,18 @@ def train_loop(
             for v_inputs, v_labels in val_loader:
                 v_inputs, v_labels = v_inputs.to(device), v_labels.to(device)
 
-                if model_type in ['CNN', 'MLP']:
+                if model_type == 'CNN':
                     v0 = model(v_inputs[:, None, :, 0])
                     v1 = model(v_inputs[:, None, :, 1])
-                if model_type == 'KAN':
+                if model_type in ['CNN', 'MLP']:
                     v0 = model(v_inputs[:, :, 0])
                     v1 = model(v_inputs[:, :, 1])
 
                 val_running += loss_fn(v0, v1, v_labels).item()
 
                 bsz = v0.shape[0]
-                val_predictions[epoch, start_idx:start_idx + bsz, 0] = v0.squeeze(-1)
-                val_predictions[epoch, start_idx:start_idx + bsz, 1] = v1.squeeze(-1)
+                val_predictions[epoch, start_idx:start_idx + bsz, 0] = v0.squeeze()
+                val_predictions[epoch, start_idx:start_idx + bsz, 1] = v1.squeeze()
                 start_idx += bsz
 
             val_epoch_loss = val_running / max(1, len(val_loader))
