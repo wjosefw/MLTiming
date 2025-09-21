@@ -88,7 +88,7 @@ def train_loop(
             if model_type == 'CNN':
                 y0 = model(inputs[:, None, :, 0])  
                 y1 = model(inputs[:, None, :, 1])
-            if model_type in ['CNN', 'MLP']:
+            if model_type in ['KAN', 'MLP']:
                 y0 = model(inputs[:, :, 0])
                 y1 = model(inputs[:, :, 1])
 
@@ -111,7 +111,7 @@ def train_loop(
             if has_test:
                 if model_type == 'CNN':
                     t = model(test_tensor[:, None, :]).squeeze()
-                if model_type in ['CNN', 'MLP']:
+                if model_type in ['KAN', 'MLP']:
                     t = model(test_tensor).squeeze()
                 test_preds[epoch, :] = t
 
@@ -124,7 +124,7 @@ def train_loop(
                 if model_type == 'CNN':
                     v0 = model(v_inputs[:, None, :, 0])
                     v1 = model(v_inputs[:, None, :, 1])
-                if model_type in ['CNN', 'MLP']:
+                if model_type in ['KAN', 'MLP']:
                     v0 = model(v_inputs[:, :, 0])
                     v1 = model(v_inputs[:, :, 1])
 
