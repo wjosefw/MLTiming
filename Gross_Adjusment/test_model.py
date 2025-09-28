@@ -6,7 +6,7 @@ import torch
 import argparse
 
 # Import Hyperparameters and Paths
-from config_Gross_Adjustment import (
+from config import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
     architecture, nbins, threshold, DATA_DIR, REF_PULSE_SAVE_DIR, 
     MODEL_SAVE_DIR, BASE_DIR)
@@ -61,15 +61,16 @@ TEST = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 # ------------------------ PREPROCESS DATA --------------------------------
 # -------------------------------------------------------------------------
 
-# Calculate moments 
-M_Test = momentos(TEST, order = moments_order)
+if args.model in ['KAN','MLP']:
+    # Calculate moments 
+    M_Test = momentos(TEST, order = moments_order)
 
-params_dec0 = (np.array([-0.07050748,  0.02451204,  0.04299015]), np.array([1.12753489, 0.93094554, 0.81081555]))
-params_dec1 = (np.array([-0.04730621,  0.01841856,  0.03066056]), np.array([1.01901136, 0.83459017, 0.72586663]))
+    params_dec0 = (np.array([-0.07050748,  0.02451204,  0.04299015]), np.array([1.12753489, 0.93094554, 0.81081555]))
+    params_dec1 = (np.array([-0.04730621,  0.01841856,  0.03066056]), np.array([1.01901136, 0.83459017, 0.72586663]))
 
-M_Test_norm_dec0 = normalize_given_params(M_Test, params_dec0, channel = 0, method = normalization_method)
-M_Test_norm_dec1 = normalize_given_params(M_Test, params_dec1, channel = 1, method = normalization_method)
-M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
+    M_Test_norm_dec0 = normalize_given_params(M_Test, params_dec0, channel = 0, method = normalization_method)
+    M_Test_norm_dec1 = normalize_given_params(M_Test, params_dec1, channel = 1, method = normalization_method)
+    M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
 
 # -------------------------------------------------------------------------
 #--------------------------- LOAD MODELS ----------------------------------
@@ -82,23 +83,26 @@ if args.model == 'KAN':
     model_dec0 = KAN(architecture)
     model_dec1 = KAN(architecture)
 
-if args.model == 'MLP':
+elif args.model == 'MLP':
     model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec0')
     model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec1')
     model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
     model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
 
-if args.model == 'MLPWAVE':
+elif args.model == 'MLPWAVE':
     model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0')
     model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec1')
     model_dec0 = MLP_Torch(NM = int(stop_dec0 - start_dec0), NN = Num_Neurons, STD_INIT = 0.5)
     model_dec1 = MLP_Torch(NM = int(stop_dec1 - start_dec1), NN = Num_Neurons, STD_INIT = 0.5)
 
-if args.model == 'CNN':
+elif args.model == 'CNN':
     model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec0')
     model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec1')
     model_dec0 = ConvolutionalModel(int(stop_dec0 - start_dec0))
     model_dec1 = ConvolutionalModel(int(stop_dec1 - start_dec1))
+else:
+    raise ValueError(f"Unsupported model_type. Choose one of the following ['KAN','MLP', 'MLPWAVE', 'CNN'] models only.")
+           
 
 model_dec0.load_state_dict(torch.load(model_dec0_dir, weights_only = True))
 model_dec1.load_state_dict(torch.load(model_dec1_dir, weights_only = True))
@@ -113,7 +117,7 @@ if args.model == 'CNN' or args.model == 'MLPWAVE':
     test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0])).detach().numpy())
     test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy())
 
-if args.model == 'KAN' or args.model == 'MLP':
+elif args.model == 'KAN' or args.model == 'MLP':
     test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
     test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
 
