@@ -79,7 +79,7 @@ if model_type == 'CNN':
     set_seed(seed)
     model_dec1 = ConvolutionalModel(int(before + after))
 else:
-    print('This routine is reserved for CNN models only')
+    raise ValueError(f"Unsupported model_type: {model_type}. This routine is for 'MLP' or 'KAN' models only.")
 
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
