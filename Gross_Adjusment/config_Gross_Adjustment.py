@@ -13,6 +13,10 @@ Num_Neurons = 16
 normalization_method = 'min-max'
 moments_order = 3
 architecture = [moments_order, 5, 1, 1]    # KAN architecture
+model_type = 'CNN' # Type of model to train CNN, MLP and KAN available
+model_name_dec0 = 'AG_model_dec0' # model names in case you are training two detectors at once
+model_name_dec1 = 'AG_model_dec1' 
+
 
 # Data settings
 delay_time = 1   # Max delay to training pulses in ns
