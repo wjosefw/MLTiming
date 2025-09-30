@@ -6,7 +6,7 @@ import sys
 
 # Import Hyperparameters and Paths
 from config import (
-    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save, 
+    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, FIGURES_DIR, 
     moments_order, delay_time, nbins, threshold, normalization_method, DATA_DIR, 
     MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, architecture, model_type,
     model_name_dec0, model_name_dec1
@@ -137,8 +137,8 @@ optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate)
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate)  
 
 # Execute train loop
-loss_dec0, val_loss_dec0, test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, model_name_dec0), save = save, model_type = model_type,  test_tensor = M_Test[:,:,0]) 
-loss_dec1, val_loss_dec1, test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, name = os.path.join(MODEL_SAVE_DIR, model_name_dec1), save = save, model_type = model_type,  test_tensor = M_Test[:,:,1])
+test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, model_dir = MODEL_SAVE_DIR, model_name = model_name_dec0, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = M_Test[:,:,0]) 
+test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, model_dir = MODEL_SAVE_DIR, model_name = model_name_dec1, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = M_Test[:,:,1])
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
@@ -156,47 +156,15 @@ Error = np.concatenate(list(error_dict.values()), axis = 1)   # Concatenate all 
 MAE = np.mean(Error, axis = 1)
 print(MAE[-1])
 
-
 # Plot
-plt.figure(figsize = (20,5))
-plt.subplot(131)
+plt.figure(figsize = (8,5))
 plt.plot(MAE, label = 'MAE')
 plt.title('Results in coincidence')
 plt.xlabel('Epochs')
 plt.ylabel('Log10')
 plt.legend()
-
-plt.subplot(132)
-plt.hist(test_dec0[-1, :], bins = nbins, range = [-0.5, 1], alpha = 0.5, label = 'Detector 0');
-plt.hist(test_dec1[-1, :], bins = nbins, range = [-0.5, 1], alpha = 0.5, label = 'Detector 1');
-plt.title('Single detector prediction histograms')
-plt.xlabel('time (ns)')
-plt.ylabel('Counts')
-plt.legend()
-
-plt.subplot(133)
-plt.plot(np.log10(loss_dec0.astype('float32')), label = 'Training loss Detector 0')
-plt.plot(np.log10(loss_dec1.astype('float32')), label = 'Training loss Detector 1')
-plt.plot(np.log10(val_loss_dec0.astype('float32')), label = 'Val loss Detector 0')
-plt.plot(np.log10(val_loss_dec1.astype('float32')), label = 'Val loss Detector 1')
-plt.title('Losses')
-plt.xlabel('Epochs')
-plt.legend()
 plt.show()
 
-
-# Histogram and gaussian fit 
-plt.figure(figsize = (16,6))
-for i in range(np.min(positions), np.max(positions) + 1):  
-    plot_gaussian(TOF_dict[i][-1,:], centroid_V00[-1], range = 0.6, label = 'pos' + str(i), nbins = nbins)
-    params, errors = get_gaussian_params(TOF_dict[i][-1,:], centroid_V00[-1], range = 0.6, nbins = nbins)
-    print(f"{i}: CENTROID(ns) = {params[1]:.4f} +/- {errors[2]:.5f}  FWHM(ns) = {params[2]:.4f} +/- {errors[3]:.5f}")
-
-print('')
-plt.legend()
-plt.xlabel(r'\Delta t$ (ns)', fontsize = 14)
-plt.ylabel('Counts', fontsize = 14)
-plt.show()
 
 ## Combine the two numbers
 #num = f"{sys.argv[1]}{sys.argv[2]}"
