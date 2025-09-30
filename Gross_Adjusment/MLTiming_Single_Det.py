@@ -6,9 +6,9 @@ import torch
 
 # Import Hyperparameters and Paths
 from config import (
-    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, save, 
+    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, 
     delay_time, nbins, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, model_type,
-    threshold
+    threshold, FIGURES_DIR  
 )
 
 print(device)
@@ -42,7 +42,7 @@ set_seed(seed)                    # Fix seeds
 
 channel = 0
 set_seed(seed)                    # Fix seeds
-save_name = os.path.join(MODEL_SAVE_DIR, f'{model_type}_AG_model_dec{str(channel)}')
+save_name = f'{model_type}_AG_model_dec{str(channel)}'
 
 # -------------------------------------------------------------------------
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
@@ -87,20 +87,11 @@ print(f"Total number of parameters: {count_parameters(model)}")
 optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate) 
 
 # Execute train loop
-loss, val_loss, val = train_loop(model, optimizer, train_loader, val_loader, EPOCHS = epochs, name = save_name, save = save, model_type = model_type) 
+val = train_loop(model, optimizer, train_loader, val_loader, EPOCHS = epochs, model_name = save_name, model_dir = MODEL_SAVE_DIR, figure_dir = FIGURES_DIR, model_type = model_type) 
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
-
-
-# Plot
-plt.plot(np.log10(loss.astype('float32')), label = 'Train loss Detector ' + str(channel))
-plt.plot(np.log10(val_loss.astype('float32')), label = 'Val loss Detector ' + str(channel))
-plt.ylabel('Loss value (log)')
-plt.xlabel('Epochs')
-plt.legend()
-plt.show()
 
 #plot validation delays hists
 plt.hist(val[-1,:,0] - val[-1,:,1], bins = nbins, alpha = 0.5, label = 'Predicted delays validation')
