@@ -128,6 +128,7 @@ plt.title('Results in coincidence')
 plt.xlabel('Epochs')
 plt.ylabel('Log10')
 plt.legend()
+plt.show()
 
 
 
