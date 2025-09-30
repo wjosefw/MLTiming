@@ -30,6 +30,4 @@ BASE_DIR = Path(__file__).resolve().parent #Get parent directory of the file
 DATA_DIR = BASE_DIR.parent / "Pulsos15CM20250130_version2"
 MODEL_SAVE_DIR = BASE_DIR.parent / "Trained_Models"
 REF_PULSE_SAVE_DIR = BASE_DIR.parent / "predictions"
-
-# Save
-save = True
+FIGURES_DIR = BASE_DIR.parent / "figures"
