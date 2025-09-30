@@ -1,15 +1,43 @@
-
+import os
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt 
 from typing import Optional, Tuple, Callable, Union
 
 
 
 from Losses import custom_loss_MSE
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------  
+
+def plot_and_save_loss(
+    train_loss: torch.tensor,
+    val_loss: torch.tensor,
+    name: str = 'loss_plot.png',
+) -> None:
+    """
+    Plots and saves the training and validation loss curves.
+    """
+    # Convert tensors to numpy arrays (ensure they are on the CPU)
+    train_loss = train_loss.cpu().detach().numpy()
+    val_loss = val_loss.cpu().detach().numpy()
+
+    epochs = np.arange(1, len(train_loss) + 1)
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, np.log10(train_loss.astype('float32')), label = 'Training Loss', color='blue')
+    plt.plot(epochs, np.log10(val_loss.astype('float32')), label = 'Validation Loss', color='orange')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training and Validation Loss Over Epochs')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(name)
+    plt.close()
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------  
@@ -20,8 +48,9 @@ def train_loop(
     train_loader: DataLoader,
     val_loader: DataLoader,
     EPOCHS: int = 75,
-    name: str = 'model',
-    save: bool = False,
+    model_name: str = 'model',
+    model_dir: str = './Trained_Models',
+    figure_dir:  str = './figures',
     model_type: Optional[str] = None,
     test_tensor: Optional[torch.Tensor] = None,
     loss_fn: Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]] = None,
@@ -100,12 +129,11 @@ def train_loop(
 
         train_epoch_loss = running_loss / max(1, len(train_loader))
         train_loss_list[epoch] = train_epoch_loss
-        print(f'EPOCH {epoch + 1}: LOSS train {train_epoch_loss:.6f}')
-
+        
+        # ---------------- Validation & Test ---------------- #
         if model_type in ['CNN', 'MLP']:
             model.eval()
 
-        # ---------------- Validation & Test ---------------- #
         with torch.no_grad():
             # Compute test predictions if enabled
             if has_test:
@@ -137,20 +165,21 @@ def train_loop(
 
             val_epoch_loss = val_running / max(1, len(val_loader))
             val_loss_list[epoch] = val_epoch_loss
+            
+        if epoch % 10 == 0 or epoch == EPOCHS - 1:
+            if not os.path.isdir(figure_dir):
+                os.makedirs(figure_dir)
+            plot_and_save_loss(train_loss_list[:epoch], val_loss_list[:epoch], name = os.path.join(figure_dir, f'{model_name}_loss_plot.png'))
+            print(f'EPOCH {epoch + 1}: LOSS train {train_epoch_loss:.6f}')
             print(f'LOSS val {val_epoch_loss:.6f}')
-
-    # Save model weights if requested
-    if save:
-        torch.save(model.state_dict(), name)
-
-    # Convert outputs to NumPy arrays for easier downstream use
-    train_np = train_loss_list.cpu().numpy()
-    val_np = val_loss_list.cpu().numpy()
-    val_pred_np = val_predictions.cpu().numpy()
+    
+    # Save model weights to specified directory
+    if not os.path.isdir(model_dir):
+        os.makedirs(model_dir)
+    torch.save(model.state_dict(), os.path.join(model_dir, f'{model_name}'))
 
     # Return outputs depending on whether test predictions were requested
     if has_test:
-        test_np = test_preds.cpu().numpy()
-        return train_np, val_np, test_np, val_pred_np
+        return test_preds.cpu().numpy(), val_predictions.cpu().numpy()
     else:
-        return train_np, val_np, val_pred_np
+        return val_predictions.cpu().numpy()
