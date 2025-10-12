@@ -1,14 +1,13 @@
 import os
+import time
 import numpy as np
+import matplotlib.pyplot as plt 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt 
 from typing import Optional, Tuple, Callable, Union
-
-
 
 from Losses import custom_loss_MSE
 
@@ -66,6 +65,9 @@ def train_loop(
     Behavior: - If test_tensor is provided: returns (train_loss, val_loss, test_preds, val_predictions). 
     - If test_tensor is None: returns (train_loss, val_loss, val_predictions).
     """
+
+    # Start clock for timing training
+    start_time = time.time()
 
     # Select device (GPU if available, otherwise CPU)
     if device is None:
@@ -172,6 +174,10 @@ def train_loop(
             plot_and_save_loss(train_loss_list[:epoch], val_loss_list[:epoch], name = os.path.join(figure_dir, f'{model_name}_loss_plot.png'))
             print(f'EPOCH {epoch + 1}: LOSS train {train_epoch_loss:.6f}')
             print(f'LOSS val {val_epoch_loss:.6f}')
+    
+    # Stop clock
+    stop_time = time.time()
+    print(f'Training time {stop_time - start_time} seconds')
     
     # Save model weights to specified directory
     if not os.path.isdir(model_dir):
