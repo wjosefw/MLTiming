@@ -28,12 +28,10 @@ dataset = Datos_LAB_GFN(data_dir = DATA_DIR)
 
 train_data = dataset.load_train_data()
 validation_data = dataset.load_val_data()
-test_data = dataset.load_test_data()
 
 time_step, positions, Theoretical_TOF = dataset.load_params() # Load data parameters
 
-print('Número de casos de entrenamiento: ', train_data.shape[0])
-print('Número de casos de test: ', test_data.shape[0])
+print('Number of training cases: ', train_data.shape[0])
 set_seed(seed)                    # Fix seeds
 
 # -------------------------------------------------------------------------
