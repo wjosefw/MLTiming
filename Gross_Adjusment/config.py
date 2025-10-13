@@ -21,7 +21,7 @@ model_name_dec1 = f'{model_type}_model_dec1'
 # Data settings
 delay_time = 1   # Max delay to training pulses in ns
 nbins = 51       # Number of histogram bins
-before = 7
+before = 8
 after = 5
 threshold = 0.1  # Reference threshold crop pulses
 
