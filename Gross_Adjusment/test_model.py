@@ -78,26 +78,26 @@ if args.model in ['KAN','MLP']:
 
 
 if args.model == 'KAN':
-    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec0')
-    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'KAN_AG_model_dec1')
+    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'KAN_model_dec0')
+    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'KAN_model_dec1')
     model_dec0 = KAN(architecture)
     model_dec1 = KAN(architecture)
 
 elif args.model == 'MLP':
-    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec0')
-    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_AG_model_dec1')
+    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_model_dec0')
+    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLP_model_dec1')
     model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
     model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
 
 elif args.model == 'MLPWAVE':
-    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec0')
-    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_AG_model_dec1')
+    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_model_dec0')
+    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'MLPWAVE_model_dec1')
     model_dec0 = MLP_Torch(NM = int(stop_dec0 - start_dec0), NN = Num_Neurons, STD_INIT = 0.5)
     model_dec1 = MLP_Torch(NM = int(stop_dec1 - start_dec1), NN = Num_Neurons, STD_INIT = 0.5)
 
 elif args.model == 'CNN':
-    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec0')
-    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'AG_model_dec1')
+    model_dec0_dir = os.path.join(MODEL_SAVE_DIR, 'CNN_model_dec0')
+    model_dec1_dir = os.path.join(MODEL_SAVE_DIR, 'CNN_model_dec1')
     model_dec0 = ConvolutionalModel(int(stop_dec0 - start_dec0))
     model_dec1 = ConvolutionalModel(int(stop_dec1 - start_dec1))
 else:
@@ -113,11 +113,11 @@ model_dec1.eval()
 #--------------------------- GET RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
-if args.model == 'CNN' or args.model == 'MLPWAVE':
+if args.model in ['CNN', 'MLPWAVE']:
     test_dec0 = np.squeeze(model_dec0(torch.tensor(TEST[:,None,:,0])).detach().numpy())
     test_dec1 = np.squeeze(model_dec1(torch.tensor(TEST[:,None,:,1])).detach().numpy())
 
-elif args.model == 'KAN' or args.model == 'MLP':
+elif args.model in ['KAN', 'MLP']:
     test_dec0 = np.squeeze(model_dec0(torch.tensor(M_Test[:,:,0]).float()).detach().numpy())
     test_dec1 = np.squeeze(model_dec1(torch.tensor(M_Test[:,:,1]).float()).detach().numpy())
 
