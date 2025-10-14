@@ -53,6 +53,33 @@ class Datos_LAB_GFN(Dataset):
             return self.data
         else:
             raise ValueError("No valid data files found!")
+    
+    def load_FS_data(self):
+        """
+        Load test data files for all predefined positions.
+
+        Returns:
+        - np.ndarray: Concatenated data array from all available test files.
+
+        Raises:
+        - ValueError: If no test files could be loaded from the specified directory.
+        """
+        data_dict = {}
+
+        for i in range(np.min(self.positions), np.max(self.positions) + 1):
+            filename = f"Na22_norm_pos{i}_val_FS.npz" if i >= 0 else f"Na22_norm_pos_min_{abs(i)}_val_FS.npz"
+            filepath = os.path.join(self.data_dir, filename)
+
+            if os.path.exists(filepath):
+                data_dict[i] = np.load(filepath, mmap_mode="r")["data"]
+            else:
+                print(f"Warning: {filepath} not found.")
+
+        if data_dict:
+            self.data = np.concatenate(list(data_dict.values()), axis=0)
+            return self.data
+        else:
+            raise ValueError("No valid data files found!")
 
     def load_params(self):
         """
