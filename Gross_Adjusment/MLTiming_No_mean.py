@@ -8,7 +8,8 @@ import sys
 from config import (
     device, seed, batch_size, epochs, learning_rate, before, after,
     delay_time, nbins, threshold, DATA_DIR, MODEL_SAVE_DIR, BASE_DIR,
-    FIGURES_DIR, model_type, model_name_dec0, model_name_dec1
+    FIGURES_DIR, model_type, model_name_dec0, model_name_dec1, moments_order, 
+    normalization_method, Num_Neurons, architecture
 )
 
 print(device)
@@ -17,10 +18,11 @@ sys.path.append(str(BASE_DIR.parent))
 # Import functions 
 from functions import (create_and_delay_pulse_pair, set_seed, create_dataloaders, 
                        calculate_gaussian_center, plot_gaussian, get_gaussian_params,
-                       extract_signal_window_by_fraction)
-from Models import ConvolutionalModel,  count_parameters
+                       extract_signal_window_by_fraction, momentos, normalize_given_params, normalize)
+from Models import ConvolutionalModel, MLP_Torch, count_parameters
 from Dataset import Datos_LAB_GFN
 from Train_loops import train_loop
+from efficient_kan.src.efficient_kan import KAN
 
 # -------------------------------------------------------------------------
 #---------------------------- LOAD DATA -----------------------------------
@@ -62,12 +64,53 @@ val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(moved_pulses_val_dec1, time
 
 TEST = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 
-# Create Dataloaders
-train_loader_dec0 = create_dataloaders(train_dec0, REF_train_dec0, batch_size = batch_size, shuffle = True)
-train_loader_dec1 = create_dataloaders(train_dec1, REF_train_dec1, batch_size = batch_size, shuffle = True)
+if model_type in ['KAN','MLP']:
 
-val_loader_dec0  = create_dataloaders(val_dec0, REF_val_dec0, batch_size =  val_dec0.shape[0], shuffle = False)
-val_loader_dec1  = create_dataloaders(val_dec1, REF_val_dec1, batch_size =  val_dec1.shape[0], shuffle = False)
+    # Calculate moments 
+    M_Train_dec0 = momentos(train_dec0, order = moments_order) 
+    M_Train_dec1 = momentos(train_dec1, order = moments_order) 
+
+    M_Val_dec0 = momentos(val_dec0, order = moments_order) 
+    M_Val_dec1 = momentos(val_dec1, order = moments_order) 
+
+    M_Test = momentos(TEST, order = moments_order)
+
+    # Normalize moments
+    M_Train_dec0, params_dec0 =  normalize(M_Train_dec0, method = normalization_method)
+    M_Train_dec1, params_dec1 =  normalize(M_Train_dec1, method = normalization_method)
+
+    M_Val_dec0_channel0 =  normalize_given_params(M_Val_dec0, params_dec0, channel = 0, method = normalization_method)
+    M_Val_dec0_channel1 =  normalize_given_params(M_Val_dec0, params_dec0, channel = 1, method = normalization_method)
+    M_Val_dec0 = np.stack((M_Val_dec0_channel0, M_Val_dec0_channel1), axis = -1)
+
+    M_Val_dec1_channel0 =  normalize_given_params(M_Val_dec1, params_dec1, channel = 0, method = normalization_method)
+    M_Val_dec1_channel1 =  normalize_given_params(M_Val_dec1, params_dec1, channel = 1, method = normalization_method)
+    M_Val_dec1 = np.stack((M_Val_dec1_channel0, M_Val_dec1_channel1), axis = -1)
+
+    M_Test_norm_dec0 = normalize_given_params(M_Test, params_dec0, channel = 0, method = normalization_method)
+    M_Test_norm_dec1 = normalize_given_params(M_Test, params_dec1, channel = 1, method = normalization_method)
+    M_Test = np.stack((M_Test_norm_dec0, M_Test_norm_dec1), axis = -1)
+    M_Test = torch.tensor(M_Test, dtype = torch.float32, device = device)
+
+    # Create Dataloaders
+    train_loader_dec0 = create_dataloaders(M_Train_dec0, REF_train_dec0, batch_size = batch_size, shuffle = True)
+    train_loader_dec1 = create_dataloaders(M_Train_dec1, REF_train_dec1, batch_size = batch_size, shuffle = True)
+
+    val_loader_dec0  = create_dataloaders(M_Val_dec0, REF_val_dec0, batch_size = M_Val_dec0.shape[0], shuffle = False)
+    val_loader_dec1  = create_dataloaders(M_Val_dec1, REF_val_dec1, batch_size = M_Val_dec1.shape[0], shuffle = False)
+
+    # Print information 
+    print("Normalization parameters detector 0:", params_dec0)
+    print("Normalization parameters detector 1:", params_dec1)
+
+elif model_type in ['CNN','MLPWAVE']:
+    
+    # Create Dataloaders
+    train_loader_dec0 = create_dataloaders(train_dec0, REF_train_dec0, batch_size = batch_size, shuffle = True)
+    train_loader_dec1 = create_dataloaders(train_dec1, REF_train_dec1, batch_size = batch_size, shuffle = True)
+
+    val_loader_dec0  = create_dataloaders(val_dec0, REF_val_dec0, batch_size =  val_dec0.shape[0], shuffle = False)
+    val_loader_dec1  = create_dataloaders(val_dec1, REF_val_dec1, batch_size =  val_dec1.shape[0], shuffle = False)
 
 # -------------------------------------------------------------------------
 # ------------------------------ MODEL ------------------------------------
@@ -76,17 +119,36 @@ val_loader_dec1  = create_dataloaders(val_dec1, REF_val_dec1, batch_size =  val_
 if model_type == 'CNN':
     model_dec0 = ConvolutionalModel(int(before + after))
     model_dec1 = ConvolutionalModel(int(before + after))
+
+elif model_type == 'KAN':
+    model_dec0 = KAN(architecture)
+    model_dec1 = KAN(architecture)
+
+elif model_type == 'MLP':
+    model_dec0 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+    model_dec1 = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
+
+elif model_type == 'MLPWAVE':
+    model_dec0 = MLP_Torch(NM = int(before + after), NN = Num_Neurons, STD_INIT = 0.5)
+    model_dec1 = MLP_Torch(NM = int(before + after), NN = Num_Neurons, STD_INIT = 0.5)
+
 else:
-    raise ValueError(f"Unsupported model_type: {model_type}. This routine is for 'CNN' models only.")
+    raise ValueError(f"Unsupported model_type: {model_type}. This routine is for 'KAN', 'MLP', 'MLPWAVE' and 'CNN' models only.")
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
 optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate) 
 optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate) 
 
-# Execute train loop
-test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, model_name = model_name_dec0, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = torch.tensor(TEST[:,:,0]).float()) 
-test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, model_name = model_name_dec1, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = torch.tensor(TEST[:,:,1]).float())
+if model_type in ['KAN','MLP']:
+    # Execute train loop
+    test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, model_name = model_name_dec0, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = M_Test[:,:,0]) 
+    test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, model_name = model_name_dec1, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = M_Test[:,:,1])
+
+elif model_type in ['CNN','MLPWAVE']:
+    # Execute train loop
+    test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, model_name = model_name_dec0, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = torch.tensor(TEST[:,:,0]).float()) 
+    test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, model_name = model_name_dec1, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = torch.tensor(TEST[:,:,1]).float())
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
