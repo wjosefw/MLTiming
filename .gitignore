@@ -37,6 +37,7 @@ pykan/
 predictions/
 efficient_kan/
 figures/
+Deprecated/MLTiming_In_Coincidence.py
 FS.sh
 results_FS.txt
 Results.py
