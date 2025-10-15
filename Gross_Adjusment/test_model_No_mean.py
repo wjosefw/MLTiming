@@ -8,8 +8,7 @@ import argparse
 # Import Hyperparameters and Paths
 from config import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
-    architecture, nbins, threshold, DATA_DIR, REF_PULSE_SAVE_DIR, 
-    MODEL_SAVE_DIR, BASE_DIR, before, after)
+    architecture, nbins, threshold, DATA_DIR, MODEL_SAVE_DIR, BASE_DIR, before, after)
 
 print(device)
 sys.path.append(str(BASE_DIR.parent))
@@ -54,11 +53,6 @@ M_Test = momentos(TEST, order = moments_order)
 
 params_dec0 = (np.array([-0.07050748,  0.02451204,  0.04299015]), np.array([1.12753489, 0.93094554, 0.81081555]))
 params_dec1 = (np.array([-0.04730621,  0.01841856,  0.03066056]), np.array([1.01901136, 0.83459017, 0.72586663]))
-
-#params_dec0 = (np.array([-0.07050748,  0.02451204,  0.04436237,  0.04975697]), np.array([1.17041325, 0.99355343, 0.86337464, 0.76888418]))
-#params_dec1 = (np.array([-0.00929751,  0.04495382,  0.0527845 ,  0.05432888]), np.array([1.23438813, 1.05928715, 0.92953213, 0.83420514]))
-
-
 
 M_Test_norm_dec0 = normalize_given_params(M_Test, params_dec0, channel = 0, method = normalization_method)
 M_Test_norm_dec1 = normalize_given_params(M_Test, params_dec1, channel = 1, method = normalization_method)
@@ -179,4 +173,64 @@ print('Mean bias: ', np.mean(bias)*1000)
 print('Std bias: ', np.std(bias)*1000)
 print('Mean MAE: ', np.mean(MAE)*1000)
 print('Std MAE: ', np.std(MAE)*1000)
+
+
+# -------------------------------------------------------------------------
+#-------------------------- INFERENCE TIME --------------------------------
+# -------------------------------------------------------------------------
+
+from extract import extract_signal_window_by_fraction
+import time
+
+time_test = np.tile(TEST[0,:,:] , (1_000_000, 1, 1))
+model_dec0 = model_dec0.to(device)
+time_list_extract = []
+time_list_moments = []
+time_list_inference = []
+
+# Start timer move to reference
+for i in range(10):
+    start_time_move = time.time()
+    moved_pulses, delays = extract_signal_window_by_fraction(time_test[:,:,0], time_step, fraction = threshold, window_low = before, window_high = after)
+    end_time_move = time.time()
+    elapsed_time_move = end_time_move - start_time_move
+    time_list_extract.append(elapsed_time_move)
+time_array_extract = np.array(time_list_extract)
+
+# Start timer moments
+for i in range(10):
+    start_time_momentos = time.time()
+    M_time_test = momentos(time_test, order = moments_order).astype(np.float32)
+    end_time_momentos = time.time()
+    elapsed_time_momentos = end_time_momentos - start_time_momentos
+    time_list_moments.append(elapsed_time_momentos)
+time_array_moments = np.array(time_list_moments)
+
+
+# Start timer inference
+for i in range(10):
+    start_time_inference = time.time()
+    with torch.no_grad():
+        assert not torch.is_grad_enabled()
+        
+        if args.model in ['KAN','MLP']:
+            output_time_test = model_dec0(torch.tensor(M_time_test[:,:,0]).to(device))
+        if args.model in ['CNN','MLPWAVE']:
+            output_time_test = model_dec0(torch.tensor(time_test[:,None,:,0]).to(device))
+    
+    end_time_inference = time.time()
+    elapsed_time_inference = end_time_inference - start_time_inference
+    time_list_inference.append(elapsed_time_inference)
+time_array_inference = np.array(time_list_inference)
+
+time_array_extract = time_array_extract[1:]  
+time_array_moments = time_array_moments[1:]   # We discard the first loop because it is artificially slower due to 'warm-up' effect 
+time_array_inference = time_array_inference[1:]
+
+print('Elapsed time extract:', np.mean(time_array_extract), np.std(time_array_extract))
+print('Elapsed time momentos:', np.mean(time_array_moments), np.std(time_array_moments))
+print('Elapsed time inference:', np.mean(time_array_inference), np.std(time_array_inference))
+print('Elapsed time extract + inference :', np.mean(time_array_extract) + np.mean(time_array_inference), np.std(time_array_extract) + np.std(time_array_inference))
+print('Elapsed time momentos + inference :', np.mean(time_array_moments) + np.mean(time_array_inference), np.std(time_array_moments) + np.std(time_array_inference))
+print('Elapsed time extract + momentos + inference :', np.mean(time_array_extract) + np.mean(time_array_moments) + np.mean(time_array_inference), np.std(time_array_extract) + np.std(time_array_moments) + np.std(time_array_inference))
 
