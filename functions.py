@@ -837,8 +837,7 @@ def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_
         stop = min(int(crossing / time_step) + window_high, vector.shape[1])
      
         # Extract the windowed portion of the signal
-        if start == 0: 
-            print(start, stop)
+        if start == 0: # Handle edge case where start index is at the beginning of the signal
             seg = vector[i, :int(window_high + window_low)] # Make sure to take the full desired segment
             new_vector[i, :len(seg)] = seg
         else:
