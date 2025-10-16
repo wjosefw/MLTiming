@@ -79,7 +79,7 @@ def train_loop(
 
     # Ensure model_type is provided
     if model_type is None:
-        raise ValueError("Error: 'model_type' cannot be None. Please specify a valid model type: CNN, MLP, or KAN")
+        raise ValueError("Error: 'model_type' cannot be None. Please specify a valid model type: CNN, MLP, MLPWAVE or KAN")
 
     # Move model to target device
     model.to(device)
@@ -106,7 +106,7 @@ def train_loop(
     # ---------------- Training loop ---------------- #
     for epoch in range(EPOCHS):
     
-        if model_type in ['CNN', 'MLP']:  
+        if model_type in ['CNN', 'MLP', 'MLPWAVE']:  
             model.train()
         running_loss = 0.0
 
@@ -116,10 +116,10 @@ def train_loop(
             optimizer.zero_grad(set_to_none=True)
 
             # Forward pass depends on model type
-            if model_type == 'CNN':
+            if model_type in ['CNN']:
                 y0 = model(inputs[:, None, :, 0])  
                 y1 = model(inputs[:, None, :, 1])
-            if model_type in ['KAN', 'MLP']:
+            if model_type in ['KAN', 'MLP', 'MLPWAVE']:
                 y0 = model(inputs[:, :, 0])
                 y1 = model(inputs[:, :, 1])
 
@@ -133,15 +133,15 @@ def train_loop(
         train_loss_list[epoch] = train_epoch_loss
         
         # ---------------- Validation & Test ---------------- #
-        if model_type in ['CNN', 'MLP']:
+        if model_type in ['CNN', 'MLP', 'MLPWAVE']:
             model.eval()
 
         with torch.no_grad():
             # Compute test predictions if enabled
             if has_test:
-                if model_type == 'CNN':
+                if model_type in ['CNN']:
                     t = model(test_tensor[:, None, :]).squeeze()
-                if model_type in ['KAN', 'MLP']:
+                if model_type in ['KAN', 'MLP', 'MLPWAVE']:
                     t = model(test_tensor).squeeze()
                 test_preds[epoch, :] = t
 
@@ -151,10 +151,10 @@ def train_loop(
             for v_inputs, v_labels in val_loader:
                 v_inputs, v_labels = v_inputs.to(device), v_labels.to(device)
 
-                if model_type == 'CNN':
+                if model_type in ['CNN']:
                     v0 = model(v_inputs[:, None, :, 0])
                     v1 = model(v_inputs[:, None, :, 1])
-                if model_type in ['KAN', 'MLP']:
+                if model_type in ['KAN', 'MLP', 'MLPWAVE']:
                     v0 = model(v_inputs[:, :, 0])
                     v1 = model(v_inputs[:, :, 1])
 
