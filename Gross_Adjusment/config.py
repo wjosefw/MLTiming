@@ -13,7 +13,7 @@ Num_Neurons = 16
 normalization_method = 'min-max'
 moments_order = 3
 architecture = [moments_order, 5, 1, 1]    # KAN architecture
-model_type = 'CNN' # Type of model to train CNN, MLP and KAN available
+model_type = 'CNN' # Type of model to train CNN, MLP, MLPWAVE and KAN available
 model_name_dec0 = f'{model_type}_model_dec0' # model names in case you are training two detectors at once
 model_name_dec1 = f'{model_type}_model_dec1' 
 
