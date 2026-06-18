@@ -1,4 +1,3 @@
-import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,16 +5,14 @@ import torch
 
 # Import Hyperparameters and Paths
 from config import (
-    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, 
-    delay_time, nbins, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, model_type,
-    threshold, FIGURES_DIR  
+    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after,
+    delay_time, nbins, DATA_DIR, MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, model_type,
+    threshold, FIGURES_DIR
 )
 
 print(device)
-sys.path.append(str(BASE_DIR.parent))
 
-
-# Import functions 
+# Import functions
 from functions import (move_to_reference, create_and_delay_pulse_pair, 
                        set_seed, create_dataloaders, get_mean_pulse_from_set,
                        calculate_slope_y_intercept)

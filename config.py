@@ -27,7 +27,7 @@ threshold = 0.1  # Reference threshold crop pulses
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent #Get parent directory of the file
-DATA_DIR = BASE_DIR.parent / "Pulsos15CM20250130_version2"
-MODEL_SAVE_DIR = BASE_DIR.parent / "Trained_Models"
-REF_PULSE_SAVE_DIR = BASE_DIR.parent / "predictions"
-FIGURES_DIR = BASE_DIR.parent / "figures"
+DATA_DIR = BASE_DIR / "Pulsos15CM20250130_version2"
+MODEL_SAVE_DIR = BASE_DIR / "Trained_Models"
+REF_PULSE_SAVE_DIR = BASE_DIR / "predictions"
+FIGURES_DIR = BASE_DIR / "figures"

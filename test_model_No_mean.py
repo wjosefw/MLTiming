@@ -1,5 +1,4 @@
-import sys
-import os 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -8,12 +7,11 @@ import argparse
 # Import Hyperparameters and Paths
 from config import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
-    architecture, nbins, threshold, DATA_DIR, MODEL_SAVE_DIR, BASE_DIR, before, after)
+    architecture, nbins, threshold, DATA_DIR, MODEL_SAVE_DIR, before, after)
 
 print(device)
-sys.path.append(str(BASE_DIR.parent))
 
-from functions import ( calculate_gaussian_center, plot_gaussian, 
+from functions import ( calculate_gaussian_center, plot_gaussian,
                        get_gaussian_params, set_seed, momentos, 
                        normalize_given_params, extract_signal_window_by_fraction)
 from Models import ConvolutionalModel, MLP_Torch

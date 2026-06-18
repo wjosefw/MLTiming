@@ -2,20 +2,18 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import sys
 
 # Import Hyperparameters and Paths
 from config import (
-    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, FIGURES_DIR, 
-    moments_order, delay_time, nbins, threshold, normalization_method, DATA_DIR, 
-    MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, architecture, model_type,
+    device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, FIGURES_DIR,
+    moments_order, delay_time, nbins, threshold, normalization_method, DATA_DIR,
+    MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, architecture, model_type,
     model_name_dec0, model_name_dec1
 )
 
 print(device)
-sys.path.append(str(BASE_DIR.parent))
 
-# Import functions 
+# Import functions
 from functions import (momentos, move_to_reference, create_and_delay_pulse_pair, 
                        set_seed, create_dataloaders, calculate_gaussian_center, 
                        normalize, normalize_given_params, get_mean_pulse_from_set,
