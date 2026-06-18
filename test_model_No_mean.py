@@ -177,7 +177,6 @@ print('Std MAE: ', np.std(MAE)*1000)
 #-------------------------- INFERENCE TIME --------------------------------
 # -------------------------------------------------------------------------
 
-from extract import extract_signal_window_by_fraction
 import time
 
 time_test = np.tile(TEST[0,:,:] , (1_000_000, 1, 1))
