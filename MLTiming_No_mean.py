@@ -61,10 +61,13 @@ val_dec1, REF_val_dec1 = create_and_delay_pulse_pair(moved_pulses_val_dec1, time
 
 TEST = np.stack((moved_pulses_test_dec0, moved_pulses_test_dec1), axis = 2)
 
+params_dec0 = None  # normalization params, only computed for moment-based models (KAN/MLP)
+params_dec1 = None
+
 if model_type in ['KAN','MLP']:
 
-    # Calculate moments 
-    M_Train_dec0 = momentos(train_dec0, order = moments_order) 
+    # Calculate moments
+    M_Train_dec0 = momentos(train_dec0, order = moments_order)
     M_Train_dec1 = momentos(train_dec1, order = moments_order) 
 
     M_Val_dec0 = momentos(val_dec0, order = moments_order) 
@@ -134,18 +137,37 @@ else:
 
 print(f"Total number of parameters: {count_parameters(model_dec0)}")
 
-optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate) 
-optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate) 
+optimizer_dec0 = torch.optim.AdamW(model_dec0.parameters(), lr = learning_rate)
+optimizer_dec1 = torch.optim.AdamW(model_dec1.parameters(), lr = learning_rate)
+
+# Metadata needed to rebuild each detector's model and preprocessing pipeline at inference time
+def build_metadata(params):
+    return {
+        'model_type': model_type,
+        'architecture': architecture,
+        'num_neurons': Num_Neurons,
+        'moments_order': moments_order,
+        'time_step_ns': time_step,
+        'crossing_threshold': threshold,
+        'before_samples': before,
+        'after_samples': after,
+        'normalization_method': normalization_method,
+        'normalization_params_min': params[0].tolist() if params is not None else None,
+        'normalization_params_max': params[1].tolist() if params is not None else None,
+    }
+
+metadata_dec0 = build_metadata(params_dec0)
+metadata_dec1 = build_metadata(params_dec1)
 
 if model_type in ['KAN','MLP']:
     # Execute train loop
-    test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, model_name = model_name_dec0, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = M_Test[:,:,0]) 
-    test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, model_name = model_name_dec1, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = M_Test[:,:,1])
+    test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, model_name = model_name_dec0, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = M_Test[:,:,0], metadata = metadata_dec0)
+    test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, model_name = model_name_dec1, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = M_Test[:,:,1], metadata = metadata_dec1)
 
 elif model_type in ['CNN','MLPWAVE']:
     # Execute train loop
-    test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, model_name = model_name_dec0, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = torch.tensor(TEST[:,:,0]).float()) 
-    test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, model_name = model_name_dec1, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = torch.tensor(TEST[:,:,1]).float())
+    test_dec0, val_dec0 = train_loop(model_dec0, optimizer_dec0, train_loader_dec0, val_loader_dec0, EPOCHS = epochs, model_name = model_name_dec0, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = torch.tensor(TEST[:,:,0]).float(), metadata = metadata_dec0)
+    test_dec1, val_dec1 = train_loop(model_dec1, optimizer_dec1, train_loader_dec1, val_loader_dec1, EPOCHS = epochs, model_name = model_name_dec1, model_dir = MODEL_SAVE_DIR, model_type = model_type, figure_dir = FIGURES_DIR, test_tensor = torch.tensor(TEST[:,:,1]).float(), metadata = metadata_dec1)
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------
