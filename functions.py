@@ -2,8 +2,6 @@ import torch
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.ndimage import gaussian_filter1d
-from scipy.interpolate import interp1d
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -368,155 +366,6 @@ def normalize_given_params(data, params, channel=0, method='standardization'):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-from scipy import signal
-
-def get_correlation(ref_pulse, pulse_set, channel=0):
-    """
-    Calculate the correlation of a reference pulse with every pulse in a set.
-
-    Parameters:
-    ref_pulse (array-like): The reference pulse to compare against.
-    pulse_set (array-like): A set of pulses to search through. Expected shape is (num_pulses, pulse_length, num_channels).
-    channel (int, optional): The channel of the pulses to use for comparison. Default is 0.
-
-    Returns:
-    array-like: An array of correlation values between the reference pulse and each pulse in the set.
-    """
-
-    y1 = ref_pulse
-    n = len(y1)
-    correlation = []
-
-    for i in range(pulse_set.shape[0]):
-        
-        y2 = pulse_set[i, :, channel]
-        corr = signal.correlate(y2, y1, mode = 'same')
-        correlation.append(corr[n // 2])  # Append the correlation at delay zero to the list
-    correlation = np.array(correlation)
-    return correlation
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def get_closest(ref_pulse, pulse_set, channel = 0):
-  """
-    Calculate the index of the pulse in a set that is most similar to a reference pulse.
-
-    Parameters:
-    ref_pulse (array-like): The reference pulse to compare against.
-    pulse_set (array-like): A set of pulses to search through. Expected shape is (num_pulses, pulse_length, num_channels).
-    channel (int, optional): The channel of the pulses to use for comparison. Default is 0.
-
-    Returns:
-    int: The index of the pulse in pulse_set that is most similar to ref_pulse.
-    """
-  
-  y1 = ref_pulse
-  mse = []
-
-  for i in range(pulse_set.shape[0]):
-    y2 = pulse_set[i,:,channel]
-    mse.append(np.mean((y1-y2)**2))
-  
-  mse = np.array(mse)
-  sorted_indices = np.argsort(mse)
-  index_of_closest = sorted_indices[1]  # Get the index of the closest pulse, excluding the first one (which is the reference pulse itself)
-
-  return index_of_closest
-
-def create_set(og_set, channel = 0):
-    """
-    Create a new set of pulses where each pulse is paired with its closest match from the original set.
-
-    Parameters:
-    og_set (array-like): The original set of pulses. Expected shape is (num_pulses, pulse_length, num_channels).
-    channel (int, optional): The channel of the pulses to use for finding the closest match. Default is 0.
-
-    Returns:
-    array-like: A new set of pulses where each pulse in the original set is paired with its closest match.
-                The returned set has shape (num_pulses, pulse_length, 2), where the first channel is the original pulse
-                and the second channel is the closest matching pulse.
-    """
-    
-    new_set = np.zeros_like(og_set)
-  
-    for i in range(og_set.shape[0]):
-        
-        closest = get_closest(og_set[i, :, channel], og_set, channel = channel)  # Find the index of the closest pulse to the current pulse
-        new_set[i, :, 0] = og_set[i, :, channel]         # Assign the original pulse to the first channel of the new set
-        new_set[i, :, 1] = og_set[closest, :, channel] # Assign the closest matching pulse to the second channel of the new set
-
-    return new_set
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def create_positive_and_negative_delays(pulse_set, time_step, start = 50, stop = 74, delay_time = 1):
-    
-
-    INPUT = np.zeros((pulse_set.shape[0], int(stop-start), 2))
-    INPUT_2 = np.zeros((pulse_set.shape[0], int(stop-start), 2))
-    REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
-
-    NRD0 = np.random.uniform(low = -0.05, high = delay_time, size = pulse_set.shape[0])
-    NRD1 = np.random.uniform(low = -0.05, high = delay_time, size = pulse_set.shape[0])
-    
-    for i in range(pulse_set.shape[0]):
-        
-        if NRD0[i] >= 0:
-            res_0 = NRD0[i] % time_step  # Fractional part of the delay
-            for j in range(int(stop-start) - 1, 0, -1):
-                slope = (pulse_set[i, start + j] - pulse_set[i, start + j - 1]) / time_step
-                INPUT[i, j, 0] = pulse_set[i, start + j] - slope * res_0 
-            INPUT[i, 0, 0] = pulse_set[i, start] 
-
-            idel_0 = int( NRD0[i] / time_step) 
-            INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
-            INPUT_2[i,:idel_0,0] = INPUT[i,:idel_0,0]
-        
-        if NRD0[i] < 0:
-            res_0 = NRD0[i] % time_step  # Fractional part of the delay
-            for j in range(int(stop-start) - 1):
-                slope = (pulse_set[i, start + j + 1] - pulse_set[i, start + j]) / time_step
-                INPUT[i, j, 0] = pulse_set[i, start + j] + slope * res_0 
-            INPUT[i, -1, 0] = pulse_set[i, stop] 
-
-            idel_0 = int(NRD0[i] / time_step) 
-            if idel_0 <= -1:
-                INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
-                INPUT_2[i,idel_0:,0] = pulse_set[i, stop + 1 : stop + abs(idel_0) + 1]
-            else:
-                INPUT_2[i,:,0] = INPUT[i,:,0]
-
-        if NRD1[i] >= 0:
-            res_1 = NRD1[i] % time_step  
-            for j in range(int(stop-start) - 1, 0, -1):
-                slope = (pulse_set[i, start + j] - pulse_set[i, start + j - 1]) / time_step
-                INPUT[i, j, 1] = pulse_set[i, start + j] - slope * res_1 
-            INPUT[i, 0, 1] = pulse_set[i, start] 
-
-            idel_1 = int( NRD1[i] / time_step) 
-            INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
-            INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
-        
-        if NRD1[i] < 0:
-           res_1 = NRD1[i] % time_step  # Fractional part of the delay
-           for j in range(int(stop-start) - 1):
-               slope = (pulse_set[i, start + j + 1] - pulse_set[i, start + j]) / time_step
-               INPUT[i, j, 1] = pulse_set[i, start + j] + slope * res_1 
-           INPUT[i, -1, 1] = pulse_set[i, stop] 
-           
-           idel_1 = int(NRD1[i] / time_step) 
-           if idel_1 != 0:
-            INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
-            INPUT_2[i,idel_1:,1] = pulse_set[i, stop + 1 : stop + abs(idel_1) + 1]
-           else:
-            INPUT_2[i,:,1] = INPUT[i,:,1]
-        
-        REF[i] = NRD0[i] - NRD1[i]
-
-    return INPUT_2, REF
-
 def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
     
 
@@ -614,28 +463,6 @@ def set_seed(seed):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def interpolate_pulses(data, EXTRASAMPLING = 8, time_step = 0.2):
-    """
-    Interpolate real pulses using cubic interpolation.
-
-    - data: numpy array of shape (N, M, 2), where N is the number of pulses,
-      M is the number of time points, and 2 represents the real and imaginary components.    
-    """
-    Nt = np.shape(data)[1]
-    Nt_new = Nt * EXTRASAMPLING
-    new_time_step = time_step / EXTRASAMPLING
-
-    t = np.linspace(0, Nt, Nt)
-    t_new = np.linspace(0, Nt, Nt_new)
-
-    interp_func_data = interp1d(t, data, kind = 'cubic', axis = 1)
-    new_data = interp_func_data(t_new)
-
-    return new_data, new_time_step
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 def constant_fraction_discrimination(vector, time_step = 0.2, fraction = 0.9, shift = 30, plot = True):
     corrected_signal = np.zeros_like(vector)
     delayed_signal = np.zeros_like(vector)
@@ -711,47 +538,6 @@ def Calculate_CFD(array, fraction = 0.7, shift = 80, time_step = 0.025):
     return np.array(timestamps_list)
 
 
-def extract_signal_window_by_LED(vector, time_step = 0.2, threshold = 0.1, window_low = 10, window_high = 7):
-    """
-    Extracts a window of signal data around a calculated timestamp for each signal in the input vector array.
-    The timestamp is determined based on the LED threshold. 
-    Interpolates the signal to align with the calculated LED position.
-    """
-
-    # Initialize arrays to store truncated and interpolated signal windows
-    new_vector = np.zeros((vector.shape[0], int(window_high + window_low)))
-    new_vector2 = np.zeros((vector.shape[0], int(window_high + window_low)))
-
-    # Calculate and store LED timestamps for each signal
-    timestamps_LED = []
-
-    for i in range(vector.shape[0]):
-        timestamp = calculate_slope_y_intercept(vector[i, :], time_step, threshold = threshold)
-        timestamps_LED.append(timestamp)
-
-    # Extract the signal window and perform interpolation
-    for i in range(vector.shape[0]):
-        # Calculate the index corresponding to the detected LED timestamp
-        idel = int(timestamps_LED[i] / time_step)
-        
-        # Define the indices for the low and high parts of the window
-        low_index = idel - window_low
-        high_index = idel + window_high
-        
-        # Extract the signal window
-        new_vector[i, :] = vector[i, low_index:high_index]
-        
-        # Calculate the residue and interpolate the signal
-        res = timestamps_LED[i] % time_step
-        for j in range(new_vector.shape[1] - 1):
-            slope = (new_vector[i, j + 1] - new_vector[i, j]) / time_step
-            new_vector2[i, j] = new_vector[i, j] + slope * res
-        last_slope = (vector[i, high_index + 1] - vector[i, high_index]) / time_step
-        new_vector2[i, -1] = new_vector[i, -1] + last_slope * res
-
-    return new_vector2
-
-
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
@@ -778,40 +564,6 @@ def calculate_slope_y_intercept(vector, time_step, threshold=0.1):
     b = vector[index - 1] - m*t0
     time = (threshold - b) / m
     return time
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def continuous_delay(vector, time_step = 0.2, delay_time = 1, channel_to_fix = 0, channel_to_move = 0):
-    
-    res = delay_time % time_step  # Fractional part of the delay
-    idel = int(delay_time / time_step) 
-    
-    new_vector = np.zeros_like(vector)
-    if delay_time >= 0:
-        for i in range(vector.shape[0]):
-            for j in range(vector.shape[1] - 1, 0, -1):
-                    slope = (vector[i, j, channel_to_move] - vector[i, j - 1, channel_to_move]) / time_step
-                    new_vector[i, j, channel_to_move] =  vector[i, j, channel_to_move] - slope * res 
-            new_vector[i,0, channel_to_move] = vector[i,0, channel_to_move]
-            new_vector[i,:,channel_to_move] = np.roll(new_vector[i,:,channel_to_move], idel)
-            new_vector[i,:idel,channel_to_move] = 0
-        new_vector[:,:,channel_to_fix] = vector[:,:,channel_to_fix]
-
-
-    if delay_time < 0:
-        for i in range(vector.shape[0]):
-            for j in range(vector.shape[1] - 1):
-                    slope = (vector[i, j + 1, channel_to_move] - vector[i, j, channel_to_move]) / time_step
-                    new_vector[i, j, channel_to_move] =  vector[i, j, channel_to_move] + slope * res 
-            new_vector[i,-1, channel_to_move] = vector[i,-1, channel_to_move]
-            if idel <= -1:
-                new_vector[i,:,channel_to_move] = np.roll(new_vector[i,:,channel_to_move], idel)
-                new_vector[i,idel:,channel_to_move] = vector[i, idel:, channel_to_move]
-            else:
-                pass
-        new_vector[:,:,channel_to_fix] = vector[:,:,channel_to_fix]
-    return new_vector
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -1030,40 +782,6 @@ def get_mean_pulse_from_set(pulse_set, channel = 0):
     mean_pulse = np.real(normalized_reconstructed_signal)
   
     return mean_pulse
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def apply_recursive_filter(waveforms, A, B, C):
-    """
-    Applies a recursive filter to a set of waveforms.
-
-    Parameters:
-    waveforms (ndarray): Input waveforms of shape (N_waveforms, n_points).
-    A (float): Coefficient for the previous output Y[n-1].
-    B (float): Coefficient for the current input x[n].
-    C (float): Coefficient for the previous input x[n-1].
-
-    Returns:
-    ndarray: The filtered waveforms of the same shape (N_waveforms, n_points).
-    """
-    N_waveforms, n_points = waveforms.shape
-    filtered_waveforms = np.zeros_like(waveforms)
-
-    # Process each waveform
-    for i in range(N_waveforms):
-        # Initialize the first point (Y[0])
-        filtered_waveforms[i, 0] = B * waveforms[i, 0]  # Assuming no previous input for x[-1]
-        
-        # Apply recursive filter for the rest of the points
-        for n in range(1, n_points):
-            x_n = waveforms[i, n]
-            x_n_minus_1 = waveforms[i, n - 1]
-            Y_n_minus_1 = filtered_waveforms[i, n - 1]
-            
-            filtered_waveforms[i, n] = A * Y_n_minus_1 + B * x_n + C * x_n_minus_1
-    
-    return filtered_waveforms
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
