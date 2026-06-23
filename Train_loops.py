@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import numpy as np
 import matplotlib.pyplot as plt 
@@ -53,18 +54,25 @@ def train_loop(
     model_type: Optional[str] = None,
     test_tensor: Optional[torch.Tensor] = None,
     loss_fn: Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]] = None,
-    device: Optional[torch.device] = None
+    device: Optional[torch.device] = None,
+    *,
+    metadata: dict
 ) -> Union[
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     Tuple[np.ndarray, np.ndarray, np.ndarray]
 ]:
     """
-    Training loop for detector convolutional or alternative models with optional 
+    Training loop for detector convolutional or alternative models with optional
     test-time inference.
 
-    Behavior: - If test_tensor is provided: returns (train_loss, val_loss, test_preds, val_predictions). 
+    Behavior: - If test_tensor is provided: returns (train_loss, val_loss, test_preds, val_predictions).
     - If test_tensor is None: returns (train_loss, val_loss, val_predictions).
     """
+    if metadata is None:
+        raise ValueError(
+            "train_loop() requires `metadata` so the saved checkpoint is self-describing "
+            "(architecture + preprocessing settings) for inference. Pass a dict, even if empty."
+        )
 
     # Start clock for timing training
     start_time = time.time()
@@ -183,6 +191,10 @@ def train_loop(
     if not os.path.isdir(model_dir):
         os.makedirs(model_dir)
     torch.save(model.state_dict(), os.path.join(model_dir, f'{model_name}'))
+
+    # Save the metadata needed to rebuild the model and preprocessing pipeline at inference time
+    with open(os.path.join(model_dir, f'{model_name}.json'), 'w') as f:
+        json.dump(metadata, f, indent = 2)
 
     # Return outputs depending on whether test predictions were requested
     if has_test:
