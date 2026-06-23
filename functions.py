@@ -1068,8 +1068,22 @@ def apply_recursive_filter(waveforms, A, B, C):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def cfg_get(cfg, path, default=None):
-    node = cfg
-    for key in path.split('.'):
-        node = node.get(key, {})
-    return node if node else default
+def select_channel(data, channel = None):
+    """
+    Accepts either a single-detector array of shape (N, M) or a coincidence array of
+    shape (N, M, 2) and returns a single-detector (N, M) array.
+
+    For (N, M, 2) input, `channel` (0 or 1) selects which detector to train/test on,
+    so users with paired coincidence measurements don't need to pre-split their data
+    into separate files.
+    """
+
+    if data.ndim == 2:
+        return data
+
+    if data.ndim == 3:
+        if channel not in (0, 1):
+            raise ValueError("`channel` must be 0 or 1 when the input data has shape (N, M, 2).")
+        return data[:, :, channel]
+
+    raise ValueError(f"Expected data of shape (N, M) or (N, M, 2), got shape {data.shape}.")
