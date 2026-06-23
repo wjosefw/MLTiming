@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 import torch
 
 import numpy as np
@@ -10,7 +11,7 @@ import matplotlib.pyplot as plt
 from Config import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, FIGURES_DIR,
     moments_order, delay_time, nbins, threshold, normalization_method, MODEL_SAVE_DIR,
-    architecture, model_type, model_name, time_step, train_data_path, validation_data_path, channel
+    architecture, model_type, time_step, train_data_path, validation_data_path
 )
 
 print(device)
@@ -27,10 +28,21 @@ from efficient_kan.src.efficient_kan import KAN
 #---------------------------- LOAD DATA -----------------------------------
 # -------------------------------------------------------------------------
 
-# Accepts either single-detector data (N, M) or paired coincidence data (N, M, 2),
-# in which case `channel` (set in config.py) picks which detector to train on.
-train_data = select_channel(np.load(train_data_path), channel = channel)
-validation_data = select_channel(np.load(validation_data_path), channel = channel)
+# Detector channel to train on when your data has shape (N, M, 2) (paired coincidence measurements). Ignored when your data is already single-detector, shape (N, M).
+parser = argparse.ArgumentParser()
+parser.add_argument('--channel', type = int, default = None, help = 'Detector channel to train on if your data has shape (N, M, 2)')
+args = parser.parse_args()
+channel = args.channel
+
+# Model name to save. Channel-suffixed automatically (e.g. 'CNN_model_dec1') 
+model_name = f'{model_type}_model' if channel is None else f'{model_type}_model_dec{channel}'
+
+# Accepts either single-detector data (N, M) or paired coincidence data (N, M, 2),  in which case `--channel` picks which detector to train on.
+try:
+    train_data = select_channel(np.load(train_data_path), channel = channel)
+    validation_data = select_channel(np.load(validation_data_path), channel = channel)
+except ValueError as e:
+    raise ValueError(f"{e} Pass --channel 0 or 1.") from e
 
 print('Number of training cases: ', train_data.shape[0])
 print('Number of validation cases: ', validation_data.shape[0])
