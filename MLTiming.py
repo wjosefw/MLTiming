@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 # Import Hyperparameters and Paths
-from config_main import (
+from Config import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, FIGURES_DIR,
     moments_order, delay_time, nbins, threshold, normalization_method, MODEL_SAVE_DIR,
     architecture, model_type, model_name, time_step, train_data_path, validation_data_path, channel
@@ -28,7 +28,7 @@ from efficient_kan.src.efficient_kan import KAN
 # -------------------------------------------------------------------------
 
 # Accepts either single-detector data (N, M) or paired coincidence data (N, M, 2),
-# in which case `channel` (set in config_main.py) picks which detector to train on.
+# in which case `channel` (set in config.py) picks which detector to train on.
 train_data = select_channel(np.load(train_data_path), channel = channel)
 validation_data = select_channel(np.load(validation_data_path), channel = channel)
 
