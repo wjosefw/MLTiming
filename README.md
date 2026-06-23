@@ -20,16 +20,32 @@ Our approach leverages Pairwise learning techniques to train small NN the delive
 
 ## 🚀 Usage
 
-### OPTION A: Quickstart
+### OPTION A: Train your own model
 
-In order to get a fast and simple glance on how to use MLTiming go to the quickstart notebook [Link to Notebook](Quickstart_MLTiming.ipynb)
+Use the [MLTiming.py](MLTiming.py) script to train a model on your own data. Hyperparameters and data paths are set in [Config.py](Config.py). Data should be a numpy array of shape (N,M) for a single detector, or (N,M,2) if you have paired coincidence measurements, where N is the number of events and M is the number of time points in the signal. A small ready-to-use example lives in [sample_data](sample_data) so you can try the workflow immediately. For example:
+
+```bash
+# Single-detector data
+python MLTiming.py
+
+# Paired coincidence data (N,M,2): pick which detector to train on
+python MLTiming.py --channel 0
+python MLTiming.py --channel 1
+```
+
+Each run saves a checkpoint to `Trained_Models/` together with a `<checkpoint>.json` metadata file recording the architecture and preprocessing settings it was trained with, so inference never needs them re-entered by hand.
 
 ### OPTION B: Inference on your data
 
-If you want to perform directly perform inference on your data, utilize the inference.py [Link to Script](inference.py) script which outputs a .txt file of the time predictions. Data should be saved in a numpy array of shape (N,M) where N is the number of events and M is the number of time points in the signal. You can choose between the available CNN, MLP, MLPWAVE and KAN trained models. For example:
+Use the [Inference.py](Inference.py) script to run a trained checkpoint on your data, outputting a .txt file of the time predictions. Data should be saved in a numpy array (.npy or .npz with key "data") of shape (N,M), or (N,M,2) for paired coincidence measurements. For example:
 
 ```bash
-python inference.py --data path_to_your_data --model CNN
+# Single detector
+python Inference.py --data path_to_your_data --checkpoint Trained_Models/CNN_model
+
+# Coincidence data: pass both detectors' checkpoints to also get the coincidence
+# time resolution (CTR) and bias, on top of each detector's predictions
+python Inference.py --data path_to_your_data --checkpoint Trained_Models/CNN_model_dec0 --checkpoint2 Trained_Models/CNN_model_dec1
 ```
 
 ## 🛠️ Installation
@@ -53,23 +69,24 @@ conda activate DT_env
 ## 📑 Repository Table of Contents 
 
 1. Trained Models
-2. Gross adjusment
-3. Fixed window
-3. Threshold
+2. Sample data
+3. Deprecated
 
 ## Trained Models 🧠
 
-* AG_model: Implementation of MLTiming for the CNN architecture.
-* KAN_AG_model: Implementation of MLTiming for the KAN architecture.
-* MLP_AG_model: Implementation of MLTiming for the MLP architecture with caclculated moments as inputs.
-* MLPWAVE_AG_model: Implementation of MLTiming for the MLP architecture with cropped waveform as input.
+Models are saved to `Trained_Models/` as `{model_type}_model` (single detector), or `{model_type}_model_dec{channel}` when trained with `--channel` on paired coincidence data, where `model_type` is one of:
 
-## Gross Adjusments
+* CNN: Implementation of MLTiming for the CNN architecture.
+* KAN: Implementation of MLTiming for the KAN architecture.
+* MLP: Implementation of MLTiming for the MLP architecture with calculated moments as inputs.
+* MLPWAVE: Implementation of MLTiming for the MLP architecture with cropped waveform as input.
 
-It includes scripts to train ML models for timing in radiation detectors using MLTiming.
+Each checkpoint is saved alongside a `<checkpoint>.json` file recording the architecture and preprocessing settings it was trained with, which [Inference.py](Inference.py) loads automatically.
 
-* config_Gross_Adjustment.py: Configuration file for training hyperamaters.
-* MLTiming_Ajuste_grueso_Single_Det.py: Train a single detector for timing using its own waveforms.
-* MLTiming_Ajuste_grueso_Conv.py: Train two detectors (separately but in the same script) and evualuate Coincidence time resolution directly for the CNN or MLPWAVE implementation
-* MLTiming_Ajuste_grueso.py: Train two detectors (separately but in the same script) and evualuate Coincidence time resolution directly for the MLP or KAN implementation:
-* test_model_Ajuste_grueso.py: Test trained models on new data. The script is built for testing Coincidence time resolution so data from two detectors is needed. If you just want to perform time inference on a single detectore use the 'inference.py' script referenced in the usage section.
+## Sample data
+
+[sample_data](sample_data) contains a small, ready-to-use coincidence dataset (`sample_data_pos0_train/val/test.npy`, shape (N,M,2)) so you can try the training and inference workflow end-to-end without supplying your own data first.
+
+## Deprecated
+
+[Deprecated](Deprecated) holds earlier approaches kept for reference (mean-pulse alignment, fixed-window and threshold-based methods). They're not maintained and not part of the recommended workflow above.
