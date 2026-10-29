@@ -8,9 +8,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 
-from functions import (set_seed, calculate_gaussian_center, plot_gaussian, 
-                       get_gaussian_params, extract_signal_along_time, 
-                       create_and_delay_pulse_pair_along_time, create_dataloaders)
+from functions import (set_seed, calculate_gaussian_center, plot_gaussian,
+                       get_gaussian_params, create_dataloaders)
+from Deprecated.functions import (extract_signal_along_time,
+                       create_and_delay_pulse_pair_along_time)
 from Models import count_parameters, ConvolutionalModel
 from Train_loops import  train_loop_convolutional
 

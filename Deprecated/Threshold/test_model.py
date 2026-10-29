@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import torch
 from efficient_kan.src.efficient_kan import KAN
 
-from functions import (momentos_threshold, normalize_given_params, 
-                       calculate_gaussian_center, plot_gaussian, get_gaussian_params,
-                       extract_signal_along_time_singles, set_seed)
+from functions import (normalize_given_params,
+                       calculate_gaussian_center, plot_gaussian, get_gaussian_params, set_seed)
+from Deprecated.functions import momentos_threshold, extract_signal_along_time_singles
 
 #Load data
 dir = '/home/josea/DEEP_TIMING/DEEP_TIMING_VS/Na22_filtered_data/'

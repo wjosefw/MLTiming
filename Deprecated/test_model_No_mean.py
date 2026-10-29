@@ -5,7 +5,7 @@ import torch
 import argparse
 
 # Import Hyperparameters and Paths
-from config import (
+from Config import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
     architecture, nbins, threshold, DATA_DIR, MODEL_SAVE_DIR, before, after)
 

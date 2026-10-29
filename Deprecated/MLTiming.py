@@ -5,7 +5,7 @@ import torch
 import sys
 
 # Import Hyperparameters and Paths
-from config import (
+from Config import (
     device, seed, batch_size, epochs, learning_rate, Num_Neurons, before, after, FIGURES_DIR,
     moments_order, delay_time, nbins, threshold, normalization_method, DATA_DIR,
     MODEL_SAVE_DIR, REF_PULSE_SAVE_DIR, BASE_DIR, architecture, model_type,

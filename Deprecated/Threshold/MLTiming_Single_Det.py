@@ -5,9 +5,10 @@ import torch
 from efficient_kan.src.efficient_kan import KAN
 
 
-from functions import (extract_signal_along_time_singles, momentos_threshold, set_seed, 
-                       normalize, normalize_given_params, create_and_delay_pulse_pair_along_time, 
+from functions import (set_seed, normalize, normalize_given_params,
                        create_dataloaders, Calculate_CFD)
+from Deprecated.functions import (extract_signal_along_time_singles, momentos_threshold,
+                       create_and_delay_pulse_pair_along_time)
 from Models import  count_parameters
 from Train_loops import train_loop_KAN, train_loop_KAN_with_target
 

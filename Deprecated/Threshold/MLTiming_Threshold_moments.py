@@ -8,10 +8,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 
-from functions import (momentos_threshold, set_seed, calculate_gaussian_center, 
-                       normalize, normalize_given_params, plot_gaussian, get_gaussian_params, 
-                       extract_signal_along_time_singles, create_and_delay_pulse_pair_along_time,
+from functions import (set_seed, calculate_gaussian_center,
+                       normalize, normalize_given_params, plot_gaussian, get_gaussian_params,
                        create_dataloaders)
+from Deprecated.functions import (momentos_threshold, extract_signal_along_time_singles,
+                       create_and_delay_pulse_pair_along_time)
 from Train_loops import train_loop_KAN
 
 

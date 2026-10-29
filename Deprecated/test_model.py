@@ -6,7 +6,7 @@ import argparse
 import sys
 
 # Import Hyperparameters and Paths
-from config import (
+from Config import (
     device, Num_Neurons, before, after, normalization_method, moments_order, seed,
     architecture, nbins, threshold, DATA_DIR, REF_PULSE_SAVE_DIR,
     MODEL_SAVE_DIR, BASE_DIR)
