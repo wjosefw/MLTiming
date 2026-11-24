@@ -184,25 +184,26 @@ def momentos(vector, order = 4):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def normalize_by_max(pulse_array, fit_polynomial=True, fit_samples=5):
+def normalize_by_max(pulse_array, fit_samples=5):
     """
-    Normalize pulse data by the maximum of each pulse.
+    Normalize pulse data by the maximum of each pulse: the vertex of a parabola least-squares
+    fitted to the fit_samples samples centred on the highest one (the highest sample itself where
+    the fit has no maximum within those samples).
 
     Parameters:
     pulse_array (numpy.ndarray): 3D array of pulse data with shape (n_pulses, n_samples, n_channels).
-    fit_polynomial (bool): If True, the maximum is the vertex of a parabola least-squares fitted to the
-                           fit_samples samples centred on the highest one (the highest sample itself
-                           where the fit has no maximum within those samples). Defaults to True.
-    fit_samples (int): Odd number of samples of the parabola fit. Defaults to 5: from the highest sample
-                       alone up to 15 samples timing is the same, while the 60 samples used for the
-                       paper's data cost ~1 ps CTR with a relative threshold.
+    fit_samples (int): Odd number of samples of the parabola fit (1: the highest sample). Defaults
+                       to 5: from the highest sample alone up to 15 samples timing is the same, while
+                       the 60 samples once used here cost ~1 ps CTR (CNN and a fixed-threshold LED).
 
     Returns:
     numpy.ndarray: Normalized pulse data with the same shape as input.
     """
+    if fit_samples < 1 or fit_samples % 2 == 0:
+        raise ValueError(f"`fit_samples` must be odd and at least 1 (got {fit_samples}).")
     x = np.asarray(pulse_array, dtype = np.float64)
     peak = x.max(axis = 1)                                     # (n_pulses, n_channels)
-    if fit_polynomial:
+    if fit_samples >= 3:
         half = fit_samples // 2
         k = np.arange(-half, half + 1)
         idx = np.clip(x.argmax(axis = 1)[:, None, :] + k[None, :, None], 0, x.shape[1] - 1)
@@ -336,51 +337,6 @@ def normalize_given_params(data, params, channel=0, method='standardization'):
         normalized_data = (data_copy[:, :, channel] - params[0]) / params[1]
 
     return normalized_data
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
-    """The virtual-pair generator of the paper, kept to reproduce its results. MLTiming.py now uses
-    create_virtual_pairs, which cuts the delayed copies from the full waveform with whole-sample delays.
-
-    pulse_set: cropped pulses (N, W). Each member is delayed by a random sub-sample delay (linear interpolation) and
-    the start of the delayed copy is filled with the crop's own first samples."""
-
-
-    INPUT = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
-    INPUT_2 = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
-    REF = np.zeros((pulse_set.shape[0],), dtype = np.float32)
-
-    NRD0 = np.random.uniform(low = 0, high = delay_time, size = pulse_set.shape[0])
-    NRD1 = np.random.uniform(low = 0, high = delay_time, size = pulse_set.shape[0])
-    
-    for i in range(pulse_set.shape[0]):
-        
-        res_0 = NRD0[i] % time_step  # Fractional part of the delay
-        for j in range(pulse_set.shape[1] - 1, 0, -1):
-            slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
-            INPUT[i, j, 0] = pulse_set[i, j] - slope * res_0 
-        INPUT[i, 0, 0] = pulse_set[i, 0] 
-
-        idel_0 = int( NRD0[i] / time_step) 
-        INPUT_2[i,:,0] = np.roll(INPUT[i,:,0], idel_0)
-        INPUT_2[i,:idel_0,0] = INPUT[i,:idel_0,0]
-
-
-        res_1 = NRD1[i] % time_step  #
-        for j in range(pulse_set.shape[1] - 1, 0, -1):
-            slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
-            INPUT[i, j, 1] = pulse_set[i, j] - slope * res_1 
-        INPUT[i, 0, 1] = pulse_set[i, 0] 
-
-        idel_1 = int( NRD1[i] / time_step) 
-        INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
-        INPUT_2[i,:idel_1,1] = INPUT[i,:idel_1,1]
-        
-        REF[i] = NRD0[i] - NRD1[i]  
-
-    return INPUT_2, REF
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -607,8 +563,7 @@ def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_
     The crossing is found by the anchor rule (as in MLPILEUP, Positronium_singles and
     PyGeneticGFN): from the first sample above `anchor` times the pulse maximum, back to the
     last sample at or below `fraction`. Baseline noise that crosses `fraction` but never
-    reaches the anchor level cannot fire it. anchor = None takes the first sample above
-    `fraction`, as in the paper.
+    reaches the anchor level cannot fire it.
     """
 
     vector = np.asarray(vector)
@@ -626,21 +581,18 @@ def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_
 
     threshold = fraction
 
-    if anchor is None:
-        # First index where each signal crosses the threshold.
-        above_threshold = vector > threshold
-        first_cross = above_threshold.argmax(axis = 1)
-        valid_cross = above_threshold[np.arange(num_signals), first_cross]
-    else:
-        # Anchor rule: first sample above max(threshold, anchor * maximum), then back to the
-        # last sample at or below the threshold before it; the crossing is the sample after it.
-        level = np.maximum(threshold, anchor * vector.max(axis = 1))
-        above_anchor = vector > level[:, None]
-        anchor_idx = above_anchor.argmax(axis = 1)
-        samples = np.arange(num_samples)
-        below = (vector <= threshold) & (samples[None, :] < anchor_idx[:, None])
-        first_cross = np.where(below, samples[None, :], -1).max(axis = 1) + 1
-        valid_cross = above_anchor[np.arange(num_signals), anchor_idx]
+    if not 0 < anchor < 1:
+        raise ValueError(f"`anchor` must be a fraction of the maximum, 0 < anchor < 1 (got {anchor}).")
+
+    # Anchor rule: first sample above max(threshold, anchor * maximum), then back to the last
+    # sample at or below the threshold before it; the crossing is the sample after it.
+    level = np.maximum(threshold, anchor * vector.max(axis = 1))
+    above_anchor = vector > level[:, None]
+    anchor_idx = above_anchor.argmax(axis = 1)
+    samples = np.arange(num_samples)
+    below = (vector <= threshold) & (samples[None, :] < anchor_idx[:, None])
+    first_cross = np.where(below, samples[None, :], -1).max(axis = 1) + 1
+    valid_cross = above_anchor[np.arange(num_signals), anchor_idx]
 
     # Validate that every signal actually crosses the threshold.
     if not np.all(valid_cross):

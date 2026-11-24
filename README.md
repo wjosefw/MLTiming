@@ -95,4 +95,4 @@ Each checkpoint is saved alongside a `<checkpoint>.json` file recording the arch
 
 ## Deprecated
 
-[Deprecated](Deprecated) holds earlier approaches kept for reference (mean-pulse alignment, fixed-window and threshold-based methods). They're not maintained and not part of the recommended workflow above.
+[Deprecated](Deprecated) holds earlier approaches kept for reference (mean-pulse alignment, fixed-window and threshold-based methods). They're not maintained, not part of the recommended workflow above, and no longer run: they need functions that `functions.py` no longer has (such as the paper's pair generator `create_and_delay_pulse_pair`, replaced by `create_virtual_pairs`).
