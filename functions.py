@@ -88,13 +88,14 @@ def calculate_gaussian_center(vector, nbins = 51, limit = 3):
     return np.array(centroid, dtype = 'float64')
 
 
-def plot_gaussian(array, shift, nbins = 51, label = ' ', range = 0.8, limit = 1):
-    """Histogram of array - shift around its peak (as fit_gaussian) with the Gaussian fit drawn over it."""
+def plot_gaussian(array, shift, nbins = 51, label = ' ', range = 0.8, limit = 1, color = None):
+    """Histogram of array - shift around its peak (as fit_gaussian) with the Gaussian fit drawn over it
+    (in color, or the next colour of the cycle)."""
     fit = fit_gaussian(array, shift, nbins = nbins, range = range, limit = limit)
     width = fit.centers[1] - fit.centers[0]
     lo, hi = fit.centers[0] - width / 2, fit.centers[-1] + width / 2
     values = np.ravel(np.asarray(array, dtype = float) - shift)
-    _, _, patches = plt.hist(values, bins = nbins, range = (lo, hi), alpha = 0.5, label = label)
+    _, _, patches = plt.hist(values, bins = nbins, range = (lo, hi), alpha = 0.5, label = label, color = color)
     if fit.success:
         x = np.linspace(lo, hi, 500)
         plt.plot(x, gauss(x, fit.H, fit.A, fit.x0, fit.sigma), color = patches[0].get_facecolor())

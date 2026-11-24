@@ -90,66 +90,6 @@ class Datos_LAB_GFN(Dataset):
         """
         return self.time_step, self.positions, self.Theoretical_TOF
 
-    def load_train_data(self):
-        """
-        Load the training dataset from position 0.
-
-        Returns:
-        - np.ndarray: Training data array.
-
-        Note:
-        - If the file is not found, a warning is printed and None is returned.
-        """
-        filename = 'Na22_norm_pos0_train.npz'
-        filepath = os.path.join(self.data_dir, filename)
-        if os.path.exists(filepath):
-            self.train_data = np.load(filepath, mmap_mode="r")["data"]
-            return self.train_data
-        else:
-            print(f"Warning: {filepath} not found.")
-
-    def load_val_data(self):
-        """
-        Load the validation dataset from position 0.
-
-        Returns:
-        - np.ndarray: Validation data array.
-
-        Note:
-        - If the file is not found, a warning is printed and None is returned.
-        """
-        filename = 'Na22_norm_pos0_val.npz'
-        filepath = os.path.join(self.data_dir, filename)
-        if os.path.exists(filepath):
-            self.val_data = np.load(filepath, mmap_mode="r")["data"]
-            return self.val_data
-        else:
-            print(f"Warning: {filepath} not found.")
-
-    def get_TOF_slices_train(self, TOF):
-        """
-        Slice the training TOF array by position based on equal-sized segments.
-
-        Parameters:
-        - TOF (np.ndarray): Input TOF array.
-
-        Returns:
-        - dict: Mapping of position index to corresponding TOF slices.
-
-        Raises:
-        - ValueError: If TOF is None.
-        """
-        if TOF is None:
-            raise ValueError("TOF array cannot be None.")
-
-        self.TOF = TOF
-        size = int(TOF.shape[1] / self.Theoretical_TOF.shape[0])
-        self.TOF_dict = {
-            position: TOF[:, (position + np.max(self.positions)) * size : (position + np.max(self.positions) + 1) * size]
-            for position in self.position_range
-        }
-        return self.TOF_dict
-
     def get_TOF_slices_eval(self, TOF):
         """
         Slice the evaluation TOF array into segments by position.
@@ -173,28 +113,3 @@ class Datos_LAB_GFN(Dataset):
             for position in self.position_range
         }
         return self.TOF_dict
-
-    def compute_error(self, centroid):
-        """
-        Compute absolute TOF errors between observed and expected centroids.
-
-        Parameters:
-        - centroid (np.ndarray): Estimated centroid value to compare against.
-
-        Returns:
-        - dict: Mapping of position index to corresponding TOF error arrays.
-
-        Raises:
-        - ValueError: If TOF_dict or centroid is None.
-        """
-        if self.TOF_dict is None:
-            raise ValueError("TOF_dict is not set. Call get_TOF_slices_train() or get_TOF_slices_eval() first.")
-        if centroid is None:
-            raise ValueError("Centroid array cannot be None.")
-
-        self.error_dict = {
-            position: abs(self.TOF_dict[position] - centroid - self.Theoretical_TOF[position + np.max(self.positions)])
-            for position in self.position_range
-        }
-
-        return self.error_dict

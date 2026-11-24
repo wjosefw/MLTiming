@@ -31,7 +31,6 @@ after = math.ceil(after_ns / time_step - 1e-9)
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent #Get parent directory of the file
-DATA_DIR = BASE_DIR / "Pulsos15CM20250130_version2"
 MODEL_SAVE_DIR = BASE_DIR / "Trained_Models"
 FIGURES_DIR = BASE_DIR / "figures"
 

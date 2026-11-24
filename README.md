@@ -82,7 +82,7 @@ git clone https://github.com/Blealtan/efficient-kan efficient_kan
 
 1. Trained Models
 2. Sample data
-3. Deprecated
+3. Earlier approaches
 
 ## Trained Models 🧠
 
@@ -99,6 +99,6 @@ Each checkpoint is saved alongside a `<checkpoint>.json` file recording the arch
 
 [sample_data](sample_data) contains a small, ready-to-use coincidence dataset (`sample_data_pos0_train/val/test.npy`, shape (N,M,2)) so you can try the training and inference workflow end-to-end without supplying your own data first.
 
-## Deprecated
+## Earlier approaches
 
-[Deprecated](Deprecated) holds earlier approaches kept for reference (mean-pulse alignment, fixed-window and threshold-based methods). They're not maintained, not part of the recommended workflow above, and no longer run: they need functions that `functions.py` no longer has (such as the paper's pair generator `create_and_delay_pulse_pair`, replaced by `create_virtual_pairs`).
+Earlier approaches (mean-pulse alignment, fixed-window and threshold-based methods) and the code exactly as published with the paper are kept in the git tag [`paper-2026`](https://github.com/wjosefw/MLTiming/tree/paper-2026) (`git checkout paper-2026`).
