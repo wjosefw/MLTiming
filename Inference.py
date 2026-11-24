@@ -3,6 +3,8 @@ import json
 import numpy as np
 import torch
 import argparse
+import matplotlib
+matplotlib.use('Agg')                 # figures are saved, never shown
 import matplotlib.pyplot as plt
 
 # Import functions
@@ -18,7 +20,7 @@ parser.add_argument('--checkpoint', type = str, required = True, help = 'Path to
 parser.add_argument('--checkpoint2', type = str, required = False, help = 'Path to a second checkpoint (detector 1). If given, both channels of --data are inferred and the coincidence time resolution is reported')
 parser.add_argument('--channel', type = int, required = False, help = 'Detector channel to select if --data has shape (N, M, 2) and --checkpoint2 is not given')
 parser.add_argument('--seed', type = int, default = 42, help = 'Random seed')
-parser.add_argument('--output', type = str, default = 'output_timing.txt', help = 'Path to write the predicted timestamps (or TOF, in coincidence mode) to')
+parser.add_argument('--output', type = str, default = 'output_timing.txt', help = 'Path to write the predicted timestamps (or TOF, in coincidence mode) to; the histogram is saved next to it as <output>.png')
 parser.add_argument('--nbins', type = int, default = 51, help = 'Number of histogram bins for the prediction/TOF histograms')
 args = parser.parse_args()
 
@@ -65,6 +67,14 @@ def predict(checkpoint_path, pulses):
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
+def save_figure():
+    """Save the current figure next to the output file, as <output>.png."""
+    path = os.path.splitext(args.output)[0] + '.png'
+    plt.savefig(path)
+    plt.close()
+    print('Saved', path)
+
+
 data = np.load(args.data)
 if args.data.endswith('.npz'):
     data = data['data']
@@ -78,7 +88,7 @@ if args.checkpoint2 is None:
     plt.hist(times, bins = args.nbins)
     plt.xlabel('Predicted time (ns)')
     plt.ylabel('Counts')
-    plt.show()
+    save_figure()
 
     np.savetxt(args.output, times.flatten(), fmt = '%.6f')
 
@@ -100,6 +110,6 @@ else:
     plot_gaussian(TOF, centroid, nbins = args.nbins, range = 0.6, label = 'Coincidence TOF')
     plt.xlabel(r'$\Delta t$ (ns)')
     plt.ylabel('Counts')
-    plt.show()
+    save_figure()
 
     np.savetxt(args.output, TOF, fmt = '%.6f')

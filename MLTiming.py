@@ -1,7 +1,10 @@
 import argparse
 import torch
 
+import os
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')                 # figures are saved, never shown
 import matplotlib.pyplot as plt
 
 
@@ -119,18 +122,28 @@ val = train_loop(model, optimizer, train_loader, val_loader, EPOCHS = epochs, mo
 # ------------------------------ RESULTS ----------------------------------
 # -------------------------------------------------------------------------
 
+os.makedirs(FIGURES_DIR, exist_ok = True)
+
 #plot validation delays hists
+plt.figure()
 plt.hist(val[-1,:,0] - val[-1,:,1], bins = nbins, alpha = 0.5, label = 'Predicted delays validation')
 plt.hist(REF_val, bins = nbins, alpha = 0.5, label = 'Target delays validation')
 plt.legend()
-plt.show()
+path = os.path.join(FIGURES_DIR, f'{model_name}_val_delays.png')
+plt.savefig(path)
+plt.close()
+print('Saved', path)
 
 # Get validation error
 err_val = (val[-1,:,0] - val[-1,:,1]) - REF_val
 print('MAE validation: ', np.mean(abs(err_val)))
 
 #Plot target validation delay vs error
+plt.figure()
 plt.plot(REF_val, err_val, 'b.', markersize = 1.5)
 plt.xlabel('Validation target delay')
 plt.ylabel('Validation prediction error')
-plt.show()
+path = os.path.join(FIGURES_DIR, f'{model_name}_val_error.png')
+plt.savefig(path)
+plt.close()
+print('Saved', path)
