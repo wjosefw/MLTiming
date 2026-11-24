@@ -37,6 +37,10 @@ python MLTiming.py --channel 1
 
 Each run saves a checkpoint to `Trained_Models/` together with a `<checkpoint>.json` metadata file recording the architecture and preprocessing settings it was trained with, so inference never needs them re-entered by hand.
 
+#### Window and delay for your detector
+
+Each pulse is cropped around the crossing of `threshold` (10 % of the maximum), and the network trains on virtual pairs: two copies of the pulse, each delayed by a random whole number of samples up to `delay_time`, cut from the full waveform. The crop and the delay set how much of the rising edge the network sees, and timing works best when it sees only its first part. In [Config.py](Config.py) they are given in ns (`before_ns`, `after_ns`, `delay_time`), which carry over to another sampling rate. At start-up [MLTiming.py](MLTiming.py) prints how far up the edge the network sees; the best results were at about 15–18 % of the maximum (LaBr3 + PMT pulses, tested at 0.133, 0.2 and 0.4 ns sampling). For pulses of another shape, adjust `after_ns` and `delay_time` until the printed level falls in that range.
+
 ### OPTION B: Inference on your data
 
 Use the [Inference.py](Inference.py) script to run a trained checkpoint on your data, outputting a .txt file of the time predictions. Data should be saved in a numpy array (.npy or .npz with key "data") of shape (N,M), or (N,M,2) for paired coincidence measurements. For example:

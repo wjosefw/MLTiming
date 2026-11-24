@@ -367,7 +367,12 @@ def normalize_given_params(data, params, channel=0, method='standardization'):
 #----------------------------------------------------------------------------------------------
 
 def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
-    
+    """The virtual-pair generator of the paper, kept to reproduce its results. MLTiming.py now uses
+    create_virtual_pairs, which cuts the delayed copies from the full waveform with whole-sample delays.
+
+    pulse_set: cropped pulses (N, W). Each member is delayed by a random sub-sample delay (linear interpolation) and
+    the start of the delayed copy is filled with the crop's own first samples."""
+
 
     INPUT = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
     INPUT_2 = np.zeros((pulse_set.shape[0], pulse_set.shape[1], 2))
@@ -402,6 +407,55 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
         REF[i] = NRD0[i] - NRD1[i]  
 
     return INPUT_2, REF
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def create_virtual_pairs(pulses, starts, window, time_step, delay_time = 1):
+    """Virtual coincidence pairs for pairwise training, cut from the full waveforms.
+
+    Each pair holds two copies of the same pulse, each delayed by its own random whole number of samples (uniform in
+    0..delay_time ns, rounded to the sampling grid); the label is the difference of the two delays, d0 - d1 (ns).
+    The copies are cut from the full waveform at the crop start, so the samples that move into the crop are the
+    real ones that precede it. Pulses arrive at random sub-sample phases already, so whole-sample delays need no
+    interpolation. Samples outside the record are 0.
+
+    pulses: full waveforms (N, M); starts: crop start of each pulse (N,), i.e. minus the delays returned by
+    extract_signal_window_by_fraction; window: crop length (before + after).
+    Returns pairs (N, window, 2) float32 and labels (N,) float32."""
+
+    pulses = np.asarray(pulses, dtype = np.float32)
+    n, m = pulses.shape
+    shifts = np.rint(np.random.uniform(0, delay_time, size = (n, 2)) / time_step).astype(np.int64)
+    pos = np.asarray(starts, dtype = np.int64)[:, None, None] + np.arange(window)[None, :, None] - shifts[:, None, :]
+    inside = (pos >= 0) & (pos < m)
+    pairs = np.where(inside, pulses[np.arange(n)[:, None, None], np.clip(pos, 0, m - 1)], 0).astype(np.float32)
+    labels = ((shifts[:, 0] - shifts[:, 1]) * time_step).astype(np.float32)
+    return pairs, labels
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def edge_level_seen(pulses, time_step, after, delay_time, fraction = 0.1, n_max = 20000, seed = 0):
+    """How far up the rising edge the network sees: the median pulse amplitude (fraction of the maximum) reached at
+    the mean time left visible after the threshold crossing, over virtual-pair members (whole-sample delays).
+
+    The window and delay worked best where this is about 0.15-0.18 (a window ending ~1.0-1.2 ns after the 10 %
+    crossing, delays up to ~1 ns, for LaBr3 + PMT pulses at 0.133, 0.2 and 0.4 ns sampling). Use it to choose
+    after / delay_time for pulses of another shape. pulses: max-normalised full waveforms (N, M)."""
+
+    x = np.asarray(pulses[:n_max], dtype = np.float64)
+    rows = np.arange(len(x))
+    i = np.maximum((x > fraction).argmax(1), 1)
+    frac = (fraction - x[rows, i - 1]) / (x[rows, i] - x[rows, i - 1])
+    t = np.arange(0, 3, 0.01)                                     # ns after the crossing
+    pos = np.minimum((i - 1 + frac)[:, None] + t[None] / time_step, x.shape[1] - 1.001)
+    k = np.floor(pos).astype(int)
+    edge = np.median(x[rows[:, None], k] * (1 - (pos - k)) + x[rows[:, None], k + 1] * (pos - k), 0)
+    rng = np.random.default_rng(seed)
+    shifts = np.rint(rng.uniform(0, delay_time, (20, len(frac))) / time_step)
+    visible = time_step * np.mean(np.clip(after - 1 - frac - shifts, 0, None))
+    return float(np.interp(visible, t, edge))
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------

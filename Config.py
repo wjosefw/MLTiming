@@ -1,3 +1,4 @@
+import math
 import torch
 from pathlib import Path
 
@@ -16,12 +17,17 @@ architecture = [moments_order, 5, 1, 1]    # KAN architecture
 model_type = 'CNN' # Type of model to train CNN, MLP, MLPWAVE and KAN available
 
 # Data settings
-time_step = 0.2  # Time step of your data
-delay_time = 1   # Max delay to training pulses in ns
+time_step = 0.2  # Time step of your data (ns)
 nbins = 51       # Number of histogram bins
-before = 8
-after = 5
-threshold = 0.1  # Reference threshold crop pulses
+threshold = 0.1  # Reference threshold crop pulses (fraction of the maximum)
+
+# Crop window and virtual-pair delays, in ns: they carry over to another sampling rate in ns, not in samples.
+# The network should see the rising edge up to ~15-18 % of the maximum; MLTiming.py prints the level for your data.
+before_ns = 1.6  # Kept before the threshold crossing (at least ~1.6 ns)
+after_ns = 1.0   # Kept after it (~1.0-1.2 ns)
+delay_time = 1   # Max delay of each virtual-pair member (ns), comparable to after_ns
+before = math.ceil(before_ns / time_step - 1e-9)   # in samples: 8 and 5 at 0.2 ns
+after = math.ceil(after_ns / time_step - 1e-9)
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent #Get parent directory of the file

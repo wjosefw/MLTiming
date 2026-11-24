@@ -17,7 +17,7 @@ from Config import (
 print(device)
 
 # Import functions
-from functions import (momentos, create_and_delay_pulse_pair, set_seed,
+from functions import (momentos, create_virtual_pairs, edge_level_seen, set_seed,
                        create_dataloaders, normalize, normalize_given_params,
                        extract_signal_window_by_fraction, select_channel)
 from Models import MLP_Torch,  ConvolutionalModel, count_parameters
@@ -56,8 +56,13 @@ set_seed(seed)                    # Fix seeds
 moved_pulses_train, delays_train = extract_signal_window_by_fraction(train_data, time_step, fraction = threshold, window_low = before, window_high = after)
 moved_pulses_val, delays_val  = extract_signal_window_by_fraction(validation_data, time_step, fraction = threshold, window_low = before, window_high = after)
 
-train, REF_train = create_and_delay_pulse_pair(moved_pulses_train, time_step, delay_time = delay_time)
-val, REF_val = create_and_delay_pulse_pair(moved_pulses_val, time_step, delay_time = delay_time)
+# Virtual pairs: two copies of each pulse, each delayed by a random whole number of samples, cut from the full waveform
+train, REF_train = create_virtual_pairs(train_data, -delays_train, before + after, time_step, delay_time = delay_time)
+val, REF_val = create_virtual_pairs(validation_data, -delays_val, before + after, time_step, delay_time = delay_time)
+
+level = edge_level_seen(train_data, time_step, after, delay_time, fraction = threshold)
+print(f'Window {before} + {after} samples, delays up to {delay_time} ns: the network sees the rising edge up to '
+      f'{100 * level:.1f} % of the maximum (best results at ~15-18 %; adjust after_ns / delay_time in Config.py)')
 
 params = None  # normalization params, only computed for moment-based models (KAN/MLP)
 
