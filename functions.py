@@ -393,7 +393,7 @@ def create_and_delay_pulse_pair(pulse_set, time_step, delay_time = 1):
         for j in range(pulse_set.shape[1] - 1, 0, -1):
             slope = (pulse_set[i, j] - pulse_set[i, j-1]) / time_step
             INPUT[i, j, 1] = pulse_set[i, j] - slope * res_1 
-        INPUT[i, 0, 1] = pulse_set[i, 1] 
+        INPUT[i, 0, 1] = pulse_set[i, 0] 
 
         idel_1 = int( NRD1[i] / time_step) 
         INPUT_2[i,:,1] = np.roll(INPUT[i,:,1], idel_1)
