@@ -100,10 +100,12 @@ else:
     # Coincidence time resolution
     TOF = predict(args.checkpoint, data[:, :, 0]) - predict(args.checkpoint2, data[:, :, 1])
 
-    centroid = calculate_gaussian_center(TOF[np.newaxis, :], nbins = args.nbins, limit = 6)[0]
+    # Centre on the median first: real detector pairs can be offset by far more than the CTR (cables, DRS4 channels)
+    median = np.median(TOF)
+    centroid = median + calculate_gaussian_center((TOF - median)[np.newaxis, :], nbins = args.nbins, limit = 6)[0]
     (H, x0, FWHM), errors = get_gaussian_params(TOF, centroid, nbins = args.nbins, range = 0.6)
 
-    print(f'Bias: {x0*1000:.2f} ps')
+    print(f'Offset (peak of the TOF distribution): {(centroid + x0)*1000:.2f} ps')
     print(f'CTR resolution (FWHM): {FWHM*1000:.2f} ps')
 
     plt.figure()

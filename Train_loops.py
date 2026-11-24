@@ -176,8 +176,7 @@ def train_loop(
             val_loss_list[epoch] = val_epoch_loss
             
         if epoch % 10 == 0 or epoch == EPOCHS - 1:
-            if not os.path.isdir(figure_dir):
-                os.makedirs(figure_dir)
+            os.makedirs(figure_dir, exist_ok = True)
             plot_and_save_loss(train_loss_list[:epoch], val_loss_list[:epoch], name = os.path.join(figure_dir, f'{model_name}_loss_plot.png'))
             print(f'EPOCH {epoch + 1}: LOSS train {train_epoch_loss:.6f}')
             print(f'LOSS val {val_epoch_loss:.6f}')
@@ -187,8 +186,7 @@ def train_loop(
     print(f'Training time {stop_time - start_time} seconds')
     
     # Save model weights to specified directory
-    if not os.path.isdir(model_dir):
-        os.makedirs(model_dir)
+    os.makedirs(model_dir, exist_ok = True)
     torch.save(model.state_dict(), os.path.join(model_dir, f'{model_name}'))
 
     # Save the metadata needed to rebuild the model and preprocessing pipeline at inference time
