@@ -184,62 +184,36 @@ def momentos(vector, order = 4):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def normalize_by_max(pulse_array, fit_polynomial=True):
+def normalize_by_max(pulse_array, fit_polynomial=True, fit_samples=5):
     """
-    Normalize pulse data by the maximum value, optionally fitting a polynomial 
-    for better normalization.
+    Normalize pulse data by the maximum of each pulse.
 
     Parameters:
     pulse_array (numpy.ndarray): 3D array of pulse data with shape (n_pulses, n_samples, n_channels).
-    fit_polynomial (bool): If True, fit a polynomial to a window around the maximum 
-                           value before normalization. Defaults to True.
+    fit_polynomial (bool): If True, the maximum is the vertex of a parabola least-squares fitted to the
+                           fit_samples samples centred on the highest one (the highest sample itself
+                           where the fit has no maximum within those samples). Defaults to True.
+    fit_samples (int): Odd number of samples of the parabola fit. Defaults to 5: from the highest sample
+                       alone up to 15 samples timing is the same, while the 60 samples used for the
+                       paper's data cost ~1 ps CTR with a relative threshold.
 
     Returns:
     numpy.ndarray: Normalized pulse data with the same shape as input.
     """
-    # Initialize the output array with zeros, same shape as input
-    y = np.zeros_like(pulse_array)
-    
+    x = np.asarray(pulse_array, dtype = np.float64)
+    peak = x.max(axis = 1)                                     # (n_pulses, n_channels)
     if fit_polynomial:
-        # Loop over each pulse
-        for i in range(pulse_array.shape[0]):
-            # Find the index of the maximum value in each channel
-            index_max_channel0 = np.argmax(pulse_array[i, :, 0])
-            index_max_channel1 = np.argmax(pulse_array[i, :, 1])
-        
-            # Define the window around the maximum value
-            lower_window_channel0 = max(index_max_channel0 - 30, 0)
-            lower_window_channel1 = max(index_max_channel1 - 30, 0)
-            higher_window_channel0 = min(index_max_channel0 + 30, pulse_array.shape[1])
-            higher_window_channel1 = min(index_max_channel1 + 30, pulse_array.shape[1])
-
-            # Extract the values within the window for each channel
-            y_channel0 = pulse_array[i, lower_window_channel0:higher_window_channel0, 0]
-            y_channel1 = pulse_array[i, lower_window_channel1:higher_window_channel1, 1]
-        
-            # Create the x values corresponding to the window
-            x_channel0 = np.arange(lower_window_channel0, higher_window_channel0)
-            x_channel1 = np.arange(lower_window_channel1, higher_window_channel1)
-
-            # Fit a 2nd-degree polynomial to the data in the window
-            r_channel0 = np.polyfit(x_channel0, y_channel0, 2)
-            r_channel1 = np.polyfit(x_channel1, y_channel1, 2)
-        
-            # Calculate the polynomial values
-            y_channel0 = r_channel0[0]*x_channel0**2 + r_channel0[1]*x_channel0 + r_channel0[2]
-            y_channel1 = r_channel1[0]*x_channel1**2 + r_channel1[1]*x_channel1 + r_channel1[2]
-        
-            # Normalize the original pulse data by the maximum value of the fitted polynomial
-            y[i, :, 0] = pulse_array[i, :, 0] / np.max(y_channel0)
-            y[i, :, 1] = pulse_array[i, :, 1] / np.max(y_channel1)
-    
-    else:
-        # If no polynomial fitting is required, normalize directly by the maximum value in each channel
-        for i in range(pulse_array.shape[0]):
-            y[i, :, 0] = pulse_array[i, :, 0] / np.max(pulse_array[i, :, 0])
-            y[i, :, 1] = pulse_array[i, :, 1] / np.max(pulse_array[i, :, 1])
-    
-    return y
+        half = fit_samples // 2
+        k = np.arange(-half, half + 1)
+        idx = np.clip(x.argmax(axis = 1)[:, None, :] + k[None, :, None], 0, x.shape[1] - 1)
+        v = np.take_along_axis(x, idx, axis = 1)                # (n_pulses, fit_samples, n_channels)
+        design = np.stack([k ** 2, k, np.ones_like(k)], axis = 1).astype(np.float64)
+        a, b, c = np.einsum('pk,nkc->pnc', np.linalg.pinv(design), v)
+        with np.errstate(divide = 'ignore', invalid = 'ignore'):
+            vertex = c - b ** 2 / (4 * a)
+            inside = np.abs(b / (2 * a)) <= half            # the vertex lies within the fitted samples
+        peak = np.where((a < 0) & inside & np.isfinite(vertex), vertex, peak)
+    return (x / peak[:, None, :]).astype(np.asarray(pulse_array).dtype)
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -622,14 +596,19 @@ def calculate_slope_y_intercept(vector, time_step, threshold=0.1):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_low = 140, window_high = 10):
+def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_low = 140, window_high = 10, anchor = 0.5):
     """
     Extracts a windowed segment of a signal around a threshold crossing point defined by a fraction
     of the maximum signal amplitude. Also computes delay indices relative to the crossing point.
 
-    Vectorised across pulses to avoid the per-signal Python loop while preserving the
-    original behaviour, including zero padding whenever the requested window extends
+    Vectorised across pulses, with zero padding whenever the requested window extends
     beyond the available samples.
+
+    The crossing is found by the anchor rule (as in MLPILEUP, Positronium_singles and
+    PyGeneticGFN): from the first sample above `anchor` times the pulse maximum, back to the
+    last sample at or below `fraction`. Baseline noise that crosses `fraction` but never
+    reaches the anchor level cannot fire it. anchor = None takes the first sample above
+    `fraction`, as in the paper.
     """
 
     vector = np.asarray(vector)
@@ -647,12 +626,23 @@ def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_
 
     threshold = fraction
 
-    # Locate the first index where each signal crosses the threshold.
-    above_threshold = vector > threshold
-    first_cross = above_threshold.argmax(axis = 1)
+    if anchor is None:
+        # First index where each signal crosses the threshold.
+        above_threshold = vector > threshold
+        first_cross = above_threshold.argmax(axis = 1)
+        valid_cross = above_threshold[np.arange(num_signals), first_cross]
+    else:
+        # Anchor rule: first sample above max(threshold, anchor * maximum), then back to the
+        # last sample at or below the threshold before it; the crossing is the sample after it.
+        level = np.maximum(threshold, anchor * vector.max(axis = 1))
+        above_anchor = vector > level[:, None]
+        anchor_idx = above_anchor.argmax(axis = 1)
+        samples = np.arange(num_samples)
+        below = (vector <= threshold) & (samples[None, :] < anchor_idx[:, None])
+        first_cross = np.where(below, samples[None, :], -1).max(axis = 1) + 1
+        valid_cross = above_anchor[np.arange(num_signals), anchor_idx]
 
     # Validate that every signal actually crosses the threshold.
-    valid_cross = above_threshold[np.arange(num_signals), first_cross]
     if not np.all(valid_cross):
         missing = np.where(~valid_cross)[0][0]
         raise IndexError(f"Signal index {missing} never crosses the threshold {threshold}.")
