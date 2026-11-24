@@ -1,9 +1,6 @@
 
-import numpy as np
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 
 
 #----------------------------------------------------------------------------------------------
@@ -89,44 +86,23 @@ def count_parameters(model):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-class ConvolutionalModel_Threshold(nn.Module):
-    def __init__(self, N_points, num_outputs=1):
-        super(ConvolutionalModel_Threshold, self).__init__()
-
-        # Define convolutional blocks with batch normalization and ReLU
-        self.conv1 = self.conv_block(1, 16, (2,5))
-        self.conv2 = self.conv_block(16, 32, (2,5))
-        self.conv3 = self.conv_block(32, 64, (2,3))
-        
-
-        # Calculate flattened size for fully connected layer
-        self.flatten_size = 2 * 64 * (N_points // 8)  
-
-        # Fully connected layer with output
-        self.fc1 = nn.Linear(self.flatten_size, 32)
-        self.fc2 = nn.Linear(32, num_outputs)
-        
-        # Dropout for regularization
-        self.dropout = nn.Dropout(p = 0.05)
-
-    def conv_block(self, in_channels, out_channels, kernel_size):
-        return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size = kernel_size, padding = 'same', stride = 1),
-            nn.MaxPool2d(kernel_size = (1,2)),
-        )
-
-    def forward(self, x):
-        # Pass through convolutional blocks
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        
-        # Flatten and pass through fully connected layer
-        x = x.view(x.size(0), -1)
-        x = self.dropout(x)
-        x = self.fc1(x)
-        x = self.fc2(x)
-        x = F.softplus(x)
-
-        return x
-
+def build_model(metadata):
+    """The model a checkpoint's metadata describes (the dict MLTiming.py saves next to it): model_type
+    'CNN' (on the cropped waveform), 'MLPWAVE' (an MLP on the cropped waveform), 'MLP' (an MLP on the
+    moments) or 'KAN' (a KAN on the moments; needs efficient-kan, see the README)."""
+    model_type = metadata['model_type']
+    window = int(metadata['before_samples'] + metadata['after_samples'])
+    if model_type == 'CNN':
+        return ConvolutionalModel(window)
+    if model_type == 'MLPWAVE':
+        return MLP_Torch(NM = window, NN = metadata['num_neurons'], STD_INIT = 0.5)
+    if model_type == 'MLP':
+        return MLP_Torch(NM = metadata['moments_order'], NN = metadata['num_neurons'], STD_INIT = 0.5)
+    if model_type == 'KAN':
+        try:
+            from efficient_kan.src.efficient_kan import KAN
+        except ImportError as e:
+            raise ImportError("KAN models need efficient-kan in the repository root: "
+                              "git clone https://github.com/Blealtan/efficient-kan efficient_kan") from e
+        return KAN(metadata['architecture'])
+    raise ValueError(f"Unsupported model_type: {model_type}. Use 'CNN', 'MLPWAVE', 'MLP' or 'KAN'.")

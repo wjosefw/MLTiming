@@ -1,185 +1,125 @@
-import torch
 import random
+import warnings
+from dataclasses import dataclass
+
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 from scipy.optimize import curve_fit
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
 def gauss(x, H, A, x0, sigma):
+    """Gaussian on a constant background."""
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
-def gauss_fit(x, y):
-    mean = sum(x * y) / sum(y)
-    sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
-    popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
-    return popt
 
-def calculate_gaussian_center(vector, nbins = 51, limit = 3):
-    """
-    Calculate Gaussian fit centroid for each row of the input vector.
+@dataclass(frozen = True)
+class GaussianFit:
+    """A gauss() fit to a histogram: its parameters (sigma in the units of the data), their standard
+    errors (perr, in the order H, A, x0, sigma), the histogram fitted (bin centres and counts) and
+    whether the fit worked (success; message says why not)."""
+    H: float
+    A: float
+    x0: float
+    sigma: float
+    perr: np.ndarray
+    centers: np.ndarray
+    counts: np.ndarray
+    success: bool
+    message: str = 'OK'
 
-    Parameters:
-    vector (numpy.ndarray): A 2D array where each row represents a set of data points to be analyzed.
-    nbins (int, optional): Number of bins to use for the histogram.
-    limits (float, optional): Range of the histogram. 
+    @property
+    def fwhm(self):
+        return 2.35482 * abs(self.sigma)
 
-    Returns:
-    numpy.ndarray: Array of centroid values (x0) for each row of the input vector. 
-    """
-    
-    centroid = [] 
 
-    for i in range(vector.shape[0]):
-        # Calculate the histogram of the current row of data
-        histogN, binsN = np.histogram(vector[i, :], bins = nbins, range = [-limit,limit]) 
-        
-        # Calculate the bin centers
-        cbinsN = 0.5 * (binsN[1:] + binsN[:-1]) 
-        
-        try:
-            # Perform Gaussian fitting
-            HN, AN, x0N, sigmaN = gauss_fit(cbinsN, histogN)
-            
-            # Handle cases where sigmaN is NaN
-            if np.isnan(sigmaN):
-                sigmaN = 10
-                x0N = 10
-        except:
-            # Handle exceptions by setting default values
-            x0N, sigmaN = 10, 10
-            
-        centroid.append(x0N)
-    
-    centroid = np.array(centroid, dtype='float64')
+def fit_histogram(centers, counts):
+    """gauss() least-squares fitted to histogram counts at bin centres, started from their mean and
+    standard deviation. Returns a GaussianFit; success is False (and the parameters NaN) if the
+    histogram is empty or the fit does not converge."""
+    centers, counts = np.asarray(centers, dtype = float), np.asarray(counts, dtype = float)
+    nan4 = np.full(4, np.nan)
+    if counts.sum() <= 0:
+        return GaussianFit(*nan4, nan4, centers, counts, False, 'Empty histogram.')
+    mean = np.sum(centers * counts) / np.sum(counts)
+    sigma = np.sqrt(np.sum(counts * (centers - mean) ** 2) / np.sum(counts))
+    try:
+        popt, pcov = curve_fit(gauss, centers, counts, p0 = [counts.min(), counts.max(), mean, sigma])
+    except (RuntimeError, ValueError) as e:
+        return GaussianFit(*nan4, nan4, centers, counts, False, str(e))
+    with np.errstate(invalid = 'ignore'):
+        perr = np.sqrt(np.diag(pcov)) if np.all(np.isfinite(pcov)) else nan4
+    ok = bool(np.all(np.isfinite(popt)))
+    return GaussianFit(*popt, perr, centers, counts, ok, 'OK' if ok else 'Non-finite parameters.')
 
-    return centroid
 
-def plot_gaussian(array, shift, nbins = 51, label = ' ', range = 0.8, limit = 1):
-    """
-    Plot histogram centered around its peak and overlay Gaussian fit.
-    """
+def fit_gaussian(array, shift = 0.0, nbins = 51, range = 0.5, limit = 1):
+    """Gaussian fit to the peak of the distribution of array - shift: the peak is located on a
+    histogram over [-limit, limit], then a histogram of nbins over the peak +- range is fitted with
+    fit_histogram. Returns a GaussianFit."""
+    values = np.ravel(np.asarray(array, dtype = float) - shift)
+    counts, edges = np.histogram(values, bins = nbins, range = [-limit, limit])
+    centers = 0.5 * (edges[1:] + edges[:-1])
+    peak = centers[np.argmax(counts)]
+    counts, edges = np.histogram(values, bins = nbins, range = (peak - range, peak + range))
+    return fit_histogram(0.5 * (edges[1:] + edges[:-1]), counts)
 
-    # Compute the initial histogram to find the peak
-    histog, bins = np.histogram(array - shift, bins = nbins, range = [-limit,limit])
-    cbins = 0.5 * (bins[1:] + bins[:-1])
-
-    # Find peak position
-    peak_index = np.argmax(histog)
-    peak_value = cbins[peak_index]
-    
-    # Define a histogram range centered at the peak
-    new_min, new_max = peak_value - range, peak_value + range
-
-    # Compute the histogram with the new centered range
-    histog, bins, patches = plt.hist(array - shift, bins=nbins, range=(new_min, new_max), alpha=0.5, label=label)
-    cbins = 0.5 * (bins[1:] + bins[:-1])
-
-    # Fit a Gaussian to the histogram data
-    popt = gauss_fit(cbins, histog)
-    hist_color = patches[0].get_facecolor()
-    
-    # Generate Gaussian fit curve
-    x_fit = np.linspace(new_min, new_max, 500)
-    y_fit = gauss(x_fit, *popt)
-    
-    plt.plot(x_fit, y_fit, color=hist_color)
-    plt.legend()
 
 def get_gaussian_params(array, shift, nbins = 51, range = 0.5, limit = 1):
-    """
-    Compute Gaussian parameters for a histogram centered around its peak.
-    """
-    
-    # Compute an initial histogram to find the peak
-    histog_full, bins_full = np.histogram(array - shift, bins = nbins, range =[-limit, limit])
-    cbins_full = 0.5 * (bins_full[1:] + bins_full[:-1])
+    """fit_gaussian as ((H, x0, FWHM), perr). Raises RuntimeError if the fit fails."""
+    fit = fit_gaussian(array, shift, nbins = nbins, range = range, limit = limit)
+    if not fit.success:
+        raise RuntimeError(f'Gaussian fit failed: {fit.message}')
+    return (fit.H, fit.x0, fit.fwhm), fit.perr
 
-    # Identify peak bin
-    peak_index = np.argmax(histog_full)
-    peak_value = cbins_full[peak_index]
 
-    # Define a histogram range centered around the peak
-    new_min, new_max = peak_value - range, peak_value + range
+def calculate_gaussian_center(vector, nbins = 51, limit = 3):
+    """Centroid (x0) of a gauss() fit to the histogram over [-limit, limit] of each row of vector
+    (2-D). NaN, with a warning, for a row whose fit fails."""
+    centroid = []
+    for row in np.atleast_2d(vector):
+        counts, edges = np.histogram(row, bins = nbins, range = [-limit, limit])
+        fit = fit_histogram(0.5 * (edges[1:] + edges[:-1]), counts)
+        if not fit.success:
+            warnings.warn(f'Gaussian centroid fit failed: {fit.message}')
+        centroid.append(fit.x0 if fit.success else np.nan)
+    return np.array(centroid, dtype = 'float64')
 
-    # Compute the histogram within the new range
-    histog, bins = np.histogram(array - shift, bins = nbins, range = (new_min, new_max))
-    cbins = 0.5 * (bins[1:] + bins[:-1])  # Bin centers
 
-    # Fit a Gaussian to the histogram data
-    x, y = cbins, histog
-    mean = sum(x * y) / sum(y)
-    sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
-
-    try:
-        popt, pcov = curve_fit(gauss, x, y, p0 = [min(y), max(y), mean, sigma])
-        HN, AN, x0, sigma = popt
-        FWHM = 2.35482 * sigma
-        perr = np.sqrt(np.diag(pcov)) if pcov is not None else np.array([np.nan] * 3)
-    except:
-        print("Gaussian fitting failed.")
-        return None, None
-
-    return (HN, x0, FWHM), perr
-
+def plot_gaussian(array, shift, nbins = 51, label = ' ', range = 0.8, limit = 1):
+    """Histogram of array - shift around its peak (as fit_gaussian) with the Gaussian fit drawn over it."""
+    fit = fit_gaussian(array, shift, nbins = nbins, range = range, limit = limit)
+    width = fit.centers[1] - fit.centers[0]
+    lo, hi = fit.centers[0] - width / 2, fit.centers[-1] + width / 2
+    values = np.ravel(np.asarray(array, dtype = float) - shift)
+    _, _, patches = plt.hist(values, bins = nbins, range = (lo, hi), alpha = 0.5, label = label)
+    if fit.success:
+        x = np.linspace(lo, hi, 500)
+        plt.plot(x, gauss(x, fit.H, fit.A, fit.x0, fit.sigma), color = patches[0].get_facecolor())
+    else:
+        warnings.warn(f'Gaussian fit failed: {fit.message}')
+    plt.legend()
+    return fit
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
-
-from numba import cuda
-
-@cuda.jit
-def calculate_moments_gpu(vector, t, MOMENT, order):
-    Nev, Nt, Nc = vector.shape[:3]  # Get dimensions
-    
-    # Thread indices in the CUDA grid
-    event_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-    order_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
-    
-    if event_idx < Nev and order_idx < order:
-        for channel in range(Nc):
-            moment = 0.0
-            for time_idx in range(Nt):
-                moment += vector[event_idx, time_idx, channel] * (t[time_idx] ** order_idx)
-            MOMENT[event_idx, order_idx, channel] = moment
 
 def momentos(vector, order = 4):
     """
-    Calculate the moments of a vector using CUDA with Numba for GPU acceleration.
+    Moments of each pulse: sum over time of vector * t**k, k = 0 .. order - 1, with t the sample
+    times rescaled to [0, 1].
 
     Parameters:
     vector (array-like): The input data array with shape (Nev, Nt, Nc).
-                         where Nev is the number of events, Nt is the number of time points,
-                         and Nc is the number of channels.
 
     Returns:
-    array-like: An array of moments calculated using different weight functions.
-                The shape of the returned array is (Nev, order, Nc).
+    numpy.ndarray: The moments, shape (Nev, order, Nc).
     """
-    # Ensure the array is contiguous
-    vector = np.ascontiguousarray(vector)
-
-    Nev, Nt, Nc = vector.shape
-    t = np.linspace(0, 1, Nt)  # Normalized time array
-
-    # Allocate memory on the GPU
-    vector_gpu = cuda.to_device(vector)
-    t_gpu = cuda.to_device(t)
-    MOMENT_gpu = cuda.device_array((Nev, order, Nc))  # Create an empty array on the GPU to store results
-
-    # Define the CUDA grid and block size
-    threads_per_block = (16, 16)  # Number of threads per block (adjust as needed)
-    blocks_per_grid = ((Nev + threads_per_block[0] - 1) // threads_per_block[0],
-                       (order + threads_per_block[1] - 1) // threads_per_block[1])
-
-    # Launch the kernel to calculate moments on the GPU
-    calculate_moments_gpu[blocks_per_grid, threads_per_block](vector_gpu, t_gpu, MOMENT_gpu, order)
-
-    # Copy the result back to the CPU
-    MOMENT = MOMENT_gpu.copy_to_host()
-
-    return MOMENT
+    vector = np.asarray(vector, dtype = np.float64)
+    t = np.linspace(0, 1, vector.shape[1])
+    return np.einsum('ntc,tk->nkc', vector, t[:, None] ** np.arange(order))
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -390,50 +330,6 @@ def edge_level_seen(pulses, time_step, after, delay_time, fraction = 0.1, n_max 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-import cupy as cp
-def move_to_reference(reference, pulse_set, start = 50, stop = 80, channel = 0):
-    batch_size = 50000 # For an NVIDIA RTX 4090 reduce if smaller GPU
-    
-    window_size = stop - start
-    reference_pulse = reference[start:stop]  # Extract reference pulse
-    num_pulses = pulse_set.shape[0]
-
-    # Initialize results
-    delays = cp.zeros(num_pulses, dtype = cp.int32)
-    aligned_pulses = cp.zeros((num_pulses, window_size), dtype = cp.float32)
-
-    # Convert reference pulse and pulse set to GPU
-    reference_pulse = cp.asarray(reference_pulse, dtype = cp.float32)
-    pulse_set = cp.asarray(pulse_set, dtype = cp.float32)
-
-    # Process in batches to avoid memory overload
-    for i in range(0, num_pulses, batch_size):
-        batch_end = min(i + batch_size, num_pulses)
-        batch_pulses = pulse_set[i:batch_end, :, channel]  # Select batch
-
-        # Create sliding windows for the batch
-        segments = cp.lib.stride_tricks.sliding_window_view(batch_pulses, window_shape = window_size, axis = 1).astype(cp.float32)
-
-        # Compute Mean Squared Error (MSE)
-        mse = cp.mean((segments - reference_pulse) ** 2, axis=2)
-
-        # Find optimal shifts
-        min_mse_indices = cp.argmin(mse, axis = 1)
-        optimal_shifts = start - min_mse_indices
-
-        # Assign batch results
-        delays[i:batch_end] = optimal_shifts
-        aligned_pulses[i:batch_end, :] = segments[cp.arange(batch_end - i), min_mse_indices, :]
-
-        # Free GPU memory
-        del batch_pulses, segments, mse, min_mse_indices, optimal_shifts
-        cp.get_default_memory_pool().free_all_blocks()
-
-    return delays.get(), aligned_pulses.get()
-   
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -447,107 +343,92 @@ def set_seed(seed):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def constant_fraction_discrimination(vector, time_step = 0.2, fraction = 0.9, shift = 30, plot = True):
-    corrected_signal = np.zeros_like(vector)
-    delayed_signal = np.zeros_like(vector)
-    delayed_signal2 = np.zeros_like(vector)
-    
-    for i in range(vector.shape[0]):
-        
-        res = shift % time_step  # Fractional part of the delay
-        for j in range(vector.shape[1] - 1, 0, -1):
-            slope = (vector[i, j] - vector[i, j-1]) / time_step
-            delayed_signal[i, j] = vector[i, j] - slope * res 
-        delayed_signal[i, 0] = vector[i, 0] 
-
-        idel = int(shift / time_step) 
-        delayed_signal2[i,:] = np.roll(delayed_signal[i,:], idel)
-        delayed_signal2[i,:idel] = delayed_signal[i,:idel]
-        
-        fraction_signal = fraction*(-vector[i,:])
-        corrected_signal[i,:] = delayed_signal2[i,:] + fraction_signal
-        if plot:
-            plt.plot(corrected_signal[i, :])
-    return corrected_signal
-
-
-def find_first_zero_crossing_after_minimum(vector, time_step):
-
-    # Create time array
-    t = np.arange(vector.shape[0]) * time_step 
-    
-    # Find index of array min
-    min_index = np.argmin(vector)
-
-    # Look for the first zero-crossing after the minimum
-    for i in range(min_index, len(vector) -  1):
-        if vector[i] < 0 and vector[i + 1] > 0:
-            m = (vector[i + 1] - vector[i]) / (t[i + 1] - t[i])
-            b = vector[i] - m*t[i]
-            crossing_time = -b / m
-            break  # Break the loop after finding the crossing point
-        if vector[i] == 0:
-            crossing_time = t[i]
-            break
-        else:
-            crossing_time = 0 # Placeholder if the other conditions do not get fullfilled
-         
-    if min_index == len(vector) - 1:
-        crossing_time = t[-1]
-    
-    return crossing_time               
-
-def Calculate_CFD(array, fraction = 0.7, shift = 80, time_step = 0.025):
+def threshold_crossing(pulses, threshold, anchor = 0.5):
     """
-    Calculate the timestamps of signals using Constant Fraction Discrimination (CFD) method.
-    
-    Parameters:
-    ----------
-    - Array : A 2D array representing the input signals where each row corresponds to a separate signal.
-    - Fraction (float): The fraction of the maximum signal amplitude used for discrimination.
-    - Shift (int): The amount to shift the CFD signal for discrimination.     
-    - Time_step (float): The time step used for calculating timestamps from the CFD signal.
-    
-    Returns:
-    -------
-    A 2D array where each row contains the calculated timestamps for the corresponding input signal.
-    """
-    cfd_signal = constant_fraction_discrimination(array, fraction = fraction, shift = shift, plot = False)
-    
-    timestamps_list = []
-    for i in range(cfd_signal.shape[0]):
-        timestamps = find_first_zero_crossing_after_minimum(cfd_signal[i,:], time_step)
-        timestamps_list.append(timestamps)
-    
-    return np.array(timestamps_list)
+    Where each pulse crosses `threshold` on its rising edge, in samples (fractional, linearly
+    interpolated), by the anchor rule (as in MLPILEUP, Positronium_singles and PyGeneticGFN): from
+    the first sample above max(threshold, anchor * maximum), back to the last sample at or below
+    the threshold. Baseline noise that crosses the threshold but never reaches the anchor level
+    cannot fire it. NaN for a pulse with no such crossing.
 
+    pulses: (N, M) or one pulse (M,). Returns (N,) or a float.
+    """
+    if not 0 < anchor < 1:
+        raise ValueError(f"`anchor` must be a fraction of the maximum, 0 < anchor < 1 (got {anchor}).")
+    x = np.atleast_2d(np.asarray(pulses))
+    n, m = x.shape
+    rows, samples = np.arange(n), np.arange(m)
+    level = np.maximum(threshold, anchor * x.max(axis = 1))
+    above = x > level[:, None]
+    anchor_idx = above.argmax(axis = 1)
+    below = (x <= threshold) & (samples[None, :] < anchor_idx[:, None])
+    last_below = np.where(below, samples[None, :], -1).max(axis = 1)
+    valid = above[rows, anchor_idx] & (last_below >= 0)
+    k = np.clip(last_below, 0, m - 2)
+    with np.errstate(divide = 'ignore', invalid = 'ignore'):
+        cross = k + (threshold - x[rows, k]) / (x[rows, k + 1] - x[rows, k])
+    cross = np.where(valid, cross, np.nan)
+    return cross if np.ndim(pulses) == 2 else float(cross[0])
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def calculate_slope_y_intercept(vector, time_step, threshold=0.1):
+def calculate_slope_y_intercept(vector, time_step, threshold = 0.1, anchor = 0.5):
     """
-    Calculate the time at which a vector exceeds a given threshold by linear interpolation.
+    Leading-edge time (ns from the first sample): where the pulse crosses `threshold` on its rising
+    edge (threshold_crossing, anchor rule), linearly interpolated. NaN where there is no crossing.
+
+    vector: one pulse (M,) or pulses (N, M). Returns a float or (N,).
+    """
+    return time_step * threshold_crossing(vector, threshold, anchor = anchor)
+
+#----------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------
+
+def Calculate_CFD(array, fraction, shift, time_step):
+    """
+    Constant fraction discrimination of each pulse: the bipolar signal c(t) = y(t - shift) -
+    fraction * y(t), the delayed copy linearly interpolated (shift in ns, any value), timed at the
+    first upward zero crossing of c after its minimum (linearly interpolated). 0 for a pulse with no
+    such crossing; the last sample time if the minimum is the last sample.
 
     Parameters:
-    ----------
-    - Vector (numpy.ndarray): A 1D array representing the signal or data to analyze.
-    - Time_step (float): The time interval between consecutive samples in the vector.  
-    - Threshold (float): The threshold value to identify the crossing point.
+    array: pulses (N, M) or one pulse (M,).
+    fraction (float): the fraction of the undelayed pulse subtracted.
+    shift (float): the delay in ns.
+    time_step (float): the sampling step in ns.
 
     Returns:
-    -------
-    time (float): The estimated time at which the signal first exceeds the threshold value. 
+    Timestamps in ns from the first sample, (N,) or a float.
     """
-    
-    t = np.arange(vector.shape[0]) * time_step
-    index = np.where(vector > threshold)[0][0]
-    t1 = t[index]
-    t0 = t[index - 1]
-    m = (vector[index] - vector[index - 1]) / (t1 - t0)
-    b = vector[index - 1] - m*t0
-    time = (threshold - b) / m
-    return time
+    x = np.atleast_2d(np.asarray(array, dtype = np.float64))
+    n, m = x.shape
+    rows = np.arange(n)
+
+    # Delayed copy: the fractional part of the delay by linear interpolation, then whole samples
+    res = shift % time_step
+    idel = int(shift / time_step)
+    interp = x.copy()
+    interp[:, 1:] = x[:, 1:] - (x[:, 1:] - x[:, :-1]) / time_step * res
+    delayed = np.roll(interp, idel, axis = 1)
+    delayed[:, :idel] = interp[:, :idel]
+    c = delayed - fraction * x
+
+    # First upward zero crossing after the minimum
+    t = np.arange(m) * time_step
+    imin = c.argmin(axis = 1)
+    i = np.arange(m - 1)
+    candidate = (i[None, :] >= imin[:, None]) & (((c[:, :-1] < 0) & (c[:, 1:] > 0)) | (c[:, :-1] == 0))
+    found = candidate.any(axis = 1)
+    k = candidate.argmax(axis = 1)
+    c0, c1, t0, t1 = c[rows, k], c[rows, np.minimum(k + 1, m - 1)], t[k], t[np.minimum(k + 1, m - 1)]
+    with np.errstate(divide = 'ignore', invalid = 'ignore'):
+        slope = (c1 - c0) / (t1 - t0)
+        crossing = -(c0 - slope * t0) / slope
+    times = np.where(c0 == 0, t0, crossing)
+    times = np.where(found, times, 0.0)
+    times = np.where(imin == m - 1, t[-1], times)
+    return times if np.ndim(array) == 2 else float(times[0])
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
@@ -560,10 +441,7 @@ def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_
     Vectorised across pulses, with zero padding whenever the requested window extends
     beyond the available samples.
 
-    The crossing is found by the anchor rule (as in MLPILEUP, Positronium_singles and
-    PyGeneticGFN): from the first sample above `anchor` times the pulse maximum, back to the
-    last sample at or below `fraction`. Baseline noise that crosses `fraction` but never
-    reaches the anchor level cannot fire it.
+    The crossing is found by the anchor rule (threshold_crossing).
     """
 
     vector = np.asarray(vector)
@@ -579,37 +457,13 @@ def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_
     if num_signals == 0:
         return new_vector, np.empty((0,), dtype = np.int64)
 
-    threshold = fraction
-
-    if not 0 < anchor < 1:
-        raise ValueError(f"`anchor` must be a fraction of the maximum, 0 < anchor < 1 (got {anchor}).")
-
-    # Anchor rule: first sample above max(threshold, anchor * maximum), then back to the last
-    # sample at or below the threshold before it; the crossing is the sample after it.
-    level = np.maximum(threshold, anchor * vector.max(axis = 1))
-    above_anchor = vector > level[:, None]
-    anchor_idx = above_anchor.argmax(axis = 1)
-    samples = np.arange(num_samples)
-    below = (vector <= threshold) & (samples[None, :] < anchor_idx[:, None])
-    first_cross = np.where(below, samples[None, :], -1).max(axis = 1) + 1
-    valid_cross = above_anchor[np.arange(num_signals), anchor_idx]
-
-    # Validate that every signal actually crosses the threshold.
-    if not np.all(valid_cross):
-        missing = np.where(~valid_cross)[0][0]
-        raise IndexError(f"Signal index {missing} never crosses the threshold {threshold}.")
+    # Crossing of each pulse by the anchor rule (threshold_crossing)
+    cross_samples = threshold_crossing(vector, fraction, anchor = anchor)
+    if np.isnan(cross_samples).any():
+        missing = np.flatnonzero(np.isnan(cross_samples))[0]
+        raise IndexError(f"Signal index {missing} has no rising-edge crossing of the threshold {fraction}.")
 
     row_idx = np.arange(num_signals)
-    prev_idx = first_cross - 1
-
-    prev_vals = vector[row_idx, prev_idx]
-    next_vals = vector[row_idx, first_cross]
-
-    # Fractional offset for the precise crossing between the two surrounding samples.
-    with np.errstate(divide = 'ignore', invalid = 'ignore'):
-        frac_offset = (threshold - prev_vals) / (next_vals - prev_vals)
-
-    cross_samples = (first_cross - 1) + frac_offset
     central_index = np.floor(cross_samples).astype(np.int64)
     start = np.maximum(central_index - window_low, 0)
 
@@ -640,34 +494,6 @@ def create_dataloaders(input, target, batch_size = 32, shuffle = True):
   dataset = torch.utils.data.TensorDataset(torch.from_numpy(input).float(), torch.from_numpy(np.expand_dims(target, axis = -1)).float())
   dataloader = torch.utils.data.DataLoader(dataset, batch_size = batch_size, shuffle = shuffle)
   return dataloader
-
-#----------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------
-
-def get_mean_pulse_from_set(pulse_set, channel = 0):
-    """
-    Calculate the mean pulse from a set of pulses using Fourier transforms.
-
-    Parameters:
-    pulse_set (array-like): The input set of pulses. Expected shape is (num_pulses, pulse_length, num_channels).
-    channel (int, optional): The channel of the pulses to use for calculation. Default is 0.
-
-    Returns:
-    array-like: The mean pulse calculated from the set of pulses.
-    """
-    transforms = []
-    
-    for i in range(pulse_set.shape[0]):
-        fourier_transform = np.fft.fft(pulse_set[i, :, channel])
-        transforms.append(fourier_transform)
-    
-    transforms = np.array(transforms, dtype='object')
-    sum_of_transf = np.sum(transforms, axis = 0)
-    reconstructed_signal = np.fft.ifft(sum_of_transf)
-    normalized_reconstructed_signal = reconstructed_signal / np.max(reconstructed_signal)
-    mean_pulse = np.real(normalized_reconstructed_signal)
-  
-    return mean_pulse
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------

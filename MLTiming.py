@@ -1,5 +1,3 @@
-import os
-import sys
 import argparse
 import torch
 
@@ -20,9 +18,8 @@ print(device)
 from functions import (momentos, create_virtual_pairs, edge_level_seen, set_seed,
                        create_dataloaders, normalize, normalize_given_params,
                        extract_signal_window_by_fraction, select_channel)
-from Models import MLP_Torch,  ConvolutionalModel, count_parameters
+from Models import build_model, count_parameters
 from Train_loops import train_loop
-from efficient_kan.src.efficient_kan import KAN
 
 # -------------------------------------------------------------------------
 #---------------------------- LOAD DATA -----------------------------------
@@ -96,24 +93,6 @@ elif model_type in ['CNN','MLPWAVE']:
 # ------------------------------ MODEL ------------------------------------
 # -------------------------------------------------------------------------
 
-if model_type == 'KAN':
-    model = KAN(architecture)
-
-elif model_type == 'MLP':
-    model = MLP_Torch(NM = moments_order, NN = Num_Neurons, STD_INIT = 0.5)
-
-elif model_type == 'CNN':
-    model = ConvolutionalModel(int(before + after))
-
-elif model_type == 'MLPWAVE':
-    model = MLP_Torch(NM = int(before + after), NN = Num_Neurons, STD_INIT = 0.5)
-
-else:
-    raise ValueError(f"Unsupported model_type: {model_type}. This routine is for 'KAN', 'MLP', 'MLPWAVE' and 'CNN' models only.")
-                  
-print(f"Total number of parameters: {count_parameters(model)}")
-optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate)
-
 # Metadata needed to rebuild this model and its preprocessing pipeline at inference time
 metadata = {
     'model_type': model_type,
@@ -128,6 +107,10 @@ metadata = {
     'normalization_params_min': params[0].tolist() if params is not None else None,
     'normalization_params_max': params[1].tolist() if params is not None else None,
 }
+
+model = build_model(metadata)
+print(f"Total number of parameters: {count_parameters(model)}")
+optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate)
 
 # Execute train loop
 val = train_loop(model, optimizer, train_loader, val_loader, EPOCHS = epochs, model_name = model_name, model_dir = MODEL_SAVE_DIR, figure_dir = FIGURES_DIR, model_type = model_type, metadata = metadata)

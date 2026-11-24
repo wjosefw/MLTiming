@@ -72,6 +72,12 @@ conda env create -f environment.yml
 # Activate the environment
 conda activate DT_env
 ```
+
+A GPU speeds up training but is not required. KAN models need [efficient-kan](https://github.com/Blealtan/efficient-kan) cloned into the repository root (the other models do not):
+
+```bash
+git clone https://github.com/Blealtan/efficient-kan efficient_kan
+```
 ## 📑 Repository Table of Contents 
 
 1. Trained Models
