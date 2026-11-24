@@ -58,15 +58,15 @@ def train_loop(
     *,
     metadata: dict
 ) -> Union[
-    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
-    Tuple[np.ndarray, np.ndarray, np.ndarray]
+    Tuple[np.ndarray, np.ndarray],
+    np.ndarray
 ]:
     """
     Training loop for detector convolutional or alternative models with optional
     test-time inference.
 
-    Behavior: - If test_tensor is provided: returns (train_loss, val_loss, test_preds, val_predictions).
-    - If test_tensor is None: returns (train_loss, val_loss, val_predictions).
+    Returns (numpy): with test_tensor, (test_preds (EPOCHS, N_test), val_predictions (EPOCHS, N_val, 2));
+    without it, val_predictions only. The loss curves are saved to figure_dir as {model_name}_loss_plot.png.
     """
     if metadata is None:
         raise ValueError(
