@@ -43,8 +43,8 @@ def predict(checkpoint_path, pulses):
         metadata = json.load(f)
 
     time_step = metadata['time_step_ns']
-    crops, delays = extract_signal_window_by_fraction(pulses, time_step, fraction = metadata['crossing_threshold'],
-                                                      window_low = metadata['before_samples'], window_high = metadata['after_samples'])
+    crops, edge = extract_signal_window_by_fraction(pulses, time_step, fraction = metadata['crossing_threshold'],
+                                                    window_low = metadata['before_samples'], window_high = metadata['after_samples'])
 
     model = build_model(metadata)
     model.load_state_dict(torch.load(checkpoint_path, weights_only = True))
@@ -61,7 +61,8 @@ def predict(checkpoint_path, pulses):
             moments = normalize_given_params(moments, params, channel = 0, method = metadata['normalization_method'])
             pred = model(torch.tensor(moments).float())
 
-    return np.squeeze(pred.numpy()) - time_step * delays
+    # Back on the record: the network's time is up to a constant of its own, so the edge sample is enough
+    return np.squeeze(pred.numpy()) + time_step * edge
 
 # -------------------------------------------------------------------------
 # ------------------------------ RESULTS ----------------------------------

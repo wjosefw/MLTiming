@@ -282,23 +282,25 @@ def normalize_given_params(data, params, channel=0, method='standardization'):
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------
 
-def create_virtual_pairs(pulses, starts, window, time_step, delay_time = 1):
+def create_virtual_pairs(pulses, edges, before, after, time_step, delay_time = 1):
     """Virtual coincidence pairs for pairwise training, cut from the full waveforms.
 
     Each pair holds two copies of the same pulse, each delayed by its own random whole number of samples (uniform in
     0..delay_time ns, rounded to the sampling grid); the label is the difference of the two delays, d0 - d1 (ns).
-    The copies are cut from the full waveform at the crop start, so the samples that move into the crop are the
-    real ones that precede it. Pulses arrive at random sub-sample phases already, so whole-sample delays need no
+    The copies are cut from the full waveform with the crop of extract_signal_window_by_fraction (`before` samples
+    before the edge sample, `after` from it on), so the samples that move into the crop are the real ones that
+    precede it. Pulses arrive at random sub-sample phases already, so whole-sample delays need no
     interpolation. Samples outside the record are 0.
 
-    pulses: full waveforms (N, M); starts: crop start of each pulse (N,), i.e. minus the delays returned by
-    extract_signal_window_by_fraction; window: crop length (before + after).
-    Returns pairs (N, window, 2) float32 and labels (N,) float32."""
+    pulses: full waveforms (N, M); edges: edge sample of each pulse (N,), as returned by
+    extract_signal_window_by_fraction; before, after: the crop, in samples.
+    Returns pairs (N, before + after, 2) float32 and labels (N,) float32."""
 
     pulses = np.asarray(pulses, dtype = np.float32)
     n, m = pulses.shape
     shifts = np.rint(np.random.uniform(0, delay_time, size = (n, 2)) / time_step).astype(np.int64)
-    pos = np.asarray(starts, dtype = np.int64)[:, None, None] + np.arange(window)[None, :, None] - shifts[:, None, :]
+    starts = np.asarray(edges, dtype = np.int64) - before
+    pos = starts[:, None, None] + np.arange(before + after)[None, :, None] - shifts[:, None, :]
     inside = (pos >= 0) & (pos < m)
     pairs = np.where(inside, pulses[np.arange(n)[:, None, None], np.clip(pos, 0, m - 1)], 0).astype(np.float32)
     labels = ((shifts[:, 0] - shifts[:, 1]) * time_step).astype(np.float32)
@@ -436,13 +438,18 @@ def Calculate_CFD(array, fraction, shift, time_step):
 
 def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_low = 140, window_high = 10, anchor = 0.5):
     """
-    Extracts a windowed segment of a signal around a threshold crossing point defined by a fraction
-    of the maximum signal amplitude. Also computes delay indices relative to the crossing point.
+    Crops each pulse around its rising edge.
 
-    Vectorised across pulses, with zero padding whenever the requested window extends
-    beyond the available samples.
+    The reference of each pulse is its edge sample: the last sample at or below `fraction` of the
+    maximum before the rising edge crosses it (anchor rule, threshold_crossing). The crop keeps
+    `window_low` samples before the edge sample and `window_high` from it on, so the edge sample is
+    always at crop index `window_low`; samples beyond the record are 0.
 
-    The crossing is found by the anchor rule (threshold_crossing).
+    The network is trained on time differences only, so its output is a time up to a constant of its
+    own. t + time_step * edge puts the output t of a crop back on the record (up to that constant).
+
+    vector: pulses (N, M). Returns crops (N, window_low + window_high) float32 and the edge sample
+    of each pulse (N,) int64.
     """
 
     vector = np.asarray(vector)
@@ -451,42 +458,22 @@ def extract_signal_window_by_fraction(vector, time_step, fraction = 0.1, window_
 
     num_signals, num_samples = vector.shape
     window_low = int(window_low)
-    window_high = int(window_high)
-    window_size = window_low + window_high
+    window_size = window_low + int(window_high)
 
-    new_vector = np.zeros((num_signals, window_size), dtype = np.float32)
-    if num_signals == 0:
-        return new_vector, np.empty((0,), dtype = np.int64)
-
-    # Crossing of each pulse by the anchor rule (threshold_crossing)
+    # Edge sample of each pulse: the last one at or below the threshold. threshold_crossing interpolates
+    # between it and the next one, a fraction in [0, 1), so its floor is that sample.
     cross_samples = threshold_crossing(vector, fraction, anchor = anchor)
     if np.isnan(cross_samples).any():
         missing = np.flatnonzero(np.isnan(cross_samples))[0]
         raise IndexError(f"Signal index {missing} has no rising-edge crossing of the threshold {fraction}.")
+    edge = np.floor(cross_samples).astype(np.int64)
 
-    row_idx = np.arange(num_signals)
-    central_index = np.floor(cross_samples).astype(np.int64)
-    start = np.maximum(central_index - window_low, 0)
-
-    # Determine how many samples are available for each signal when the window spills over the edges.
-    lengths = np.minimum(window_size, np.maximum(num_samples - start, 0))
-
-    # Gather the windowed samples via advanced indexing; clamp indices to stay in-bounds.
-    offsets = np.arange(window_size)
-    indices = start[:, None] + offsets
-    if num_samples == 0:
-        gathered = np.zeros((num_signals, window_size), dtype = vector.dtype)
-    else:
-        clipped = np.clip(indices, 0, num_samples - 1)
-        gathered = vector[row_idx[:, None], clipped]
-
-    mask = offsets < lengths[:, None]
-    if gathered.dtype != np.float32:
-        gathered = gathered.astype(np.float32, copy = False)
-    new_vector[mask] = gathered[mask]
-
-    delays = (-start).astype(np.int64, copy = False)
-    return new_vector, delays
+    # Crop from window_low samples before the edge sample, zero outside the record
+    pos = (edge - window_low)[:, None] + np.arange(window_size)[None, :]
+    inside = (pos >= 0) & (pos < num_samples)
+    gathered = vector[np.arange(num_signals)[:, None], np.clip(pos, 0, max(num_samples - 1, 0))]
+    crops = np.where(inside, gathered, 0).astype(np.float32)
+    return crops, edge
 
 #----------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------

@@ -52,13 +52,13 @@ set_seed(seed)                    # Fix seeds
 # -------------------- TRAIN/VALIDATION/TEST SET --------------------------
 # -------------------------------------------------------------------------
 
-# Delays
-moved_pulses_train, delays_train = extract_signal_window_by_fraction(train_data, time_step, fraction = threshold, window_low = before, window_high = after)
-moved_pulses_val, delays_val  = extract_signal_window_by_fraction(validation_data, time_step, fraction = threshold, window_low = before, window_high = after)
+# Edge sample of each pulse: the last one at or below the threshold
+_, edge_train = extract_signal_window_by_fraction(train_data, time_step, fraction = threshold, window_low = before, window_high = after)
+_, edge_val = extract_signal_window_by_fraction(validation_data, time_step, fraction = threshold, window_low = before, window_high = after)
 
 # Virtual pairs: two copies of each pulse, each delayed by a random whole number of samples, cut from the full waveform
-train, REF_train = create_virtual_pairs(train_data, -delays_train, before + after, time_step, delay_time = delay_time)
-val, REF_val = create_virtual_pairs(validation_data, -delays_val, before + after, time_step, delay_time = delay_time)
+train, REF_train = create_virtual_pairs(train_data, edge_train, before, after, time_step, delay_time = delay_time)
+val, REF_val = create_virtual_pairs(validation_data, edge_val, before, after, time_step, delay_time = delay_time)
 
 level = edge_level_seen(train_data, time_step, after, delay_time, fraction = threshold)
 print(f'Window {before} + {after} samples, delays up to {delay_time} ns: the network sees the rising edge up to '
